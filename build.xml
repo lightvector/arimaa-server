@@ -1,0 +1,45 @@
+<project name="Arimaa server" default="run" basedir=".">
+  <description>
+    Build file for all Arimaa server programming tasks.
+  </description>
+
+  <property name="src" location="src"/>
+  <property name="build" location="target/classes"/>
+  <property name="lib" location="lib"/>
+
+  <!-- The classpath used for compiling source files. -->
+  <path id="classpath">
+    <fileset dir="${lib}">
+      <include name="scala/*.jar"/>
+    </fileset>
+    <pathelement path="${build}"/>
+  </path>
+
+  <target name="clean">
+    <delete dir="${build}"/>
+  </target>
+
+  <target name="init">
+    <mkdir dir="${build}"/>
+
+    <!-- defines the scala and scalac ant tasks -->
+    <taskdef resource="scala/tools/ant/antlib.xml">
+      <classpath refid="classpath"/>
+    </taskdef>
+  </target>
+
+  <target name="compile" depends="init">
+    <mkdir dir="${build}"/>
+
+    <scalac srcdir="${src}" destdir="${build}"
+            classpathref="classpath" force="changed">
+      <include name="**/*.scala"/>
+    </scalac>
+  </target>
+
+  <target name="run" depends="compile">
+    <java classname="HelloWorld">
+      <classpath refid="classpath"/>
+    </java>
+  </target>
+</project>
