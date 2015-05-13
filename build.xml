@@ -15,11 +15,11 @@
     <pathelement path="${build}"/>
   </path>
 
-  <target name="clean">
+  <target name="clean" description="Delete the build directory.">
     <delete dir="${build}"/>
   </target>
 
-  <target name="init">
+  <target name="init" description="Perform initialization tasks.">
     <mkdir dir="${build}"/>
 
     <!-- defines the scala and scalac ant tasks -->
@@ -28,7 +28,7 @@
     </taskdef>
   </target>
 
-  <target name="compile" depends="init">
+  <target name="compile" depends="init" description="Compile the source files.">
     <mkdir dir="${build}"/>
 
     <scalac srcdir="${src}" destdir="${build}"
@@ -37,7 +37,7 @@
     </scalac>
   </target>
 
-  <target name="run" depends="compile">
+  <target name="run" depends="compile" description="Runs the server.">
     <java classname="HelloWorld">
       <classpath refid="classpath"/>
     </java>
