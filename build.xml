@@ -4,15 +4,24 @@
   </description>
 
   <property name="src" location="src"/>
+  <property name="src-test" location="test/src"/>
   <property name="build" location="target/classes"/>
   <property name="lib" location="lib"/>
 
   <!-- The classpath used for compiling source files. -->
-  <path id="classpath">
+  <path id="cp">
     <fileset dir="${lib}">
       <include name="scala/*.jar"/>
     </fileset>
     <pathelement path="${build}"/>
+  </path>
+
+  <!-- The classpath used for compiling test files. -->
+  <path id="cp-tests">
+    <path refid="cp"/>
+    <fileset dir="${lib}">
+      <include name="junit/*.jar"/>
+    </fileset>
   </path>
 
   <target name="clean" description="Delete the build directory.">
@@ -24,7 +33,7 @@
 
     <!-- defines the scala and scalac ant tasks -->
     <taskdef resource="scala/tools/ant/antlib.xml">
-      <classpath refid="classpath"/>
+      <classpath refid="cp"/>
     </taskdef>
   </target>
 
@@ -32,14 +41,34 @@
     <mkdir dir="${build}"/>
 
     <scalac srcdir="${src}" destdir="${build}"
-            classpathref="classpath" force="changed">
+            classpathref="cp" force="changed">
       <include name="**/*.scala"/>
     </scalac>
   </target>
 
-  <target name="run" depends="compile" description="Runs the server.">
-    <java classname="HelloWorld">
-      <classpath refid="classpath"/>
+  <target name="compile-tests" depends="compile" description="Compile the test files.">
+    <scalac srcdir="${src-test}" destdir="${build}"
+            classpathref="cp-tests" force="changed">
+      <include name="**/*.scala"/>
+    </scalac>
+  </target>
+
+  <target name="run" depends="compile" description="Run the server.">
+    <java classname="Hello">
+      <classpath refid="cp"/>
     </java>
+  </target>
+
+  <target name="run-tests" depends="compile-tests" description="Run the unit tests.">
+    <!-- TODO(mattj256): use scalatest instead? -->
+    <junit haltonerror="true" haltonfailure="true">
+      <classpath refid="cp-tests" />
+      <batchtest>
+        <fileset dir="${build}">
+          <include name="**/*Test*.class" />
+        </fileset>
+      </batchtest>
+      <formatter type="brief" usefile="false"/>
+    </junit>
   </target>
 </project>
