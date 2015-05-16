@@ -21,6 +21,7 @@
     <path refid="cp"/>
     <fileset dir="${lib}">
       <include name="junit/*.jar"/>
+      <include name="scalatest/*.jar"/>
     </fileset>
   </path>
 
@@ -34,6 +35,11 @@
     <!-- defines the scala and scalac ant tasks -->
     <taskdef resource="scala/tools/ant/antlib.xml">
       <classpath refid="cp"/>
+    </taskdef>
+
+    <!-- defines the scalatest ant task -->
+    <taskdef name="scalatest" classname="org.scalatest.tools.ScalaTestAntTask">
+      <classpath refid="cp-tests"/>
     </taskdef>
   </target>
 
@@ -60,7 +66,6 @@
   </target>
 
   <target name="run-tests" depends="compile-tests" description="Run the unit tests.">
-    <!-- TODO(mattj256): use scalatest instead? -->
     <junit haltonerror="true" haltonfailure="true">
       <classpath refid="cp-tests" />
       <batchtest>
@@ -70,5 +75,9 @@
       </batchtest>
       <formatter type="brief" usefile="false"/>
     </junit>
+    
+    <scalatest>
+      <suite classname="ExampleSpec"/>
+    </scalatest>
   </target>
 </project>
