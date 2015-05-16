@@ -3,15 +3,28 @@
     Build file for all Arimaa server programming tasks.
   </description>
 
-  <property name="src" location="src"/>
-  <property name="src-test" location="test/src"/>
-  <property name="build" location="target/classes"/>
+  <property name="src-scala" location="src/scala"/>
+  <property name="src-test" location="src/test"/>
+  <property name="src-web" value="src/webapp" />
+  <property name="web-xml" value="src/webapp/WEB-INF/web.xml" />
   <property name="lib" location="lib"/>
+
+  <property name="target" location="target"/>
+  <property name="build" location="target/classes"/>
+  <property name="build-lib" location="target/lib/"/>
+  <property name="build-war" value="target/arimaa-server.war"/>
+
+  <property name="builder" value="ArimaaServerTeam" />
+  <tstamp prefix="build-info">
+    <format property="current-date" pattern="d-MMMM-yyyy" locale="en" />
+    <format property="current-time" pattern="hh:mm:ss a z" locale="en" />
+  </tstamp>
 
   <!-- The classpath used for compiling source files. -->
   <path id="cp">
     <fileset dir="${lib}">
       <include name="scala/*.jar"/>
+      <include name="scalatra/*.jar"/>
     </fileset>
     <pathelement path="${build}"/>
   </path>
@@ -27,10 +40,13 @@
 
   <target name="clean" description="Delete the build directory.">
     <delete dir="${build}"/>
+    <delete dir="${build-lib}"/>
+    <delete dir="${build-war}"/>
   </target>
 
   <target name="init" description="Perform initialization tasks.">
     <mkdir dir="${build}"/>
+    <mkdir dir="${build-lib}"/>
 
     <!-- defines the scala and scalac ant tasks -->
     <taskdef resource="scala/tools/ant/antlib.xml">
@@ -46,7 +62,7 @@
   <target name="compile" depends="init" description="Compile the source files.">
     <mkdir dir="${build}"/>
 
-    <scalac srcdir="${src}" destdir="${build}"
+    <scalac srcdir="${src-scala}" destdir="${build}"
             classpathref="cp" force="changed">
       <include name="**/*.scala"/>
     </scalac>
@@ -57,6 +73,29 @@
             classpathref="cp-tests" force="changed">
       <include name="**/*.scala"/>
     </scalac>
+  </target>
+
+  <target name="package" depends="compile" description="Package server into WAR file">
+    <!-- We copy libs over in order to flatten them for inclusion in war file. -->
+    <copy todir="${build-lib}" flatten="true" includeEmptyDirs="false">
+      <fileset dir="${lib}"/>
+    </copy>
+    <war warfile="${build-war}" webxml="${web-xml}">
+      <classes dir="${build}" />
+      <lib dir="${build-lib}">
+	<include name="**/*.jar"/>
+      </lib>
+      <fileset dir="${src-web}">
+	<!-- Need to exclude it since webxml is an attribute of the war tag above -->
+	<exclude name="WEB-INF/web.xml" />
+      </fileset>
+      <!-- <zipfileset dir="props" prefix="WEB-INF/classes/props"/> -->
+      <manifest>
+	<attribute name="Built-By" value="${builder}" />
+	<attribute name="Built-On" value="${build-info.current-date}" />
+	<attribute name="Built-At" value="${build-info.current-time}" />
+      </manifest>
+    </war>
   </target>
 
   <target name="run" depends="compile" description="Run the server.">
