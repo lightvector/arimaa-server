@@ -1,4 +1,4 @@
-package com.dreamsmadevisible.arimaa.server
+package org.playarimaa.server
 
 object Piece extends Enumeration {
 
