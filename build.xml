@@ -6,11 +6,11 @@
   <property name="src-scala" location="src/scala"/>
   <property name="src-test" location="src/test"/>
   <property name="src-web" value="src/webapp" />
-  <property name="web-xml" value="src/webapp/WEB-INF/web.xml" />
-  <property name="lib" location="lib"/>
+  <property name="lib" location="lib/main"/>
+  <property name="lib-test" location="lib/test"/>
 
-  <property name="target" location="target"/>
-  <property name="build" location="target/classes"/>
+  <property name="build" location="target"/>
+  <property name="build-classes" location="target/classes"/>
   <property name="build-lib" location="target/lib/"/>
   <property name="build-war" value="target/arimaa-server.war"/>
 
@@ -26,13 +26,13 @@
       <include name="scala/*.jar"/>
       <include name="scalatra/*.jar"/>
     </fileset>
-    <pathelement path="${build}"/>
+    <pathelement path="${build-classes}"/>
   </path>
 
   <!-- The classpath used for compiling test files. -->
   <path id="cp-tests">
     <path refid="cp"/>
-    <fileset dir="${lib}">
+    <fileset dir="${lib-test}">
       <include name="junit/*.jar"/>
       <include name="scalatest/*.jar"/>
     </fileset>
@@ -40,12 +40,10 @@
 
   <target name="clean" description="Delete the build directory.">
     <delete dir="${build}"/>
-    <delete dir="${build-lib}"/>
-    <delete dir="${build-war}"/>
   </target>
 
   <target name="init" description="Perform initialization tasks.">
-    <mkdir dir="${build}"/>
+    <mkdir dir="${build-classes}"/>
     <mkdir dir="${build-lib}"/>
 
     <!-- defines the scala and scalac ant tasks -->
@@ -60,35 +58,33 @@
   </target>
 
   <target name="compile" depends="init" description="Compile the source files.">
-    <mkdir dir="${build}"/>
-
-    <scalac srcdir="${src-scala}" destdir="${build}"
+    <scalac srcdir="${src-scala}" destdir="${build-classes}"
             classpathref="cp" force="changed">
       <include name="**/*.scala"/>
     </scalac>
   </target>
 
   <target name="compile-tests" depends="compile" description="Compile the test files.">
-    <scalac srcdir="${src-test}" destdir="${build}"
+    <scalac srcdir="${src-test}" destdir="${build-classes}"
             classpathref="cp-tests" force="changed">
       <include name="**/*.scala"/>
     </scalac>
   </target>
 
-  <target name="package" depends="compile" description="Package server into WAR file">
+  <target name="package-noclean" depends="compile" description="Package server into WAR file">
+    <!-- Delete and recreate to clean out old libraries, since <copy> doesn't do that -->
+    <delete dir="${build-lib}"/>
+    <mkdir dir="${build-lib}"/>
     <!-- We copy libs over in order to flatten them for inclusion in war file. -->
     <copy todir="${build-lib}" flatten="true" includeEmptyDirs="false">
       <fileset dir="${lib}"/>
     </copy>
-    <war warfile="${build-war}" webxml="${web-xml}">
-      <classes dir="${build}" />
+    <war warfile="${build-war}" needxmlfile="false">
+      <classes dir="${build-classes}" />
       <lib dir="${build-lib}">
 	<include name="**/*.jar"/>
       </lib>
-      <fileset dir="${src-web}">
-	<!-- Need to exclude it since webxml is an attribute of the war tag above -->
-	<exclude name="WEB-INF/web.xml" />
-      </fileset>
+      <fileset dir="${src-web}"/>
       <!-- <zipfileset dir="props" prefix="WEB-INF/classes/props"/> -->
       <manifest>
 	<attribute name="Built-By" value="${builder}" />
@@ -97,6 +93,9 @@
       </manifest>
     </war>
   </target>
+
+  <target name="package" depends="clean,package-noclean"
+          description="Package server into WAR file with a fresh compile"/>
 
   <target name="run" depends="compile" description="Run the server.">
     <java classname="Hello">
@@ -108,7 +107,7 @@
     <junit haltonerror="true" haltonfailure="true">
       <classpath refid="cp-tests" />
       <batchtest>
-        <fileset dir="${build}">
+        <fileset dir="${build-classes}">
           <include name="**/*Test*.class" />
         </fileset>
       </batchtest>
