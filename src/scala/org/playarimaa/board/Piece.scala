@@ -1,4 +1,4 @@
-package org.playarimaa.server
+package org.playarimaa.board
 
 object Piece extends Enumeration {
 
