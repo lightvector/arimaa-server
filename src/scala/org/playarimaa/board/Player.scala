@@ -21,4 +21,3 @@ object Player {
 }
 case object GOLD extends Player {val char = 'g'}
 case object SILV extends Player {val char = 's'}
-
