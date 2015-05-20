@@ -116,6 +116,7 @@
     
     <scalatest>
       <suite classname="ExampleSpec"/>
+      <suite classname="PieceSpec"/>
     </scalatest>
   </target>
 </project>

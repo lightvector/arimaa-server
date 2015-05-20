@@ -1,25 +1,31 @@
 package org.playarimaa.board
+import org.playarimaa.util._
 
-object Piece extends Enumeration {
+case class Piece(owner: Player, pieceType: PieceType) {
+  def toChar: Char =
+    this.owner match {
+      case GOLD => this.pieceType.lowercaseChar.toUpper
+      case SILV => this.pieceType.lowercaseChar
+    }
+}
 
-  case class PieceVal(strength: Int, abbreviation: Char) extends Val
+object Piece {
 
-  val RABBIT_GOLD = PieceVal(1, 'R')
-  val CAT_GOLD = PieceVal(2, 'C')
-  val DOG_GOLD = PieceVal(3, 'D')
-  val HORSE_GOLD = PieceVal(4, 'H')
-  val CAMEL_GOLD = PieceVal(5, 'M')
-  val ELEPHANT_GOLD = PieceVal(6, 'E')
+  val values: List[Piece] =
+    Player.values.flatMap( p =>
+      PieceType.values.map( pt =>
+        Piece(p,pt)
+      )
+    )
 
-  val RABBIT_SILVER = PieceVal(1, 'r')
-  val CAT_SILVER = PieceVal(2, 'c')
-  val DOG_SILVER = PieceVal(3, 'd')
-  val HORSE_SILVER = PieceVal(4, 'h')
-  val CAMEL_SILVER = PieceVal(5, 'm')
-  val ELEPHANT_SILVER = PieceVal(6, 'e')
+  def ofChar(c: Char): Result[Piece] =
+    PieceType.ofChar(c).map { pt =>
+      val player = if(c.isUpper) GOLD else SILV
+      Piece(player,pt)
+    }
 
   /** For testing only. */
   def main(args: Array[String]) {
-    Piece.values foreach (s => println(s.asInstanceOf[PieceVal].abbreviation))
+    Piece.values foreach ((s: Piece) => println(s.toChar))
   }
 }
