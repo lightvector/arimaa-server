@@ -71,7 +71,7 @@
     </scalac>
   </target>
 
-  <target name="package-noclean" depends="compile" description="Package server into WAR file">
+  <target name="package-noclean" depends="compile">
     <!-- Delete and recreate to clean out old libraries, since <copy> doesn't do that -->
     <delete dir="${build-lib}"/>
     <mkdir dir="${build-lib}"/>
@@ -95,7 +95,7 @@
   </target>
 
   <target name="package" depends="clean,package-noclean"
-          description="Package server into WAR file with a fresh compile"/>
+          description="Package server into WAR file."/>
 
   <target name="run" depends="compile" description="Run the server.">
     <java classname="Hello">
