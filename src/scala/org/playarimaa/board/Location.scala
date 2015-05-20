@@ -16,6 +16,12 @@ case class Location (x: Int, y: Int) {
 
   def apply(dir: Direction) =
     Location(x + dir.offset._1, y + dir.offset._2)
+
+  def existsAdjacent( f:(Location => Boolean) ):Boolean =
+    f(this(SOUTH)) || f(this(WEST)) || f(this(EAST)) || f(this(NORTH))
+
+  def forAllAdjacent( f:(Location => Boolean) ):Boolean =
+    f(this(SOUTH)) && f(this(WEST)) && f(this(EAST)) && f(this(NORTH))
 }
 
 object Location {
