@@ -3,13 +3,13 @@ import org.playarimaa.util._
 
 case class Location (x: Int, y: Int) {
 
-  def isOutOfBounds: Boolean =
+  def isOffBoard: Boolean =
     x < 0 || x > 7 || y < 0 || y > 7
-  def isInBounds: Boolean =
-    !this.isOutOfBounds
+  def isOnBoard: Boolean =
+    !this.isOffBoard
 
   override def toString: String =
-    if(this.isOutOfBounds)
+    if(this.isOffBoard)
       "OOB" + super.toString
     else
       "" + ('a' + this.x).toChar + this.y
