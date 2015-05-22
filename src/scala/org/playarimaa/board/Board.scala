@@ -26,25 +26,27 @@ class Board(
       case Empty | OffBoard => false
       case HasPiece(piece) => piece.owner == p
     }
-
-  //True if there are pieces at loc0 and loc1 owned by opposite players where loc1 is bigger than loc0
-  def isDominatedBy(loc0: Location, loc1: Location): Boolean =
-    this(loc0) match {
+  def isStrongerThan(loc: Location, pt: PieceType): Boolean =
+    this(loc) match {
       case Empty | OffBoard => false
-      case HasPiece(piece0) =>
-        this(loc1) match {
-          case Empty | OffBoard => false
-          case HasPiece(piece1) =>
-            piece0.owner != piece1.owner && piece0.pieceType < piece1.pieceType
-        }
+      case HasPiece(piece) => piece.pieceType > pt
     }
+
+  /** Returns true if there is a piece owned by [p] adjacent to [loc] */
+  def isGuardedBy(loc: Location, p: Player): Boolean =
+    loc.existsAdjacent(adj => isOwnedBy(adj,p))
+
+  /** Returns true if there is a piece owned by [p] stronger than [pt] adjacent to [loc] */
+  def isGuardedByStrongerThan(loc: Location, p: Player, pt: PieceType): Boolean =
+    loc.existsAdjacent(adj => isOwnedBy(adj,p) && isStrongerThan(adj,pt))
+
 
   def isFrozen(loc: Location): Boolean =
     this(loc) match {
       case Empty | OffBoard => false
       case HasPiece(piece) => {
-        loc.existsAdjacent(adj => isDominatedBy(loc,adj)) &&
-        loc.forAllAdjacent(adj => !isOwnedBy(adj,piece.owner))
+        isGuardedByStrongerThan(loc, piece.owner.flip, piece.pieceType) &&
+        !isGuardedBy(loc, piece.owner)
       }
     }
 

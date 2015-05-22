@@ -1,16 +1,18 @@
 package org.playarimaa.board
 import org.playarimaa.util._
 
-sealed trait Player {val char: Char}
+sealed trait Player {
+  val char: Char
 
-object Player {
-  val values = List(GOLD,SILV)
-
-  def flip(p: Player): Player =
-    p match {
+  def flip: Player =
+    this match {
       case GOLD => SILV
       case SILV => GOLD
     }
+}
+
+object Player {
+  val values = List(GOLD,SILV)
 
   def ofChar(c: Char): Result[Player] =
     c match {
