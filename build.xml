@@ -108,14 +108,14 @@
       <classpath refid="cp-tests" />
       <batchtest>
         <fileset dir="${build-classes}">
-          <include name="**/*Test*.class" />
+          <include name="**/*JTests.class" />
         </fileset>
       </batchtest>
       <formatter type="brief" usefile="false"/>
     </junit>
-    
+
     <scalatest>
-      <suite classname="ExampleSpec"/>
+      <suite classname="BoardTests"/>
     </scalatest>
   </target>
 </project>

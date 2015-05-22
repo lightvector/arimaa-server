@@ -1,3 +1,4 @@
+package org.playarimaa.server
 import org.scalatra._
 import scalate.ScalateSupport
 
