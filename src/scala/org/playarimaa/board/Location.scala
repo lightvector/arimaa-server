@@ -3,13 +3,8 @@ import org.playarimaa.util._
 
 case class Location (x: Int, y: Int) {
 
-  def isOffBoard: Boolean =
-    x < 0 || x > 7 || y < 0 || y > 7
-  def isOnBoard: Boolean =
-    !this.isOffBoard
-
   override def toString: String =
-    if(this.isOffBoard)
+    if(Board.isOutOfBounds(this))
       "OOB" + super.toString
     else
       "" + ('a' + this.x).toChar + this.y
@@ -29,10 +24,11 @@ object Location {
   def ofString(s: String): Result[Location] = {
     def failure = Error("Error parsing location string: " + s)
     if(s.length != 2
-      || s(0) < 'a'
-      || s(0) > 'h'
+      || s(0) <  'a'
+      || s(0) >= ('a' + Board.SIZE)
       || s(1) < '1'
-      || s(1) > '8')
+      || s(1) >= ('1' + Board.SIZE)
+    )
       return failure
 
     val x = s(0) - 'a'

@@ -12,7 +12,7 @@ class Board(
   val stepsLeft: Int
 ){
   def apply(loc: Location): LocContents = {
-    if(loc.isOffBoard)
+    if(Board.isOutOfBounds(loc))
       OffBoard
     else
       pieces.get(loc) match {
@@ -51,5 +51,15 @@ class Board(
 }
 
 object Board {
+  val SIZE = 8
 
+  val TRAPS = List(
+    Location(2,2),
+    Location(5,2),
+    Location(2,5),
+    Location(5,5)
+  )
+
+  def isOutOfBounds(loc: Location): Boolean =
+    loc.x < 0 || loc.x >= SIZE || loc.y < 0 || loc.y >= SIZE
 }
