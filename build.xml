@@ -113,9 +113,8 @@
       </batchtest>
       <formatter type="brief" usefile="false"/>
     </junit>
-    
+
     <scalatest>
-      <suite classname="ExampleSpec"/>
       <suite classname="PieceSpec"/>
     </scalatest>
   </target>
