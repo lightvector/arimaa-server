@@ -1,7 +1,13 @@
 package org.playarimaa.board
 import org.playarimaa.util._
 
-sealed trait Direction {val offset: (Int,Int); val char: Char;}
+sealed trait Direction {
+  val offset: (Int,Int)
+  val char: Char
+
+  override def toString: String =
+    char.toString
+}
 
 object Direction {
   val values = List(SOUTH,WEST,EAST,NORTH)
