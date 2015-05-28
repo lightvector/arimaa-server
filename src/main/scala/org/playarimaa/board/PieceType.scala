@@ -2,9 +2,11 @@ package org.playarimaa.board
 import org.playarimaa.util._
 
 sealed trait PieceType extends Ordered[PieceType] {
-  def strength: Int
-  def lowercaseChar: Char
-  def compare(that: PieceType): Int = this.strength.compare(that.strength)
+  val strength: Int
+  val lowercaseChar: Char
+
+  def compare(that: PieceType): Int =
+    this.strength.compare(that.strength)
 }
 
 object PieceType {
