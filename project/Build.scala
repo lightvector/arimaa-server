@@ -20,8 +20,7 @@ object ArimaaServerBuild extends Build {
       ),
 
       //TODO(lightvector): Is this concerning? This is a dependency of scalatra-json, and I guess whoever owns this library
-      //messed up when uploading things and updating the published hash? (either that or I got a bad/hacked version of this library
-    )
+      //messed up when uploading things and updating the published hash? (either that or I got a bad/hacked version of this library)
       //Working around error in sbt:
       //[warn] problem while downloading module descriptor:
       //https://repo1.maven.org/maven2/com/thoughtworks/paranamer/paranamer/2.7/paranamer-2.7.pom:
