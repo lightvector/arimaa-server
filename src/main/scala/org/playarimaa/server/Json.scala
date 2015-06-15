@@ -1,39 +1,56 @@
 package org.playarimaa.server
 import scala.util.Try
 import scala.util.{Success, Failure}
-import org.json4s.{DefaultFormats, Formats, JValue, JField, JString, JObject}
+import org.json4s.{DefaultFormats, Formats, CustomSerializer}
+import org.json4s.{JValue, JField, JString, JObject, JInt, JDouble, JBool}
 import org.json4s.jackson.JsonMethods
 import org.json4s.jackson.Serialization
 
 object Json {
-  protected implicit lazy val jsonFormats: Formats = DefaultFormats
-  def read[T](jsonString: String)(implicit mf: Manifest[T]): Try[T] = {
-    Try(JsonMethods.parse(jsonString).extract[T](jsonFormats,mf))
-  }
-  def extract[T](jValue: JValue)(implicit mf: Manifest[T]): Try[T] = {
-    Try(jValue.extract[T](jsonFormats,mf))
-  }
-  def write(src: AnyRef): String = {
-    implicit val formats = Serialization.formats(org.json4s.NoTypeHints)
-    Serialization.write(src)
+  protected lazy val defaultFormats: Formats = DefaultFormats
+  protected lazy val plainFormats = Serialization.formats(org.json4s.NoTypeHints)
+  protected lazy val stringFormats = {
+    Serialization.formats(org.json4s.NoTypeHints) +
+    new CustomSerializers.IntSerializer() +
+    new CustomSerializers.DoubleSerializer() +
+    new CustomSerializers.BooleanSerializer()
   }
 
-  def mapToJson(map: Map[String,String]): JValue = {
+  def read[T](jsonString: String)(implicit mf: Manifest[T]): T = {
+    JsonMethods.parse(jsonString).extract[T](defaultFormats,mf)
+  }
+  def extract[T](jValue: JValue)(implicit mf: Manifest[T]): T = {
+    jValue.extract[T](defaultFormats,mf)
+  }
+  def write(src: AnyRef): String = {
+    Serialization.write(src)(plainFormats)
+  }
+
+  def readFromMap[T](map: Map[String,String])(implicit mf: Manifest[T]): T = {
     val fieldList = map.map {case (k,v) => JField(k, JString(v)) }(collection.breakOut) : List[JField]
-    JObject(fieldList)
+    JObject(fieldList).extract[T](stringFormats,mf)
   }
 }
 
-case class SimpleError(error: String)
+object CustomSerializers {
+  class IntSerializer extends CustomSerializer[Int](format => ({
+    case JInt(x) => x.toInt
+    case JString(x) => x.toInt
+  },{
+    case x: Int => JInt(x)
+  }))
 
-object JsonUtils {
-  //Adds a [toJsonString] function to the scala built-in [Try] class
-  implicit class TryWithJson[T <: AnyRef](result:Try[T]) {
-    def toJsonString[T]: String = {
-      result match {
-        case Success(x) => Json.write(x)
-        case Failure(err) => Json.write(SimpleError(err.getMessage()))
-      }
-    }
-  }
+  class DoubleSerializer extends CustomSerializer[Double](format => ({
+    case JDouble(x) => x.toDouble
+    case JString(x) => x.toDouble
+  },{
+    case x: Double => JDouble(x)
+  }))
+
+  class BooleanSerializer extends CustomSerializer[Boolean](format => ({
+    case JBool(x) => x
+    case JString(x) => x.toBoolean
+  },{
+    case x: Boolean => JBool(x)
+  }))
 }

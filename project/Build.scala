@@ -16,7 +16,9 @@ object ArimaaServerBuild extends Build {
         "javax.servlet" %  "javax.servlet-api" % "3.1.0",
         "org.scalatest" %% "scalatest"         % "2.2.5" % "test",
         "org.scalatra"  %% "scalatra-json"     % "2.4.0.RC1",
-        "org.json4s"    %% "json4s-jackson"    % "3.3.0.RC1"
+        "org.json4s"    %% "json4s-jackson"    % "3.3.0.RC1",
+        "com.typesafe.akka" %% "akka-actor" % "2.3.4",
+        "net.databinder.dispatch" %% "dispatch-core" % "0.11.1"
       ),
 
       //TODO(lightvector): Is this concerning? This is a dependency of scalatra-json, and I guess whoever owns this library
