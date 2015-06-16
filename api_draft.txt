@@ -14,6 +14,7 @@ Shared types:
 <Auth> = <String>  #Authorization token returned from logging in
 <GameAuth> = <String>  #Authorization token returned from joining a game
 <Username> = <String>
+<Timestamp> = <Float> #Seconds since the epoch (1970-01-01 00:00 UTC) (up to however much precision the server has)
 
 ===ACCOUNTS========================================================
 To register an account:
@@ -25,7 +26,7 @@ POST /accounts/register {"username":<Username>,"email":<String>,"password":<Stri
 ===LOGIN===========================================================
 To log in:
 POST /accounts/login {"username":<Username>,"password":<String>}
-Response if successful = {"auth":<Auth>}
+Response if successful = {"username":<Username>,"auth":<Auth>}
 Response if not successful = <Error>
 
 To log out:
@@ -35,10 +36,10 @@ Response if not successful = <Error>
 
 ===GAMEROOM========================================================
 <Board> = {
-  "record":<String>, #Full game record, ex:"1g Ra1 Cc2\n1s ra7\n2g Ra1n Ra2n Ra3n Ra4n\n2s"
-  "moves":[<String>,<String>,<String>,...], #Moves made in the game, ex: ["Ra1","Ra7","Ra1n Ra2n Ra3n Ra4n"]
-  "toMove":<String>, #"g" or "s"
-  "position":<String> #FEN-style string, ex: "1r4r/rHc2rcD/rm/1E3M/1R1dr/1DedCR/2H1r/"
+  "history":[<String>,<String>,<String>,...], #Move history in the order [1g,1s,2g,2s...] ex: ["Ra1","Ra7","Ra1n Ra2n Ra3n Ra4n"]
+  "toMove":<String>,  #Next player to move, either "g" or "s"
+  "position":<String> #64-char string specifying the board in the order a8-h8,a7-h7,...,a1-h1
+                      #ex:"rrrrrrrrchdemdhc                                CHDMEDHCRRRRRRRR"
 }
 
 <UserInfo> = {
@@ -47,15 +48,19 @@ Response if not successful = <Error>
 }
 
 <GameResult> = {
-  "resultCode":<String>,
-  "endTime":<Float>
+  "resultCode":<String>, #TODO - describe this. Same as current Arimaa resultCode system seems okay
+  "endTime":<Timestamp>
+}
+
+<PlayerTimeControl> = {
+  #TODO - probably just adopt the current arimaa time control system or something similar
 }
 
 <GameMetadata> = {
   "id":<Int>,
-  "plyCount":<Int>,
-  "startTime":<Float>,
-  "moveTimes":[<Float>,<Float>,<Float>,...], #Seconds since the epoch that each move was made
+  "numMoves":<Int>, #Total number of moves made in the game (ex: {1g, 1s, 2g, 2s, 3g} = 5 moves)
+  "startTime":<Timestamp> #Time that the game clock was started
+  "moveTimes":[<Timestamp>,<Timestamp>,<Timestamp>,...], #Time that each move was received and played
   "gUser":<UserInfo>,
   "sUser":<UserInfo>,
   "gTC":<PlayerTimeControl>, #Time control for Gold
@@ -69,33 +74,36 @@ Response if not successful = <Error>
 <GameState> = {
   "board":<Board>,
   "meta":<GameMetadata>,
-  "lastMoveTime":<Float>,
-  "gReserveLeft":<Float>,
-  "sReserveLeft":<Float>,
+  "lastMoveTime":<Timestamp>,
+  "gReserveLeft":<Float>, #in seconds
+  "sReserveLeft":<Float>, #in seconds
   "gPresent":<Bool>,
   "sPresent":<Bool>,
-  "now":<Float>
+  "now":<Timestamp>
 }
 
 To get just the metadata about a game;
-GET /games/<GameID>/metadata
+GET /game/<GameID>/metadata
 Response if successful = <GameMetadata>
 Response if not successful = <Error>
 
 To get the full state of a game:
-GET /games/<GameID>/state
+GET /game/<GameID>/state
 Response if successful = <GameState>
 Response if not successful = <Error>
 
 #TODO - interface for creating a game
 #TODO - detect timeouts via heartbeating?
 
-To join, leave, make a move, resign a game:
+To join, leave, resign a game, make a move:
 POST /games/<GameID>/actions/join {"auth":<Auth>}
 POST /games/<GameID>/actions/leave {"auth":<Auth>}
-POST /games/<GameID>/actions/move {"gameauth":<GameAuth>, "move":<String>}
 POST /games/<GameID>/actions/resign {"gameauth":<GameAuth>}
-
+POST /games/<GameID>/actions/move {
+  "gameauth":<GameAuth>,
+  "move":<String>, #ex: Ra1n Ra2n Ra3e Rb3e Rc3x"
+  "moveNum:<Int>   #1g = 0, 1s = 1, 2g = 2, 2s = 3, ...
+}
 Response if successful = <Message>
 Response if not successful = <Error>
 
