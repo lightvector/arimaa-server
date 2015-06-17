@@ -5,6 +5,10 @@ Arimaa Game Server JSON API
 
 #TODO - see todos below
 
+#TODO:
+#  Make the formatting more consistent, and use some sort of standard format.
+#  mattj256: YAML? Markdown? txt2html?
+
 All requests and responses are in JSON.
 
 Shared types:
@@ -60,6 +64,7 @@ Response if not successful = <Error>
   "maxGameTime::<Int>, #OPTIONAL - if present, the maximum allowed time for the game
 }
 
+#TODO consider adding a string description for special games ("EEE", "WC Round 1", etc)
 <GameMetadata> = {
   "id":<GameID>,
   "numPly":<Int>, #Total number of half-moves made in the game (ex: {1g, 1s, 2g, 2s, 3g} = 5 ply)
@@ -69,6 +74,7 @@ Response if not successful = <Error>
   "gTC":<PlayerTimeControl>, #Time control for Gold
   "sTC":<PlayerTimeControl>, #Time control for Silver
   "rated":<Bool>, #Whether the game was used for rating calculations
+  #TODO consider making this more than just a bool
   "experimental":<Bool>, #Whether the game allows nontraditional setups (handicaps, alternate starting positions)
   "active":<Bool> #Whether the game is open or is being played right now
   "result":<GameResult> #ONLY present if the game is not active!
