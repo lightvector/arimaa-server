@@ -10,15 +10,18 @@ All requests and responses are in JSON.
 Shared types:
 <Message> = {"message":<String>}
 <Error> = {"error":<String>}
-<GameID> = <Int>   #Identifier for a game
+<GameID> = <String> #Alphanumeric hash used as an identifier for a game
 <Auth> = <String>  #Authorization token returned from logging in
 <GameAuth> = <String>  #Authorization token returned from joining a game
 <Username> = <String>
+#TODO - should this be an int with the number of milliseconds?
 <Timestamp> = <Float> #Seconds since the epoch (1970-01-01 00:00 UTC) (up to however much precision the server has)
 
 ===ACCOUNTS========================================================
 To register an account:
-POST /accounts/register {"username":<Username>,"email":<String>,"password":<String>}
+#TODO How to prevent spamming of registration of new accounts?
+#TODO add country? (how to standardize it as a string? or use an integer enum code?)
+POST /accounts/register {"username":<Username>,"email":<String>,"password":<String>,"isBot":<Bool>}
 
 #TODO add other account facilities
 #TODO add ways of looking up users
@@ -35,32 +38,32 @@ Response if successful = <Message>
 Response if not successful = <Error>
 
 ===GAMEROOM========================================================
-<Board> = {
-  "history":[<String>,<String>,<String>,...], #Move history in the order [1g,1s,2g,2s...] ex: ["Ra1","Ra7","Ra1n Ra2n Ra3n Ra4n"]
-  "toMove":<String>,  #Next player to move, either "g" or "s"
-  "position":<String> #64-char string specifying the board in the order a8-h8,a7-h7,...,a1-h1
-                      #ex:"rrrrrrrrchdemdhc                                CHDMEDHCRRRRRRRR"
-}
-
 <UserInfo> = {
   "username":<Username>,
+  "isBot"<Bool>,
   "rating":<Float>
 }
 
 <GameResult> = {
+  "winner":<String>, #"g" or "s", or "n" if there was no winner
   "resultCode":<String>, #TODO - describe this. Same as current Arimaa resultCode system seems okay
   "endTime":<Timestamp>
 }
 
 <PlayerTimeControl> = {
-  #TODO - probably just adopt the current arimaa time control system or something similar
+  #All values are in seconds
+  "initialTime":<Int>, #The initial amount of time a player begins with on the clock
+  "increment":<Int>,   #Time added to a player's clock after the completion of each move
+  "delay":<Int>,       #Length of time into a move before a player's clock actually begins decrementing
+  "maxReserve":<Int>,  #OPTIONAL - if present, the maximum amount of time that can be stored
+  "maxMoveTime":<Int>, #OPTIONAL - if present, the maximum allowed time for a player to make one move
+  "maxGameTime::<Int>, #OPTIONAL - if present, the maximum allowed time for the game
 }
 
 <GameMetadata> = {
-  "id":<Int>,
-  "numMoves":<Int>, #Total number of moves made in the game (ex: {1g, 1s, 2g, 2s, 3g} = 5 moves)
+  "id":<GameID>,
+  "numPly":<Int>, #Total number of half-moves made in the game (ex: {1g, 1s, 2g, 2s, 3g} = 5 ply)
   "startTime":<Timestamp> #Time that the game clock was started
-  "moveTimes":[<Timestamp>,<Timestamp>,<Timestamp>,...], #Time that each move was received and played
   "gUser":<UserInfo>,
   "sUser":<UserInfo>,
   "gTC":<PlayerTimeControl>, #Time control for Gold
@@ -72,31 +75,47 @@ Response if not successful = <Error>
 }
 
 <GameState> = {
-  "board":<Board>,
+  "history":[<String>,<String>,<String>,...], #Move history in the order [1g,1s,2g,2s...] ex: ["Ra1","Ra7","Ra1n Ra2n Ra3n Ra4n"]
+  "moveTimes":[<Timestamp>,<Timestamp>,<Timestamp>,...], #Time that each move was received and played
+  "toMove":<String>,  #Next player to move, either "g" or "s"
+  #TODO - should this be a FEN-style string?
+  "position":<String> #64-char string specifying the board in the order a8-h8,a7-h7,...,a1-h1
+                      #ex:"rrrrrrrrchdemdhc                                CHDMEDHCRRRRRRRR"
   "meta":<GameMetadata>,
-  "lastMoveTime":<Timestamp>,
-  "gReserveLeft":<Float>, #in seconds
-  "sReserveLeft":<Float>, #in seconds
-  "gPresent":<Bool>,
-  "sPresent":<Bool>,
-  "now":<Timestamp>
+  "lastMoveTime":<Timestamp>, #Time that the previous move was recieved and made
+  "timeSpent":<Float>, #Seconds since the start of this move
+  "gTimeThisMove":<Float>, #Seconds on gold's clock at the start of this move
+  "sTimeThisMove":<Float>, #Seconds on silver's's clock at the start of this move
+  "gPresent":<Bool>, #Whether gold is present and connected to the game, always false if the game is finished
+  "sPresent":<Bool>, #Whether silver is present and connected to the game, always false if the game is finished
+  "now":<Timestamp>  #Server timestamp as of the reporting of this gamestate
 }
 
 To get just the metadata about a game;
 GET /game/<GameID>/metadata
 Response if successful = <GameMetadata>
 Response if not successful = <Error>
+#TODO - note that this will also accept old arimaa.com numeric game ids in place of <GameID>
 
 To get the full state of a game:
 GET /game/<GameID>/state
+GET /game/<GameID>/state?minPly=<INT>&timeout=<INT>
 Response if successful = <GameState>
 Response if not successful = <Error>
+If 'minPly' is specified, the current game is active, and 'numPly' < 'minPly', blocks until either
+'timeout' seconds have passed (default 15), the game ends (timeout, resignation, etc.) or a move
+is played causing 'numPly' >= 'minPly'.
+#TODO - note that this will also accept old arimaa.com numeric game ids in place of <GameID>
 
 #TODO - interface for creating a game
 #TODO - detect timeouts via heartbeating?
 
-To join, leave, resign a game, make a move:
+To join a game:
 POST /games/<GameID>/actions/join {"auth":<Auth>}
+Response if successful = {"gameauth":<GameAuth>}
+Response if not successful = <Error>
+
+To leave, resign a game, make a move:
 POST /games/<GameID>/actions/leave {"auth":<Auth>}
 POST /games/<GameID>/actions/resign {"gameauth":<GameAuth>}
 POST /games/<GameID>/actions/move {
