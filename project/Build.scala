@@ -19,12 +19,7 @@ object ArimaaServerBuild extends Build {
         "org.json4s"    %% "json4s-jackson"    % "3.3.0.RC1",
         "com.typesafe.akka" %% "akka-actor" % "2.3.4",
         "net.databinder.dispatch" %% "dispatch-core" % "0.11.1"
-      ),
-
-      //Skip hash checking to work around hash conflict when downloading a library in sbt.
-      //See https://github.com/lightvector/arimaa-server/issues/34
-      checksums in update := Nil
-
+      )
     ) ++ jetty()
 
   )
