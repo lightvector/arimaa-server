@@ -21,13 +21,10 @@ object ArimaaServerBuild extends Build {
         "net.databinder.dispatch" %% "dispatch-core" % "0.11.1"
       ),
 
-      //TODO(lightvector): Is this concerning? This is a dependency of scalatra-json, and I guess whoever owns this library
-      //messed up when uploading things and updating the published hash? (either that or I got a bad/hacked version of this library)
-      //Working around error in sbt:
-      //[warn] problem while downloading module descriptor:
-      //https://repo1.maven.org/maven2/com/thoughtworks/paranamer/paranamer/2.7/paranamer-2.7.pom:
-      //invalid sha1: expected=deea673ac6c495cfca3c2fecce26bd9b67295e5b computed=36ef984e4403f800d8aeb5b82045ea4cec0db07b
+      //Skip hash checking to work around hash conflict when downloading a library in sbt.
+      //See https://github.com/lightvector/arimaa-server/issues/34
       checksums in update := Nil
+
     ) ++ jetty()
 
   )
