@@ -5,6 +5,7 @@ import scalate.ScalateSupport
 import org.json4s.{DefaultFormats, Formats}
 import org.scalatra.json._
 
+
 case class Response(message: String, message2: Option[String], timestamp: Long)
 object Response {
   def create(message: String): Response = {
@@ -26,7 +27,7 @@ val errorHandling: PartialFunction[Throwable, Unit] = {
   case e => send_error("Internal Error", InternalError)
 }*/
 
-class ArimaaServlet extends WebAppStack with JacksonJsonSupport {
+class ArimaaServlet extends WebAppStack with JacksonJsonSupport with ScalateSupport {
   // Sets up automatic case class to JSON output serialization, required by
   // the JValueResult trait.
   protected implicit lazy val jsonFormats: Formats = DefaultFormats
@@ -38,7 +39,13 @@ class ArimaaServlet extends WebAppStack with JacksonJsonSupport {
 
   //curl -i http://localhost:8080/
   get("/") {
-    Response.create("Hello world")
+
+    //
+    contentType="text/html"
+    //layoutTemplate("/WEB-INF/views/hello.jade")
+    //jade("/WEB-INF/views/index.jade", "layout" -> "/WEB-INF/layouts/basic_layout.jade")
+    jade("/WEB-INF/views/hello.jade", "layout"->"/WEB-INF/layouts/default.jade")
+    //Response.create("Hello world")
   }
 
   //curl -i -X POST -d "name=sally" http://localhost:8080/test
@@ -52,6 +59,8 @@ class ArimaaServlet extends WebAppStack with JacksonJsonSupport {
     val r = parse(request.body).extract[Request]
     Response.create("" + (r.a + r.b))
   }
+
+
 
 
 }
