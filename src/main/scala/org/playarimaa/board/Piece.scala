@@ -1,5 +1,5 @@
 package org.playarimaa.board
-import org.playarimaa.util._
+import scala.util.{Try, Success, Failure}
 
 case class Piece(owner: Player, pieceType: PieceType) {
   def toChar: Char =
@@ -22,7 +22,7 @@ object Piece {
       )
     )
 
-  def ofChar(c: Char): Result[Piece] =
+  def ofChar(c: Char): Try[Piece] =
     PieceType.ofChar(c).map { pt =>
       val player = if(c.isUpper) GOLD else SILV
       Piece(player,pt)

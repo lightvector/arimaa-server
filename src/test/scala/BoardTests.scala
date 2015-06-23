@@ -1,14 +1,14 @@
 import collection.mutable.Stack
+import scala.util.{Try, Success, Failure}
 import org.scalatest._
 
-import org.playarimaa.util._
 import org.playarimaa.board._
 
 class BoardTests extends FlatSpec with Matchers {
 
   "Piece" should "round-trip through char" in {
     Piece.values.foreach( piece =>
-      Piece.ofChar(piece.toChar) should be (Ok(piece))
+      Piece.ofChar(piece.toChar) should be (Success(piece))
     )
   }
 

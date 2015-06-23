@@ -11,8 +11,6 @@ import org.json4s.jackson.Serialization
 import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 import akka.pattern.{ask, pipe, after}
 import akka.util.Timeout
-import org.playarimaa.util._
-
 
 object AuthTokenGen {
   val NUM_SEED_BYTES = 32
@@ -48,25 +46,25 @@ class Chat {
   def join(username: String, auth: String): Unit = this.synchronized {
     authToUser = authToUser + (auth -> username)
   }
-  def leave(auth: String): Result[Unit] = this.synchronized {
+  def leave(auth: String): Try[Unit] = this.synchronized {
     authToUser.get(auth) match {
-      case None => Error("Not logged in")
+      case None => Failure(new ApplicationException("Not logged in"))
       case Some(_) =>
         authToUser = authToUser - auth
-        Ok()
+        Success(())
     }
   }
 
-  def post(auth: String, text:String): Result[Unit] = this.synchronized {
+  def post(auth: String, text:String): Try[Unit] = this.synchronized {
     authToUser.get(auth) match {
-      case None => Error("Not logged in")
+      case None => Failure(new ApplicationException("Not logged in"))
       case Some(username) =>
         val line = ChatLine(username, text, DoubleTime.get, nextId)
         chatLines = line :: chatLines
         nextMessage.success(line)
         nextMessage = Promise()
         nextId = nextId + 1
-        Ok()
+        Success(())
     }
   }
 
@@ -130,8 +128,8 @@ class ChatServlet(system: ActorSystem)
   post("/logout") {
     val query = Json.read[LeaveQuery](request.body)
     chat.leave(query.auth) match {
-      case Error(e) => Json.write(SimpleError(e))
-      case Ok(()) => Json.write(SimpleResponse("Ok"))
+      case Failure(e) => Json.write(SimpleError(e.getMessage))
+      case Success(()) => Json.write(SimpleResponse("Ok"))
     }
   }
 
@@ -139,8 +137,8 @@ class ChatServlet(system: ActorSystem)
   post("/") {
     val query = Json.read[PostQuery](request.body)
     chat.post(query.auth,query.text) match {
-      case Error(e) => Json.write(SimpleError(e))
-      case Ok(()) => Json.write(SimpleResponse("Ok"))
+      case Failure(e) => Json.write(SimpleError(e.getMessage))
+      case Success(()) => Json.write(SimpleResponse("Ok"))
     }
   }
 

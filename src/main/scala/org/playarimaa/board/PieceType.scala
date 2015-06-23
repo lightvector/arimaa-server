@@ -1,5 +1,5 @@
 package org.playarimaa.board
-import org.playarimaa.util._
+import scala.util.{Try, Success, Failure}
 
 sealed trait PieceType extends Ordered[PieceType] {
   val strength: Int
@@ -12,15 +12,15 @@ sealed trait PieceType extends Ordered[PieceType] {
 object PieceType {
   val values = List(RAB,CAT,DOG,HOR,CAM,ELE)
 
-  def ofChar(c: Char): Result[PieceType] =
+  def ofChar(c: Char): Try[PieceType] =
     c.toLower match {
-      case 'r' => Ok(RAB)
-      case 'c' => Ok(CAT)
-      case 'd' => Ok(DOG)
-      case 'h' => Ok(HOR)
-      case 'm' => Ok(CAM)
-      case 'e' => Ok(ELE)
-      case _   => Error("Unknown piece type: " + c)
+      case 'r' => Success(RAB)
+      case 'c' => Success(CAT)
+      case 'd' => Success(DOG)
+      case 'h' => Success(HOR)
+      case 'm' => Success(CAM)
+      case 'e' => Success(ELE)
+      case _   => Failure(new IllegalArgumentException("Unknown piece type: " + c))
     }
 }
 case object RAB extends PieceType {val strength = 1; val lowercaseChar = 'r'}
