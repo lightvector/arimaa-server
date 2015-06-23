@@ -1,5 +1,5 @@
 package org.playarimaa.board
-import org.playarimaa.util._
+import scala.util.{Try, Success, Failure}
 
 /** Internal representation of a single step. */
 case class Step(src: Location, dir: Direction) {
@@ -34,22 +34,22 @@ trait Notation {
   /** Returns the move corresponding to [moveStr] on the current board,
     * and the resulting board position after making the move.
     */
-  def read(board: Board, moveStr: String): Result[(Move,Board)]
+  def read(board: Board, moveStr: String): Try[(Move,Board)]
 
   /** Returns the string notation corresponding to [move] on the current board. */
-  def write(board: Board, move: Move): Result[String]
+  def write(board: Board, move: Move): Try[String]
 }
 
 
 /** Parser for standard Arimaa notation, ex: "Ec4w hc5s hc4s hc4x Eb4e" */
 object StandardNotation extends Notation {
-  def read(board: Board, moveStr: String): Result[(Move,Board)] = {
+  def read(board: Board, moveStr: String): Try[(Move,Board)] = {
     //TODO
-    Error("unimplemented")
+    Failure(new UnsupportedOperationException())
   }
 
-  def write(board: Board, move: Move): Result[String] = {
+  def write(board: Board, move: Move): Try[String] = {
     //TODO
-    Error("unimplemented")
+    Failure(new UnsupportedOperationException())
   }
 }

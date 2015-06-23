@@ -1,5 +1,5 @@
 package org.playarimaa.board
-import org.playarimaa.util._
+import scala.util.{Try, Success, Failure}
 
 class Game private (
   val boards: Vector[Board],
@@ -8,15 +8,15 @@ class Game private (
   def this() =
     this(Vector(new Board()), Vector())
 
-  def parseAndMakeMove(moveStr: String, notation: Notation): Result[Game] = {
+  def parseAndMakeMove(moveStr: String, notation: Notation): Try[Game] = {
     notation.read(boards.last, moveStr).flatMap { result =>
       val (move,board) = result
       if(boards.last.samePositionAs(board))
-        Error("Illegal move (unchanged position): " + moveStr)
+        Failure(new IllegalArgumentException("Illegal move (unchanged position): " + moveStr))
       else if(situationOccursTwice(board))
-        Error("Illegal move (3x repetition): " + moveStr)
+        Failure(new IllegalArgumentException("Illegal move (3x repetition): " + moveStr))
       else
-        Ok(new Game(boards :+ board, moves :+ move))
+        Success(new Game(boards :+ board, moves :+ move))
     }
   }
 

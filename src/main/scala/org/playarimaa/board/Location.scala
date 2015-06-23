@@ -1,5 +1,5 @@
 package org.playarimaa.board
-import org.playarimaa.util._
+import scala.util.{Try, Success, Failure}
 
 case class Location (x: Int, y: Int) {
 
@@ -21,19 +21,19 @@ case class Location (x: Int, y: Int) {
 
 object Location {
 
-  def ofString(s: String): Result[Location] = {
-    def failure = Error("Error parsing location string: " + s)
+  def ofString(s: String): Try[Location] = {
     if(s.length != 2
       || s(0) <  'a'
       || s(0) >= ('a' + Board.SIZE)
       || s(1) < '1'
       || s(1) >= ('1' + Board.SIZE)
-    )
-      return failure
+    ) {
+      Failure(new IllegalArgumentException("Error parsing location string: " + s))
+    }
 
     val x = s(0) - 'a'
     val y = s(1) - '1'
-    Ok(Location(x,y))
+    Success(Location(x,y))
   }
 
   val values: List[Location] = (

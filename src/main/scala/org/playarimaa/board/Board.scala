@@ -1,5 +1,5 @@
 package org.playarimaa.board
-import org.playarimaa.util._
+import scala.util.{Try, Success, Failure}
 
 sealed trait LocContents
 case class HasPiece(piece: Piece) extends LocContents
@@ -71,24 +71,24 @@ class Board(
     * Returns Error if placements are not on unique empty locations
     * OR if the resulting position has an unguarded piece on a trap
     */
-  def place(placements: Seq[Placement]): Result[Board] = {
+  def place(placements: Seq[Placement]): Try[Board] = {
     val newPieces = placements.foldLeft(pieces) { (newPieces: Map[Location,Piece], placement: Placement) =>
       if(this(placement.dest) != Empty)
-        return Error("Invalid placement " + placement + " in: " + placements.mkString(" "))
+        return Failure(new IllegalArgumentException("Invalid placement " + placement + " in: " + placements.mkString(" ")))
       newPieces + (placement.dest -> placement.piece)
     }
     val (newBoard, caps) = new Board(newPieces, player, stepsLeft).resolveCaps
     if(!caps.isEmpty)
-      Error(
+      Failure(new IllegalArgumentException(
         "Invalid placements: " + placements.mkString(" ") +
           ", unguarded piece(s) on trap: " + caps.mkString(" ")
-      )
-    else Ok(newBoard)
+      ))
+    else Success(newBoard)
   }
 
-  def step(step: Step): Result[Board] = {
+  def step(step: Step): Try[Board] = {
     //TODO
-    Error("unimplemented")
+    Failure(new UnsupportedOperationException())
   }
 
   def resolveCaps: (Board, List[Capture]) = {

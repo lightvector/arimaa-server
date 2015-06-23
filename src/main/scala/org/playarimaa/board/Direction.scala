@@ -1,5 +1,5 @@
 package org.playarimaa.board
-import org.playarimaa.util._
+import scala.util.{Try, Success, Failure}
 
 sealed trait Direction {
   val offset: (Int,Int)
@@ -12,13 +12,13 @@ sealed trait Direction {
 object Direction {
   val values = List(SOUTH,WEST,EAST,NORTH)
 
-  def ofChar(c: Char): Result[Direction] =
+  def ofChar(c: Char): Try[Direction] =
     c match {
-      case 's' => Ok(SOUTH)
-      case 'w' => Ok(WEST)
-      case 'e' => Ok(EAST)
-      case 'n' => Ok(NORTH)
-      case _   => Error("Unknown direction: " + c)
+      case 's' => Success(SOUTH)
+      case 'w' => Success(WEST)
+      case 'e' => Success(EAST)
+      case 'n' => Success(NORTH)
+      case _   => Failure(new IllegalArgumentException("Unknown direction: " + c))
     }
 }
 case object SOUTH extends Direction {val offset = ( 0,-1); val char = 's';}

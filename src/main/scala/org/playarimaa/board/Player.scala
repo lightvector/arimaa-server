@@ -1,5 +1,5 @@
 package org.playarimaa.board
-import org.playarimaa.util._
+import scala.util.{Try, Success, Failure}
 
 sealed trait Player {
   val char: Char
@@ -14,11 +14,11 @@ sealed trait Player {
 object Player {
   val values = List(GOLD,SILV)
 
-  def ofChar(c: Char): Result[Player] =
+  def ofChar(c: Char): Try[Player] =
     c match {
-      case 'g' => Ok(GOLD)
-      case 's' => Ok(SILV)
-      case _   => Error("Unknown player: " + c)
+      case 'g' => Success(GOLD)
+      case 's' => Success(SILV)
+      case _   => Failure(new IllegalArgumentException("Unknown player: " + c))
     }
 }
 case object GOLD extends Player {val char = 'g'}
