@@ -7,7 +7,7 @@ case class Location (x: Int, y: Int) {
     if(Board.isOutOfBounds(this))
       "OOB" + super.toString
     else
-      "" + ('a' + this.x).toChar + this.y
+      "" + ('a' + this.x).toChar + (this.y + 1)
 
   def apply(dir: Direction): Location =
     Location(x + dir.offset._1, y + dir.offset._2)
@@ -28,7 +28,7 @@ object Location {
       || s(1) < '1'
       || s(1) >= ('1' + Board.SIZE)
     ) {
-      Failure(new IllegalArgumentException("Error parsing location string: " + s))
+      return Failure(new IllegalArgumentException("Error parsing location string: " + s))
     }
 
     val x = s(0) - 'a'
