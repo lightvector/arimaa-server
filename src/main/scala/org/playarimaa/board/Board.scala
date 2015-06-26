@@ -67,6 +67,42 @@ class Board(
       }
     }
 
+  /**
+   * Primitive method called to add a new piece to the board.
+   * If the location is currently empty, returns a new board with the piece added.
+   * Otherwise returns an error.
+   */
+  def add(piece: Piece, loc: Location): Try[Board] = {
+    this(loc) match {
+      case OffBoard => Failure(new IllegalArgumentException("Bad location: " + loc))
+      case HasPiece(p) => Failure(new IllegalStateException("Square " + loc + " already occupied with " + p))
+      case Empty => {
+        val newPieces = pieces  + (loc -> piece)
+        Success(new Board(newPieces, player, stepsLeft))
+      }
+    }
+  }
+
+  /**
+   * Primitive method called to remove a piece from the board.
+   * If there is currently the correct piece at the correct location, returns a new board with the piece removed.
+   * Otherwise returns an error.
+   */
+  def remove(piece: Piece, loc: Location): Try[Board] = {
+    this(loc) match {
+      case OffBoard => Failure(new IllegalArgumentException("Bad location: " + loc))
+      case Empty => Failure(new IllegalStateException("Square " + loc + " is empty."))
+      case HasPiece(p) => {
+        if (p equals piece) {
+          val newPieces = pieces  - loc
+          Success(new Board(newPieces, player, stepsLeft))
+        } else {
+          Failure(new IllegalArgumentException("Location " + loc + " has " + p + ", trying to remove " + piece))
+        }
+      }
+    }
+  }
+
   /** Make the specified placements, returning the new board.
     * Returns Error if placements are not on unique empty locations
     * OR if the resulting position has an unguarded piece on a trap
@@ -99,6 +135,25 @@ class Board(
   def endTurn: Board =
     new Board(pieces, player.flip, Board.STEPS_PER_TURN)
 
+  def toStringAei : String = {
+    val returnVal : StringBuilder = new StringBuilder
+    returnVal.append("[")
+    Location.valuesAei foreach {
+      ((loc : Location) => {
+        this(loc) match {
+          case OffBoard => throw new AssertionError("Bad location: " + loc)
+          case HasPiece(p) => returnVal.append(p.toChar)
+          case Empty => returnVal.append(' ')
+        }
+      })
+    }
+    returnVal.append("]")
+    returnVal.toString
+  }
+  
+  override def toString = {
+    toStringAei
+  }
 }
 
 object Board {

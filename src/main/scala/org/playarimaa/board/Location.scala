@@ -36,6 +36,13 @@ object Location {
     Success(Location(x,y))
   }
 
+  /** Returns values in AEI order (a8-h8, a7-h7...a1-h1) */
+  val valuesAei: List[Location] = (
+    for(y <- 7 to 0 by -1; x <- 0 to 7)
+    yield Location(x,y)
+    )(collection.breakOut)
+
+  /** Returns values: (a1-h1, a2-h2, ... a8-h8) */
   val values: List[Location] = (
     for(y <- 0 to 7; x <- 0 to 7)
     yield Location(x,y)

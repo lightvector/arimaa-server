@@ -21,25 +21,13 @@ class BoardTests extends FlatSpec with Matchers {
   "Board" should "not be larger than size 9 due to notation" in {
     assert(Board.SIZE <= 9)
   }
-}
 
-/*
-import org.scalatest.junit.JUnitSuite
-import org.junit.Assert.assertTrue
-import org.junit.Assert.assertFalse
-import org.junit.Test
-
-import org.playarimaa.util._
-import org.playarimaa.board._
-
-class PieceTest extends JUnitSuite {
-
-  @Test
-  def testPiece() {
-    Piece.values.foreach( piece =>
-      assertTrue(Piece.ofChar(piece.toChar) == Ok(piece))
-    )
+  it should "print toStringAei correctly" in {
+    new Board().toStringAei should be ("[                                                                ]")
+    new Board().add(new Piece(GOLD, RAB), Location.ofString("a8").get).get
+        .toStringAei should be ("[R                                                               ]")
+    new Board().add(new Piece(SILV, RAB), Location.ofString("a8").get).get
+        .add(new Piece(GOLD, HOR), Location.ofString("b1").get).get
+        .toStringAei should be ("[r                                                        H      ]")
   }
 }
-
- */
