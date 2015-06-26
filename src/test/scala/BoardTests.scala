@@ -21,25 +21,20 @@ class BoardTests extends FlatSpec with Matchers {
   "Board" should "not be larger than size 9 due to notation" in {
     assert(Board.SIZE <= 9)
   }
-}
 
-/*
-import org.scalatest.junit.JUnitSuite
-import org.junit.Assert.assertTrue
-import org.junit.Assert.assertFalse
-import org.junit.Test
+  "Location" should "detect traps correctly" in {
+    Location.ofString("c3").map(x => x.isTrap).get should be (true)
+    Location.ofString("c6").map(x => x.isTrap).get should be (true)
+    Location.ofString("f3").map(x => x.isTrap).get should be (true)
+    Location.ofString("f6").map(x => x.isTrap).get should be (true)
 
-import org.playarimaa.util._
-import org.playarimaa.board._
-
-class PieceTest extends JUnitSuite {
-
-  @Test
-  def testPiece() {
-    Piece.values.foreach( piece =>
-      assertTrue(Piece.ofChar(piece.toChar) == Ok(piece))
-    )
+    Location.ofString("a1").map(x => x.isTrap).get should be (false)
+    Location.ofString("a8").map(x => x.isTrap).get should be (false)
+    Location.ofString("h1").map(x => x.isTrap).get should be (false)
+    Location.ofString("h8").map(x => x.isTrap).get should be (false)
+    Location.ofString("c2").map(x => x.isTrap).get should be (false)
+    Location.ofString("c4").map(x => x.isTrap).get should be (false)
+    Location.ofString("b3").map(x => x.isTrap).get should be (false)
+    Location.ofString("d3").map(x => x.isTrap).get should be (false)
   }
 }
-
- */

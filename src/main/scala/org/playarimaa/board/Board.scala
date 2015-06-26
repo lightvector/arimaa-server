@@ -104,12 +104,14 @@ class Board(
 object Board {
   val SIZE = 8
   val STEPS_PER_TURN = 4
+  /*
   val TRAPS = List(
     Location(2,2),
     Location(5,2),
     Location(2,5),
     Location(5,5)
   )
+  */
 
   def isOutOfBounds(loc: Location): Boolean =
     loc.x < 0 || loc.x >= SIZE || loc.y < 0 || loc.y >= SIZE

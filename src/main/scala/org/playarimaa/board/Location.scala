@@ -3,6 +3,9 @@ import scala.util.{Try, Success, Failure}
 
 case class Location (x: Int, y: Int) {
 
+  def isTrap : Boolean =
+    (x == 2 || x == 5) && (y == 2 || y == 5)
+
   override def toString: String =
     if(Board.isOutOfBounds(this))
       "OOB" + super.toString
