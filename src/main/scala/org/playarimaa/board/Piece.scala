@@ -8,7 +8,6 @@ case class Piece(owner: Player, pieceType: PieceType) {
       case SILV => this.pieceType.lowercaseChar
     }
 
-
   override def toString: String =
     toChar.toString
 }
