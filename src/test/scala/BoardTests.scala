@@ -108,6 +108,15 @@ class BoardTests extends FlatSpec with Matchers {
     assert(Board.SIZE <= 9)
   }
 
+  it should "print toStringAei correctly" in {
+    new Board().toStringAei should be ("[                                                                ]")
+    new Board().add(new Piece(GOLD, RAB), Location.ofString("a8").get).get
+        .toStringAei should be ("[R                                                               ]")
+    new Board().add(new Piece(SILV, RAB), Location.ofString("a8").get).get
+        .add(new Piece(GOLD, HOR), Location.ofString("b1").get).get
+        .toStringAei should be ("[r                                                        H      ]")
+  }
+
   "Location" should "detect traps correctly" in {
     Location.ofString("c3").map(x => x.isTrap).get should be (true)
     Location.ofString("c6").map(x => x.isTrap).get should be (true)
