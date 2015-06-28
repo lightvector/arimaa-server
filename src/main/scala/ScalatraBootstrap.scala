@@ -10,7 +10,9 @@ class ScalatraBootstrap extends LifeCycle {
 
   override def init(context: ServletContext) {
 
+    AuthTokenGen.initialize
+
     context.mount(new ArimaaServlet, "/*")
-    context.mount(new ChatServlet(system), "/chat/*")
+    context.mount(new ChatServlet(system), "/api/chat/*")
   }
 }
