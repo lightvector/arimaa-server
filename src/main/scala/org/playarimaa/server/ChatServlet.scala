@@ -16,14 +16,43 @@ import slick.driver.H2Driver.api.Database
 import org.playarimaa.server.Timestamp.Timestamp
 
 case class SimpleError(error: String)
-case class SimpleResponse(message: String)
 
-case class JoinQuery(channel:String, username: String)
-case class JoinResponse(channel:String, username:String, auth: String)
-case class LeaveQuery(channel:String, username:String, auth: String)
-case class PostQuery(channel:String, username:String, auth: String, text: String)
-case class GetQuery(channel:String, minId: Option[Long], minTime: Option[Timestamp], doWait:Boolean)
-case class GetResponse(lines: List[ChatLine])
+case object Get {
+  case class Query(minId: Option[Long], minTime: Option[Timestamp], doWait: Option[Boolean])
+  case class Reply(lines: List[ChatLine])
+
+  def parseQuery(params: Map[String,String]): Query =
+    new Query(
+      params.get("minId").map(_.toLong),
+      params.get("minTime").map(_.toDouble),
+      params.get("doWait").map(_.toBoolean)
+    )
+}
+sealed trait Action {
+  val name: String
+  abstract class Query
+  abstract class Reply
+}
+object Action {
+  val all: List[Action] = List(Join,Leave,Post)
+}
+
+case object Join extends Action {
+  val name = "join"
+  case class Query(username: String)
+  case class Reply(username: String, auth: String)
+}
+case object Leave extends Action {
+  val name = "leave"
+  case class Query(username: String, auth: String)
+  case class Reply(message: String)
+}
+case object Post extends Action {
+  val name = "post"
+  case class Query(username: String, auth: String, text: String)
+  case class Reply(message: String)
+}
+
 
 class ChatServlet(system: ActorSystem)
     extends WebAppStack with JacksonJsonSupport with FutureSupport {
@@ -41,39 +70,78 @@ class ChatServlet(system: ActorSystem)
     contentType = formats("json")
   }
 
+  def getAction(action: String): Option[Action] = {
+    Action.all.find(_.name == action)
+  }
+
   //curl -i -H "Content-Type: application/json" -X POST -d '{"username":"Bob"}' http://localhost:8080/chat/login
-  post("/join") {
-    val query = Json.read[JoinQuery](request.body)
-    chat.join(query.channel, query.username).map { auth =>
-      Json.write(JoinResponse(query.channel,query.username,auth))
-    }
-  }
-
-
-  post("/leave") {
-    val query = Json.read[LeaveQuery](request.body)
-    chat.leave(query.channel, query.username, query.auth) match {
-      case Failure(e) => Json.write(SimpleError(e.getMessage()))
-      case Success(()) => Json.write(SimpleResponse("Ok"))
-    }
-  }
-
   //curl -i -H "Content-Type: application/json" -X POST -d '{"auth":"528aa3ec17260b97ec11a19","text":"Ha"}' http://localhost:8080/chat/
-  post("/") {
-    val query = Json.read[PostQuery](request.body)
-    chat.post(query.channel, query.username, query.auth, query.text) match {
-      case Failure(e) => Json.write(SimpleError(e.getMessage()))
-      case Success(()) => Json.write(SimpleResponse("Ok"))
+  //curl -i -X GET 'http://localhost:8080/chat/?minId=1&doWait=true'
+
+  def handleGet(channel: String, params: Map[String,String]) = {
+    val query = Get.parseQuery(params)
+    chat.get(channel, query.minId, None, query.minTime, None, query.doWait).map { chatLines =>
+      Json.write(Get.Reply(chatLines))
+    }
+  }
+  def handleAction(channel: String, params: Map[String,String]) = {
+    getAction(params("action")).get match {
+      case Join =>
+        val query = Json.read[Join.Query](request.body)
+        chat.join(channel, query.username).map { auth =>
+          Json.write(Join.Reply(query.username,auth))
+        }
+      case Leave =>
+        val query = Json.read[Leave.Query](request.body)
+        chat.leave(channel, query.username, query.auth).map { case () =>
+          Json.write(Leave.Reply("Ok"))
+        }
+      case Post =>
+        val query = Json.read[Post.Query](request.body)
+        chat.post(channel, query.username, query.auth, query.text).map { case () =>
+          Json.write(Post.Reply("Ok"))
+        }
     }
   }
 
-  //curl -i -X GET 'http://localhost:8080/chat/?minId=1&doWait=true'
-  get("/") {
-    val query = Json.readFromMap[GetQuery](params)
-    chat.get(query.channel, query.minId, None, query.minTime, None, query.doWait).map { chatLines =>
-      Json.write(GetResponse(chatLines))
-    }
+  def isValidBaseChannel(channel: String): Boolean = {
+    channel == "main"
   }
+  def isValidGameChannel(channel: String): Boolean = {
+    //TODO isValidGameHash(channel)
+    true
+  }
+
+  get("/:channel") {
+    val channel = params("channel")
+    if(!isValidBaseChannel(channel))
+      pass()
+    else
+      handleGet(channel,params)
+  }
+  post("/:channel/:action") {
+    val channel = params("channel")
+    if(!isValidBaseChannel(channel) || getAction(params("action")).isEmpty)
+      pass()
+    else
+      handleAction(channel,params)
+  }
+
+  get("/game/:channel") {
+    val channel = params("channel")
+    if(!isValidBaseChannel(channel))
+      pass()
+    else
+      handleGet(channel,params)
+  }
+  post("/game/:channel/:action") {
+    val channel = params("channel")
+    if(!isValidBaseChannel(channel) || getAction(params("action")).isEmpty)
+      pass()
+    else
+      handleAction(channel,params)
+  }
+
 
   error {
     case e: Throwable => Json.write(SimpleError(e.getMessage()))
