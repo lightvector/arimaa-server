@@ -63,7 +63,7 @@ class ChatServlet(system: ActorSystem)
   protected implicit def executor: ExecutionContext = system.dispatcher
 
   val db = Database.forConfig("h2mem1")
-  val chat = new Chat(db,system)
+  val chat = new ChatSystem(db,system)
 
   //Before every action runs, set the content type to be in JSON format.
   before() {
