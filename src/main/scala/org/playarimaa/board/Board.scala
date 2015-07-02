@@ -93,7 +93,7 @@ class Board(
       case OffBoard => Failure(new IllegalArgumentException("Bad location: " + loc))
       case Empty => Failure(new IllegalStateException("Square " + loc + " is empty."))
       case HasPiece(p) => {
-        if (p equals piece) {
+        if (p == piece) {
           val newPieces = pieces  - loc
           Success(new Board(newPieces, player, stepsLeft))
         } else {

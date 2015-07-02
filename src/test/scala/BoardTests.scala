@@ -42,6 +42,24 @@ class BoardTests extends FlatSpec with Matchers {
     Piece(SILV, CAM).pieceType should be (CAM)
   }
 
+  it should "detect freezing correctly" in {
+    // Same owner
+    GOLD_RAB.canFreeze(GOLD_RAB) should be (false)
+    GOLD_CAT.canFreeze(GOLD_RAB) should be (false)
+    GOLD_RAB.canFreeze(GOLD_CAT) should be (false)
+    SILV_RAB.canFreeze(SILV_RAB) should be (false)
+    SILV_CAT.canFreeze(SILV_RAB) should be (false)
+    SILV_RAB.canFreeze(SILV_CAT) should be (false)
+
+    // Different owners
+    GOLD_RAB.canFreeze(SILV_RAB) should be (false)
+    GOLD_CAT.canFreeze(SILV_RAB) should be (true)
+    GOLD_RAB.canFreeze(SILV_CAT) should be (false)
+    SILV_RAB.canFreeze(GOLD_RAB) should be (false)
+    SILV_CAT.canFreeze(GOLD_RAB) should be (true)
+    SILV_RAB.canFreeze(GOLD_CAT) should be (false)
+  }
+
   "PieceType" should "parse valid characters correctly" in {
     PieceType.ofChar('r') should be (Success(RAB))
     PieceType.ofChar('c') should be (Success(CAT))
@@ -110,10 +128,10 @@ class BoardTests extends FlatSpec with Matchers {
 
   it should "print toStringAei correctly" in {
     new Board().toStringAei should be ("[                                                                ]")
-    new Board().add(new Piece(GOLD, RAB), Location.ofString("a8").get).get
+    new Board().add(GOLD_RAB, Location.ofString("a8").get).get
         .toStringAei should be ("[R                                                               ]")
-    new Board().add(new Piece(SILV, RAB), Location.ofString("a8").get).get
-        .add(new Piece(GOLD, HOR), Location.ofString("b1").get).get
+    new Board().add(SILV_RAB, Location.ofString("a8").get).get
+        .add(GOLD_HOR, Location.ofString("b1").get).get
         .toStringAei should be ("[r                                                        H      ]")
   }
 
