@@ -135,6 +135,32 @@ class BoardTests extends FlatSpec with Matchers {
         .toStringAei should be ("[r                                                        H      ]")
   }
 
+  it should "step pieces to empty squares correctly. (no captures, no errors)" in {
+    var board = new Board().add(GOLD_RAB, Location.ofString("a8").get).get
+    board.toStringAei should be("[R                                                               ]")
+    val step = new Step(GOLD_RAB, Location.ofString("a8").get, EAST)
+    board = board.step(step).get
+    board.toStringAei should be("[ R                                                              ]")
+    val step2 = new Step(GOLD_RAB, Location.ofString("b8").get, SOUTH)
+    board = board.step(step2).get
+    board.toStringAei should be("[         R                                                      ]")
+  }
+
+  it should "give an error if you try to step a piece off the board" in {
+    var board = new Board().add(GOLD_RAB, Location.ofString("a8").get).get
+    board.toStringAei should be("[R                                                               ]")
+    val step = new Step(GOLD_RAB, Location.ofString("a8").get, WEST)
+    board.step(step).isFailure should be (true)
+  }
+
+  it should "give an error if you try to step a piece onto another piece" in {
+    var board = new Board().add(GOLD_RAB, Location.ofString("a8").get).get
+    board = board.add(GOLD_RAB, Location.ofString("b8").get).get
+    board.toStringAei should be("[RR                                                              ]")
+    val step = new Step(GOLD_RAB, Location.ofString("a8").get, EAST)
+    board.step(step).isFailure should be (true)
+  }
+
   "Location" should "detect traps correctly" in {
     Location.ofString("c3").map(x => x.isTrap).get should be (true)
     Location.ofString("c6").map(x => x.isTrap).get should be (true)

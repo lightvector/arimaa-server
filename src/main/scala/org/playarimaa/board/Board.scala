@@ -69,12 +69,15 @@ class Board(
 
   /**
    * Primitive method called to add a new piece to the board.
-   * If the location is currently empty, returns a new board with the piece added.
+   * If the location is not a trap and is currently empty, returns a new board with the piece added.
    * Otherwise returns an error.
    */
   def add(piece: Piece, loc: Location): Try[Board] = {
+    if (loc.isTrap) {
+      return Failure(new IllegalArgumentException("Bad location: " + loc))
+    }
     this(loc) match {
-      case OffBoard => Failure(new IllegalArgumentException("Bad location: " + loc))
+      case OffBoard=> Failure(new IllegalArgumentException("Bad location: " + loc))
       case HasPiece(p) => Failure(new IllegalStateException("Square " + loc + " already occupied with " + p))
       case Empty => {
         val newPieces = pieces  + (loc -> piece)
@@ -123,8 +126,16 @@ class Board(
   }
 
   def step(step: Step): Try[Board] = {
-    //TODO
-    Failure(new UnsupportedOperationException())
+    // TODO
+    // 1. capture detection: suicide step
+    // 2. capture detection: friendly abandonment
+    // 3. "remove" and "add" must be atomic: either both succeed or both fail. (Needs test)
+
+    var board = remove(step.piece, step.src)
+    if (board.isSuccess) {
+      board = board.get.add(step.piece, step.dest)
+    }
+    board
   }
 
   def resolveCaps: (Board, List[Capture]) = {
