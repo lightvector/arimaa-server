@@ -25,11 +25,6 @@ object Json {
   def write(src: AnyRef): String = {
     Serialization.write(src)(plainFormats)
   }
-
-  def readFromMap[T](map: Map[String,String])(implicit mf: Manifest[T]): T = {
-    val fieldList = map.map {case (k,v) => JField(k, JString(v)) }(collection.breakOut) : List[JField]
-    JObject(fieldList).extract[T](stringFormats,mf)
-  }
 }
 
 object CustomSerializers {

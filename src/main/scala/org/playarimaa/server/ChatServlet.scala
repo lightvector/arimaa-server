@@ -2,7 +2,7 @@ package org.playarimaa.server
 import org.scalatra.json.JacksonJsonSupport
 import org.scalatra.{Accepted, FutureSupport, ScalatraServlet}
 import org.scalatra.scalate.ScalateSupport
-import java.security.SecureRandom
+
 import scala.concurrent.{ExecutionContext, Future, Promise, future}
 import scala.concurrent.duration._
 import scala.util.{Try, Success, Failure}
@@ -11,92 +11,52 @@ import org.json4s.jackson.Serialization
 import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 import akka.pattern.{ask, pipe, after}
 import akka.util.Timeout
+import slick.driver.H2Driver.api.Database
 
-object AuthTokenGen {
-  val NUM_SEED_BYTES = 32
-  val NUM_TOKEN_INTS = 3
+import org.playarimaa.server.Timestamp.Timestamp
 
-  val secureRand: SecureRandom = new SecureRandom()
-  secureRand.setSeed(SecureRandom.getSeed(NUM_SEED_BYTES))
+case object ChatServlet {
 
-  def genToken: String = {
-    this.synchronized {
-      List.range(0,NUM_TOKEN_INTS).
-        map(_ => secureRand.nextInt).
-        map(_.toHexString).
-        mkString("")
-    }
+  case class SimpleError(error: String)
+
+  case object Get {
+    case class Query(minId: Option[Long], minTime: Option[Timestamp], doWait: Option[Boolean])
+    case class Reply(lines: List[ChatLine])
+
+    def parseQuery(params: Map[String,String]): Query =
+      new Query(
+        params.get("minId").map(_.toLong),
+        params.get("minTime").map(_.toDouble),
+        params.get("doWait").map(_.toBoolean)
+      )
+  }
+  sealed trait Action {
+    val name: String
+    abstract class Query
+    abstract class Reply
+  }
+  object Action {
+    val all: List[Action] = List(Join,Leave,Post)
+  }
+
+  case object Join extends Action {
+    val name = "join"
+    case class Query(username: String)
+    case class Reply(username: String, auth: String)
+  }
+  case object Leave extends Action {
+    val name = "leave"
+    case class Query(username: String, auth: String)
+    case class Reply(message: String)
+  }
+  case object Post extends Action {
+    val name = "post"
+    case class Query(username: String, auth: String, text: String)
+    case class Reply(message: String)
   }
 }
 
-object DoubleTime {
-  def get: Double = {
-    System.currentTimeMillis.toDouble / 1000.0
-  }
-}
-
-case class ChatLine(username: String, text: String, time: Double, id: Int)
-
-class Chat {
-  var authToUser: Map[String,String] = Map()
-  var chatLines: List[ChatLine] = List()
-  var nextMessage: Promise[ChatLine] = Promise()
-  var nextId: Int = 0
-
-  def join(username: String, auth: String): Unit = this.synchronized {
-    authToUser = authToUser + (auth -> username)
-  }
-  def leave(auth: String): Try[Unit] = this.synchronized {
-    authToUser.get(auth) match {
-      case None => Failure(new ApplicationException("Not logged in"))
-      case Some(_) =>
-        authToUser = authToUser - auth
-        Success(())
-    }
-  }
-
-  def post(auth: String, text:String): Try[Unit] = this.synchronized {
-    authToUser.get(auth) match {
-      case None => Failure(new ApplicationException("Not logged in"))
-      case Some(username) =>
-        val line = ChatLine(username, text, DoubleTime.get, nextId)
-        chatLines = line :: chatLines
-        nextMessage.success(line)
-        nextMessage = Promise()
-        nextId = nextId + 1
-        Success(())
-    }
-  }
-
-  def get(minId: Option[Int], minTime: Option[Int], doWait: Boolean)
-    (implicit ec: ExecutionContext): Future[List[ChatLine]] = this.synchronized {
-    var lines = chatLines
-    minId.foreach(minId => lines = lines.filter(_.id >= minId))
-    minTime.foreach(minId => lines = lines.filter(_.time >= minId))
-    if(doWait && lines.isEmpty) {
-      nextMessage.future.map{ x =>
-        if(minId.exists(minId => x.id >= minId) || minTime.exists(minTime => x.time >= minTime))
-          List()
-        else
-          List(x)
-      }
-    }
-    else {
-      val reversed = lines.reverse
-      Future(reversed)
-    }
-  }
-}
-
-case class SimpleError(error: String)
-case class SimpleResponse(message: String)
-
-case class JoinQuery(username: String)
-case class JoinResponse(auth: String)
-case class LeaveQuery(auth: String)
-case class PostQuery(auth: String, text: String)
-case class GetQuery(minId: Option[Int], minTime: Option[Int], doWait:Boolean)
-case class GetResponse(lines: List[ChatLine])
+import org.playarimaa.server.ChatServlet._
 
 class ChatServlet(system: ActorSystem)
     extends WebAppStack with JacksonJsonSupport with FutureSupport {
@@ -106,52 +66,90 @@ class ChatServlet(system: ActorSystem)
   //Execution context for FutureSupport
   protected implicit def executor: ExecutionContext = system.dispatcher
 
-  //val chatActor = system.actorOf(Props[ChatActor])
-  //implicit val timeout = new Timeout(10000)
-
-  val chat = new Chat()
+  val db = Database.forConfig("h2mem1")
+  val chat = new ChatSystem(db,system)
 
   //Before every action runs, set the content type to be in JSON format.
   before() {
     contentType = formats("json")
   }
 
-  //curl -i -H "Content-Type: application/json" -X POST -d '{"username":"Bob"}' http://localhost:8080/chat/login
-  post("/login") {
-    val query = Json.read[JoinQuery](request.body)
-    val auth = AuthTokenGen.genToken
-    chat.join(query.username,auth)
-    Json.write(JoinResponse(auth))
+  def getAction(action: String): Option[Action] = {
+    Action.all.find(_.name == action)
   }
 
+  //curl -i -H "Content-Type: application/json" -X POST -d '{"username":"Bob"}' http://localhost:8080/api/chat/main/login
+  //curl -i -H "Content-Type: application/json" -X POST -d '{"username:"Bob","auth":"528aa3ec17260b97ec11a19","text":"Ha"}' http://localhost:8080/api/chat/main/post
+  //curl -i -X GET 'http://localhost:8080/api/chat/main?minId=1&doWait=true'
 
-  post("/logout") {
-    val query = Json.read[LeaveQuery](request.body)
-    chat.leave(query.auth) match {
-      case Failure(e) => Json.write(SimpleError(e.getMessage))
-      case Success(()) => Json.write(SimpleResponse("Ok"))
+  def handleGet(channel: String, params: Map[String,String]) = {
+    val query = Get.parseQuery(params)
+    chat.get(channel, query.minId, None, query.minTime, None, query.doWait).map { chatLines =>
+      Json.write(Get.Reply(chatLines))
+    }
+  }
+  def handleAction(channel: String, params: Map[String,String]) = {
+    getAction(params("action")).get match {
+      case Join =>
+        val query = Json.read[Join.Query](request.body)
+        chat.join(channel, query.username).map { auth =>
+          Json.write(Join.Reply(query.username,auth))
+        }
+      case Leave =>
+        val query = Json.read[Leave.Query](request.body)
+        chat.leave(channel, query.username, query.auth).map { case () =>
+          Json.write(Leave.Reply("Ok"))
+        }
+      case Post =>
+        val query = Json.read[Post.Query](request.body)
+        chat.post(channel, query.username, query.auth, query.text).map { case () =>
+          Json.write(Post.Reply("Ok"))
+        }
     }
   }
 
-  //curl -i -H "Content-Type: application/json" -X POST -d '{"auth":"528aa3ec17260b97ec11a19","text":"Ha"}' http://localhost:8080/chat/
-  post("/") {
-    val query = Json.read[PostQuery](request.body)
-    chat.post(query.auth,query.text) match {
-      case Failure(e) => Json.write(SimpleError(e.getMessage))
-      case Success(()) => Json.write(SimpleResponse("Ok"))
+  def isValidBaseChannel(channel: String): Boolean = {
+    channel == "main"
+  }
+  def isValidGameId(gameId: String): Boolean = {
+    //TODO
+    false
+  }
+
+  get("/:channel") {
+    val channel = params("channel")
+    if(!isValidBaseChannel(channel))
+      pass()
+    else
+      handleGet(channel,params)
+  }
+  post("/:channel/:action") {
+    val channel = params("channel")
+    if(!isValidBaseChannel(channel) || getAction(params("action")).isEmpty)
+      pass()
+    else
+      handleAction(channel,params)
+  }
+
+  get("/game/:gameId") {
+    val gameId = params("gameId")
+    if(!isValidGameId(gameId))
+      pass()
+    else {
+      val channel = "game/" + gameId
+      handleGet(channel,params)
+    }
+  }
+  post("/game/:gameId/:action") {
+    val gameId = params("gameId")
+    if(!isValidGameId(gameId) || getAction(params("action")).isEmpty)
+      pass()
+    else {
+      val channel = "game/" + gameId
+      handleAction(channel,params)
     }
   }
 
-  //curl -i -X GET 'http://localhost:8080/chat/?minId=1&doWait=true'
-  val getTimeoutSecs = 15
-  get("/") {
-    val query = Json.readFromMap[GetQuery](params)
-    val chatLines = chat.get(query.minId, query.minTime, query.doWait)
-    val timeout = akka.pattern.after(getTimeoutSecs seconds, system.scheduler)(Future(List()))
-    Future.firstCompletedOf(List(chatLines,timeout)).map { lines =>
-      Json.write(GetResponse(lines))
-    }
-  }
 
   error {
     case e: Throwable => Json.write(SimpleError(e.getMessage()))
