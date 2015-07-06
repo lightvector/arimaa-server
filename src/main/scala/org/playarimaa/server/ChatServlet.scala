@@ -111,8 +111,8 @@ class ChatServlet(system: ActorSystem)
   def isValidBaseChannel(channel: String): Boolean = {
     channel == "main"
   }
-  def isValidGameChannel(channel: String): Boolean = {
-    //TODO isValidGameHash(channel)
+  def isValidGameId(gameId: String): Boolean = {
+    //TODO
     false
   }
 
@@ -131,19 +131,21 @@ class ChatServlet(system: ActorSystem)
       handleAction(channel,params)
   }
 
-  get("/game/:channel") {
-    if(!isValidGameChannel(channel))
+  get("/game/:gameId") {
+    val gameId = params("gameId")
+    if(!isValidGameId(gameId))
       pass()
     else {
-      val channel = "game/" + params("channel")
+      val channel = "game/" + gameId
       handleGet(channel,params)
     }
   }
-  post("/game/:channel/:action") {
-    if(!isValidGameChannel(channel) || getAction(params("action")).isEmpty)
+  post("/game/:gameId/:action") {
+    val gameId = params("gameId")
+    if(!isValidGameId(gameId) || getAction(params("action")).isEmpty)
       pass()
     else {
-      val channel = "game/" + params("channel")
+      val channel = "game/" + gameId
       handleAction(channel,params)
     }
   }
