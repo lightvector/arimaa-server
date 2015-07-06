@@ -15,44 +15,48 @@ import slick.driver.H2Driver.api.Database
 
 import org.playarimaa.server.Timestamp.Timestamp
 
-case class SimpleError(error: String)
+case object ChatServlet {
 
-case object Get {
-  case class Query(minId: Option[Long], minTime: Option[Timestamp], doWait: Option[Boolean])
-  case class Reply(lines: List[ChatLine])
+  case class SimpleError(error: String)
 
-  def parseQuery(params: Map[String,String]): Query =
-    new Query(
-      params.get("minId").map(_.toLong),
-      params.get("minTime").map(_.toDouble),
-      params.get("doWait").map(_.toBoolean)
-    )
-}
-sealed trait Action {
-  val name: String
-  abstract class Query
-  abstract class Reply
-}
-object Action {
-  val all: List[Action] = List(Join,Leave,Post)
+  case object Get {
+    case class Query(minId: Option[Long], minTime: Option[Timestamp], doWait: Option[Boolean])
+    case class Reply(lines: List[ChatLine])
+
+    def parseQuery(params: Map[String,String]): Query =
+      new Query(
+        params.get("minId").map(_.toLong),
+        params.get("minTime").map(_.toDouble),
+        params.get("doWait").map(_.toBoolean)
+      )
+  }
+  sealed trait Action {
+    val name: String
+    abstract class Query
+    abstract class Reply
+  }
+  object Action {
+    val all: List[Action] = List(Join,Leave,Post)
+  }
+
+  case object Join extends Action {
+    val name = "join"
+    case class Query(username: String)
+    case class Reply(username: String, auth: String)
+  }
+  case object Leave extends Action {
+    val name = "leave"
+    case class Query(username: String, auth: String)
+    case class Reply(message: String)
+  }
+  case object Post extends Action {
+    val name = "post"
+    case class Query(username: String, auth: String, text: String)
+    case class Reply(message: String)
+  }
 }
 
-case object Join extends Action {
-  val name = "join"
-  case class Query(username: String)
-  case class Reply(username: String, auth: String)
-}
-case object Leave extends Action {
-  val name = "leave"
-  case class Query(username: String, auth: String)
-  case class Reply(message: String)
-}
-case object Post extends Action {
-  val name = "post"
-  case class Query(username: String, auth: String, text: String)
-  case class Reply(message: String)
-}
-
+import org.playarimaa.server.ChatServlet._
 
 class ChatServlet(system: ActorSystem)
     extends WebAppStack with JacksonJsonSupport with FutureSupport {
@@ -74,9 +78,9 @@ class ChatServlet(system: ActorSystem)
     Action.all.find(_.name == action)
   }
 
-  //curl -i -H "Content-Type: application/json" -X POST -d '{"username":"Bob"}' http://localhost:8080/chat/login
-  //curl -i -H "Content-Type: application/json" -X POST -d '{"auth":"528aa3ec17260b97ec11a19","text":"Ha"}' http://localhost:8080/chat/
-  //curl -i -X GET 'http://localhost:8080/chat/?minId=1&doWait=true'
+  //curl -i -H "Content-Type: application/json" -X POST -d '{"username":"Bob"}' http://localhost:8080/api/chat/main/login
+  //curl -i -H "Content-Type: application/json" -X POST -d '{"username:"Bob","auth":"528aa3ec17260b97ec11a19","text":"Ha"}' http://localhost:8080/api/chat/main/post
+  //curl -i -X GET 'http://localhost:8080/api/chat/main?minId=1&doWait=true'
 
   def handleGet(channel: String, params: Map[String,String]) = {
     val query = Get.parseQuery(params)

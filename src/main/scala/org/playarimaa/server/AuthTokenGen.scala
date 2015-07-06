@@ -17,21 +17,24 @@ object AuthTokenGen {
   //may actually take a little time.
   def initialize: Unit = {
     this.synchronized {
-      try {
-        //Try /dev/urandom since the default seeding uses /dev/random and is very slow to start
-        val buf = Source.fromFile("/dev/urandom")(Codec.ISO8859)
-        val bytes = buf.take(NUM_SEED_BYTES * 2).map(_.toByte).toArray
-        if(bytes.length < NUM_SEED_BYTES * 2)
-          throw new IOException("Not all desired bytes read")
-        secureRand.setSeed(bytes)
+      if(!initialized) {
+        try {
+          //Try /dev/urandom since the default seeding uses /dev/random and is very slow to start
+          val buf = Source.fromFile("/dev/urandom")(Codec.ISO8859)
+          val bytes = buf.take(NUM_SEED_BYTES * 2).map(_.toByte).toArray
+          if(bytes.length < NUM_SEED_BYTES * 2)
+            throw new IOException("Not all desired bytes read")
+          secureRand.setSeed(bytes)
+        }
+        catch
+        {
+          case e: Exception =>
+            //TODO consider logging exception (github issue #48)
+            System.err.println("Error initializing from /dev/urandom, using default seed initialization: " +  e)
+            secureRand.setSeed(SecureRandom.getSeed(NUM_SEED_BYTES))
+        }
+        initialized = true
       }
-      catch
-      {
-        case e: Exception =>
-          //TODO log exception
-          secureRand.setSeed(SecureRandom.getSeed(NUM_SEED_BYTES))
-      }
-      initialized = true
     }
   }
 
