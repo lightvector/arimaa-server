@@ -39,13 +39,15 @@ class ArimaaServlet extends WebAppStack with JacksonJsonSupport with ScalateSupp
 
   //curl -i http://localhost:8080/
   get("/") {
-
     //
     contentType="text/html"
-    //layoutTemplate("/WEB-INF/views/hello.jade")
-    //jade("/WEB-INF/views/index.jade", "layout" -> "/WEB-INF/layouts/basic_layout.jade")
-    jade("/WEB-INF/views/hello.jade", "layout"->"/WEB-INF/layouts/default.jade")
-    //Response.create("Hello world")
+    jade("/WEB-INF/views/index.jade", "layout"->"/WEB-INF/layouts/default.jade")
+  }
+
+  get("/chat") {
+    contentType="text/html"
+    val path = "/chat.html"
+    new java.io.File( getServletContext().getResource(path).getFile )
   }
 
   //curl -i -X POST -d "name=sally" http://localhost:8080/test
