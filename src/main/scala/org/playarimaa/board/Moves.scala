@@ -2,25 +2,25 @@ package org.playarimaa.board
 import scala.util.{Try, Success, Failure}
 
 /** Internal representation of a single step. */
-case class Step(src: Location, dir: Direction) {
+case class Step(piece: Piece, src: Location, dir: Direction) {
   def dest: Location =
     src(dir)
 
   override def toString: String =
-    src.toString + dir
+    "" + piece + src + dir
 }
 
 
 /** Internal representation of a single piece placement (such as during setup). */
 case class Placement(piece: Piece, dest: Location) {
   override def toString: String =
-    piece.toString + dest
+    "" + piece + dest
 }
 
 /** Internal utility class representing a piece capture. */
 case class Capture(piece: Piece, src: Location) {
   override def toString: String =
-    piece.toString + src + "x"
+    "" + piece + src + "x"
 }
 
 /** Internal representation of a move */
