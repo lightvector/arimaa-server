@@ -8,24 +8,24 @@ class BoardTests extends FlatSpec with Matchers {
 
   "Piece" should "round-trip through char" in {
     Piece.values.foreach( piece =>
-      Piece.ofChar(piece.toChar) should be (Success(piece))
+      Piece(piece.toChar) should be (piece)
     )
   }
 
   it should "parse valid characters correctly" in {
-    Piece.ofChar('R') should be (Success(Piece(GOLD, RAB)))
-    Piece.ofChar('C') should be (Success(Piece(GOLD, CAT)))
-    Piece.ofChar('D') should be (Success(Piece(GOLD, DOG)))
-    Piece.ofChar('H') should be (Success(Piece(GOLD, HOR)))
-    Piece.ofChar('M') should be (Success(Piece(GOLD, CAM)))
-    Piece.ofChar('E') should be (Success(Piece(GOLD, ELE)))
+    Piece('R') should be (Piece(GOLD, RAB))
+    Piece('C') should be (Piece(GOLD, CAT))
+    Piece('D') should be (Piece(GOLD, DOG))
+    Piece('H') should be (Piece(GOLD, HOR))
+    Piece('M') should be (Piece(GOLD, CAM))
+    Piece('E') should be (Piece(GOLD, ELE))
 
-    Piece.ofChar('r') should be (Success(Piece(SILV, RAB)))
-    Piece.ofChar('c') should be (Success(Piece(SILV, CAT)))
-    Piece.ofChar('d') should be (Success(Piece(SILV, DOG)))
-    Piece.ofChar('h') should be (Success(Piece(SILV, HOR)))
-    Piece.ofChar('m') should be (Success(Piece(SILV, CAM)))
-    Piece.ofChar('e') should be (Success(Piece(SILV, ELE)))
+    Piece('r') should be (Piece(SILV, RAB))
+    Piece('c') should be (Piece(SILV, CAT))
+    Piece('d') should be (Piece(SILV, DOG))
+    Piece('h') should be (Piece(SILV, HOR))
+    Piece('m') should be (Piece(SILV, CAM))
+    Piece('e') should be (Piece(SILV, ELE))
   }
 
   it should "parse invalid characters correctly" in {
@@ -99,7 +99,7 @@ class BoardTests extends FlatSpec with Matchers {
   }
 
   "Location" should "parse valid strings correctly" in {
-    Location.ofString("a1") should be (Success(new Location(0, 0)))
+    Location("a1") should be (Location(0, 0))
   }
 
   it should "parse invalid strings correctly" in {
@@ -128,10 +128,10 @@ class BoardTests extends FlatSpec with Matchers {
 
   it should "print toStringAei correctly" in {
     new Board().toStringAei should be ("[                                                                ]")
-    new Board().add(GOLD_RAB, Location.ofString("a8").get).get
+    new Board().add(GOLD_RAB, Location("a8")).get
         .toStringAei should be ("[R                                                               ]")
-    new Board().add(SILV_RAB, Location.ofString("a8").get).get
-        .add(GOLD_HOR, Location.ofString("b1").get).get
+    new Board().add(SILV_RAB, Location("a8")).get
+        .add(GOLD_HOR, Location("b1")).get
         .toStringAei should be ("[r                                                        H      ]")
   }
 
@@ -162,19 +162,19 @@ class BoardTests extends FlatSpec with Matchers {
   }
 
   "Location" should "detect traps correctly" in {
-    Location.ofString("c3").map(x => x.isTrap).get should be (true)
-    Location.ofString("c6").map(x => x.isTrap).get should be (true)
-    Location.ofString("f3").map(x => x.isTrap).get should be (true)
-    Location.ofString("f6").map(x => x.isTrap).get should be (true)
+    Location("c3").isTrap should be (true)
+    Location("c6").isTrap should be (true)
+    Location("f3").isTrap should be (true)
+    Location("f6").isTrap should be (true)
 
-    Location.ofString("a1").map(x => x.isTrap).get should be (false)
-    Location.ofString("a8").map(x => x.isTrap).get should be (false)
-    Location.ofString("h1").map(x => x.isTrap).get should be (false)
-    Location.ofString("h8").map(x => x.isTrap).get should be (false)
-    Location.ofString("c2").map(x => x.isTrap).get should be (false)
-    Location.ofString("c4").map(x => x.isTrap).get should be (false)
-    Location.ofString("b3").map(x => x.isTrap).get should be (false)
-    Location.ofString("d3").map(x => x.isTrap).get should be (false)
+    Location("a1").isTrap should be (false)
+    Location("a8").isTrap should be (false)
+    Location("h1").isTrap should be (false)
+    Location("h8").isTrap should be (false)
+    Location("c2").isTrap should be (false)
+    Location("c4").isTrap should be (false)
+    Location("b3").isTrap should be (false)
+    Location("d3").isTrap should be (false)
   }
 
   it should "detect out of bounds correctly" in {
