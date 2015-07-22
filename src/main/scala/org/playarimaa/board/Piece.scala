@@ -46,6 +46,10 @@ object Piece {
     }
   }
 
+  def apply(c: Char): Piece = {
+    ofChar(c).get
+  }
+
   def ofChar(c: Char): Try[Piece] =
     PieceType.ofChar(c).map { pt =>
       val player = if(c.isUpper) GOLD else SILV

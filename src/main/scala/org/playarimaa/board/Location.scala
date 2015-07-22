@@ -24,6 +24,10 @@ case class Location (x: Int, y: Int) {
 
 object Location {
 
+  def apply(s: String): Location = {
+    ofString(s).get
+  }
+
   def ofString(s: String): Try[Location] = {
     if(s.length != 2
       || s(0) <  'a'

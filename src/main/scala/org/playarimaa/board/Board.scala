@@ -106,6 +106,17 @@ class Board(
     }
   }
 
+  def setPlayer(p: Player): Board = {
+    new Board(pieces, p, stepsLeft)
+  }
+
+  def setStepsLeft(s: Int): Board = {
+    if (s < 0 || s > Board.STEPS_PER_TURN) {
+      throw new IllegalArgumentException("Invalid steps left: " + s)
+    }
+    new Board(pieces, player, s)
+  }
+
   /** Make the specified placements, returning the new board.
     * Returns Error if placements are not on unique empty locations
     * OR if the resulting position has an unguarded piece on a trap
@@ -131,16 +142,37 @@ class Board(
     // 2. capture detection: friendly abandonment
     // 3. "remove" and "add" must be atomic: either both succeed or both fail. (Needs test)
 
-    var board = remove(step.piece, step.src)
-    if (board.isSuccess) {
-      board = board.get.add(step.piece, step.dest)
+    val piece = step.piece
+    val fromSquare = step.src
+    val toSquare = step.dest
+
+    if (stepsLeft <= 0) {
+      return Failure(new IllegalArgumentException("No steps left."))
     }
-    board
+
+    remove(piece, fromSquare).flatMap { board =>
+      board.add(piece, toSquare).flatMap { board =>
+        Success(board.setStepsLeft(stepsLeft - 1))
+      }
+    }
   }
 
   def resolveCaps: (Board, List[Capture]) = {
-    //TODO
-    (this,List())
+    var captures : List[Capture] = List()
+    var newBoard = this
+
+    Board.TRAPS.foreach { trap =>
+      newBoard(trap) match {
+        case Empty | OffBoard => ()
+        case HasPiece(piece) => {
+          if (!newBoard.isGuardedBy(trap, piece.owner)) {
+            captures = new Capture(piece, trap) :: captures
+            newBoard = newBoard.remove(piece, trap).get
+          }
+        }
+      }
+    }
+    (newBoard, captures)
   }
 
   def endTurn: Board =
@@ -170,14 +202,12 @@ class Board(
 object Board {
   val SIZE = 8
   val STEPS_PER_TURN = 4
-  /*
   val TRAPS = List(
     Location(2,2),
     Location(5,2),
     Location(2,5),
     Location(5,5)
   )
-  */
 
   def isOutOfBounds(loc: Location): Boolean =
     loc.x < 0 || loc.x >= SIZE || loc.y < 0 || loc.y >= SIZE
