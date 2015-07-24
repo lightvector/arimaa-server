@@ -5,9 +5,13 @@ import scala.io.Codec
 import java.security.SecureRandom
 import java.io.IOException
 
-object AuthTokenGen {
+object RandGen {
+  type Auth = String
+  type GameID = String
+
   val NUM_SEED_BYTES = 32
-  val NUM_TOKEN_INTS = 3
+  val NUM_AUTH_INTS = 3
+  val NUM_GAME_ID_INTS = 2
 
   private val secureRand: SecureRandom = new SecureRandom()
   private var initialized = false
@@ -38,15 +42,20 @@ object AuthTokenGen {
     }
   }
 
-  def genToken: String = {
+  def genToken(numInts: Int): String = {
     this.synchronized {
       if(!initialized)
-        throw new IllegalStateException("AuthTokenGen.initialize not called")
+        throw new IllegalStateException("RandGen.initialize not called")
 
-      List.range(0,NUM_TOKEN_INTS).
+      List.range(0,numInts).
         map(_ => secureRand.nextInt).
         map(_.toHexString).
         mkString("")
     }
   }
+
+  def genAuth: Auth =
+    genToken(NUM_AUTH_INTS)
+  def genGameID: GameID =
+    genToken(NUM_GAME_ID_INTS)
 }

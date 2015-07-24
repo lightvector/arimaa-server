@@ -9,6 +9,8 @@ import akka.pattern.{ask, pipe, after}
 import akka.util.Timeout
 import slick.driver.H2Driver.api._
 import org.playarimaa.server.Timestamp.Timestamp
+import org.playarimaa.server.RandGen.Auth
+import org.playarimaa.server.Accounts.Import._
 
 object ChatSystem {
   //Leave chat if it's been this many seconds with no activity
@@ -23,15 +25,10 @@ object ChatSystem {
   val NO_CHANNEL_MESSAGE = "No such chat channel, or not authorized"
   val NO_LOGIN_MESSAGE = "Not logged in, or timed out due to inactivity"
 
-  object Import {
-    //Alias a few types to make method declarations more self-documenting
-    type Channel = String
-    type Username = String
-    type Auth = String
-  }
+  type Channel = String
 }
 
-import ChatSystem.Import._
+import ChatSystem.Channel
 
 case class ChatLine(id: Long, channel: Channel, username: Username, text: String, timestamp: Timestamp)
 
@@ -142,14 +139,6 @@ object ChatChannel {
 /** An actor that handles an individual channel that people can chat in */
 class ChatChannel(val channel: Channel, val chatDB: ActorRef, val actorSystem: ActorSystem) extends Actor with Stash {
 
-  class LoginData() {
-    //All auth keys this user has, along with the time they were most recently used
-    var auths: Map[Auth,Timestamp] = Map()
-    //Most recent time anything happened for this user
-    var lastActive: Timestamp = Timestamp.get
-  }
-  var loginData: Map[Username,LoginData] = Map()
-
   //Fulfilled and replaced on each message - this is the mechanism by which
   //queries can block and wait for chat activity
   var nextMessage: Promise[ChatLine] = Promise()
@@ -160,7 +149,7 @@ class ChatChannel(val channel: Channel, val chatDB: ActorRef, val actorSystem: A
   var messagesNotYetInDB: Queue[ChatLine] = Queue()
 
   //Most recent time anything happened in this channel
-  var lastActive: Timestamp = Timestamp.get
+  val logins: LoginTracker = new LoginTracker(ChatSystem.INACTIVITY_TIMEOUT)
 
   case class Initialized(nextId:Try[Long])
   case class DBWritten(upToId:Long)
@@ -186,17 +175,12 @@ class ChatChannel(val channel: Channel, val chatDB: ActorRef, val actorSystem: A
 
   def normalReceive: Receive = {
     case ChatChannel.Join(username: Username) =>
-      lastActive = Timestamp.get
-      val auth = AuthTokenGen.genToken
-      val ld = findOrAddLogin(username)
-      ld.auths = ld.auths + (auth -> lastActive)
-      ld.lastActive = lastActive
+      val auth = logins.login(username, Timestamp.get)
       sender ! (auth : Auth)
 
     case ChatChannel.Leave(username: Username, auth: Auth) =>
       val result: Try[Unit] = requiringLogin(username,auth) { () =>
-        val ld = loginData(username)
-        ld.auths = ld.auths - auth
+        logins.logout(username,auth,Timestamp.get)
       }
       replyWith(sender, result)
 
@@ -231,7 +215,7 @@ class ChatChannel(val channel: Channel, val chatDB: ActorRef, val actorSystem: A
       maxTime: Option[Timestamp],
       doWait: Option[Boolean]
     ) =>
-      lastActive = Timestamp.get
+      logins.setLastActive(Timestamp.get)
       val minId_ = minId.getOrElse(nextId - ChatSystem.READ_MAX_LINES)
       val doWait_ = doWait.getOrElse(false)
 
@@ -276,28 +260,11 @@ class ChatChannel(val channel: Channel, val chatDB: ActorRef, val actorSystem: A
   }
 
 
-  def findOrAddLogin(username: Username): LoginData = {
-    val ld = loginData.getOrElse(username, new LoginData)
-    loginData = loginData + (username -> ld)
-    ld
-  }
-
   def requiringLogin[T](username: Username, auth: Auth)(f:() => T) : Try[T] = {
-    def loginFailed = Failure(new Exception(ChatSystem.NO_LOGIN_MESSAGE))
-
-    Try(loginData(username)).orElse(loginFailed).flatMap { ld =>
-      Try(ld.auths(auth)).orElse(loginFailed).flatMap { time =>
-        val now = Timestamp.get
-        if(now >= time + ChatSystem.INACTIVITY_TIMEOUT)
-          loginFailed
-        else {
-          ld.auths = ld.auths + (auth -> now)
-          lastActive = now
-          ld.lastActive = now
-          Success(f())
-        }
-      }
-    }
+    if(logins.requireLogin(username,auth,Timestamp.get))
+      Success(f())
+    else
+      Failure(new Exception(ChatSystem.NO_LOGIN_MESSAGE))
   }
 
   def clearMessagesNotYetInDB(upToId: Long) {

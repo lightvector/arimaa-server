@@ -9,6 +9,9 @@ sealed trait Player {
       case GOLD => SILV
       case SILV => GOLD
     }
+
+  override def toString: String =
+    "" + char
 }
 
 object Player {
@@ -20,6 +23,13 @@ object Player {
       case 's' => Success(SILV)
       case _   => Failure(new IllegalArgumentException("Unknown player: " + c))
     }
+
+  def ofString(s: String): Try[Player] = {
+    if(s.length == 1)
+      ofChar(s(0))
+    else
+      Failure(new IllegalArgumentException("Unknown player: " + s))
+  }
 }
 case object GOLD extends Player {val char = 'g'}
 case object SILV extends Player {val char = 's'}

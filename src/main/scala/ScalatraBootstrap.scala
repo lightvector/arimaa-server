@@ -17,7 +17,7 @@ object ArimaaServerInit {
     this.synchronized {
       if(!initialized) {
         //Initalize CSPRNG on startup
-        AuthTokenGen.initialize
+        RandGen.initialize
 
         //Initialize in-memory database and create tables for testing
         val db = Database.forConfig("h2mem1")
