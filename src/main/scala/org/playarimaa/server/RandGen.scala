@@ -49,7 +49,7 @@ object RandGen {
 
       List.range(0,numInts).
         map(_ => secureRand.nextInt).
-        map(_.toHexString).
+        map("%08x".format(_)).
         mkString("")
     }
   }
