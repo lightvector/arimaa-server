@@ -26,6 +26,8 @@ object ChatSystem {
   val NO_LOGIN_MESSAGE = "Not logged in, or timed out due to inactivity"
 
   type Channel = String
+
+  val table = TableQuery[ChatTable]
 }
 
 import ChatSystem.Channel
@@ -38,14 +40,13 @@ case class ChatLine(id: Long, channel: Channel, username: Username, text: String
 class ChatSystem(val db: Database, val actorSystem: ActorSystem)(implicit ec: ExecutionContext) {
 
   private var channelData: Map[Channel,ActorRef] = Map()
-  private val chatDB = actorSystem.actorOf(Props(new ChatDB(db)))
   implicit val timeout = ChatSystem.AKKA_TIMEOUT
 
   private def openChannel(channel: Channel): ActorRef = this.synchronized {
     channelData.get(channel) match {
       case Some(cc) => cc
       case None =>
-        val cc = actorSystem.actorOf(Props(new ChatChannel(channel,chatDB,actorSystem)))
+        val cc = actorSystem.actorOf(Props(new ChatChannel(channel,db,actorSystem)))
         channelData = channelData + (channel -> cc)
         cc
     }
@@ -137,7 +138,7 @@ object ChatChannel {
 }
 
 /** An actor that handles an individual channel that people can chat in */
-class ChatChannel(val channel: Channel, val chatDB: ActorRef, val actorSystem: ActorSystem) extends Actor with Stash {
+class ChatChannel(val channel: Channel, val db: Database, val actorSystem: ActorSystem) extends Actor with Stash {
 
   //Fulfilled and replaced on each message - this is the mechanism by which
   //queries can block and wait for chat activity
@@ -151,23 +152,27 @@ class ChatChannel(val channel: Channel, val chatDB: ActorRef, val actorSystem: A
   //Most recent time anything happened in this channel
   val logins: LoginTracker = new LoginTracker(ChatSystem.INACTIVITY_TIMEOUT)
 
-  case class Initialized(nextId:Try[Long])
-  case class DBWritten(upToId:Long)
+  case class Initialized(maxId: Try[Long])
+  case class DBWritten(upToId: Long)
 
   implicit val timeout = ChatSystem.AKKA_TIMEOUT
   import context.dispatcher
 
   override def preStart = {
-    (chatDB ? ChatDB.GetNextId(channel)).onComplete {
-      result => self ! Initialized(result.map(_.asInstanceOf[Long]))
+    //Find the maximum chat id in this channel from the database
+    val query: Rep[Option[Long]] = ChatSystem.table.filter(_.channel === channel).map(_.id).max
+    db.run(query.result).map(_.getOrElse(-1L)).onComplete {
+      result => self ! Initialized(result)
     }
   }
 
   def receive = initialReceive
-
   def initialReceive: Receive = {
-    case Initialized(id: Try[Long]) =>
-      nextId = id.get + 1
+    //Wait for us to have found the maximum chat id
+    case Initialized(maxId: Try[Long]) =>
+      //Raises an exception in the case where we failed to find the max id
+      nextId = maxId.get + 1
+      //And begin normal operation
       context.become(normalReceive)
       unstashAll()
     case _ => stash()
@@ -193,8 +198,8 @@ class ChatChannel(val channel: Channel, val chatDB: ActorRef, val actorSystem: A
         messagesNotYetInDB = messagesNotYetInDB.enqueue(line)
 
         //Write to DB and on success clear own memory
-        val written: Future[Any] = (chatDB ? ChatDB.WriteLine(line))
-        written.foreach { _ =>
+        val query = ChatSystem.table += line
+        db.run(DBIO.seq(query)).foreach { _ =>
           self ! DBWritten(line.id)
         }
 
@@ -226,9 +231,18 @@ class ChatChannel(val channel: Channel, val chatDB: ActorRef, val actorSystem: A
         maxTime.forall(maxTime => x.timestamp <= maxTime)
       }
 
-      val query = ChatDB.ReadLines(channel,minId_,maxId,minTime,maxTime)
-      val result: Future[List[ChatLine]] = (chatDB ? query).flatMap { result =>
-        val dbLines = result.asInstanceOf[List[ChatLine]]
+      var query = ChatSystem.table.
+        filter(_.channel === channel).
+        filter(_.id >= minId_)
+      maxId.foreach(maxId => query = query.filter(_.id <= maxId))
+      minTime.foreach(minTime => query = query.filter(_.timestamp >= minTime))
+      maxTime.foreach(maxTime => query = query.filter(_.timestamp <= maxTime))
+      query = query.
+        sortBy(_.id).
+        take(ChatSystem.READ_MAX_LINES)
+
+      val dbResult: Future[List[ChatLine]] = db.run(query.result).map(_.toList)
+      val result: Future[List[ChatLine]] = dbResult.flatMap { dbLines =>
         val extraLines = messagesNotYetInDB.toList.filter(isOk)
         val lines =
           (dbLines,extraLines) match {
@@ -250,6 +264,11 @@ class ChatChannel(val channel: Channel, val chatDB: ActorRef, val actorSystem: A
         }
       }
       result pipeTo sender
+
+    case DBWritten(upToId: Long) =>
+      messagesNotYetInDB = messagesNotYetInDB.dropWhile { line =>
+        line.id <= upToId
+      }
   }
 
   def replyWith[T](sender: ActorRef, result: Try[T]) = {
@@ -265,67 +284,6 @@ class ChatChannel(val channel: Channel, val chatDB: ActorRef, val actorSystem: A
       Success(f())
     else
       Failure(new Exception(ChatSystem.NO_LOGIN_MESSAGE))
-  }
-
-  def clearMessagesNotYetInDB(upToId: Long) {
-    messagesNotYetInDB = messagesNotYetInDB.dropWhile{ line =>
-      line.id <= upToId
-    }
-  }
-
-
-}
-
-//CHAT DATABASE---------------------------------------------------------------------
-
-object ChatDB {
-
-  //ACTOR MESSAGES---------------------------------------------------------
-
-  //Replies with Long
-  case class GetNextId(channel: Channel)
-  //Replies with Unit when result committed
-  case class WriteLine(line: ChatLine)
-  //Replies with List[ChatLine]
-  case class ReadLines(channel: Channel, minId: Long, maxId: Option[Long], minTime: Option[Timestamp], maxTime: Option[Timestamp])
-
-
-  val table = TableQuery[ChatTable]
-}
-
-/** An actor that handles chat-related database queries */
-class ChatDB(val db: Database)(implicit ec: ExecutionContext) extends Actor {
-
-  def receive = {
-    case ChatDB.GetNextId(channel) => {
-      val query: Rep[Option[Long]] = ChatDB.table.filter(_.channel === channel).map(_.id).max
-      //println("Generated SQL:\n" + query.result.statements)
-
-      val result: Future[Long] = db.run(query.result).map(_.getOrElse(-1L))
-      result.pipeTo(sender)
-    }
-
-    case ChatDB.WriteLine(line) => {
-      val query = ChatDB.table += line
-
-      val result: Future[Unit] = db.run(DBIO.seq(query))
-      result.pipeTo(sender)
-    }
-
-    case ChatDB.ReadLines(channel, minId, maxId, minTime, maxTime) => {
-      var query = ChatDB.table.
-        filter(_.channel === channel).
-        filter(_.id >= minId)
-      maxId.foreach(maxId => query = query.filter(_.id <= maxId))
-      minTime.foreach(minTime => query = query.filter(_.timestamp >= minTime))
-      maxTime.foreach(maxTime => query = query.filter(_.timestamp <= maxTime))
-      query = query.
-        sortBy(_.id).
-        take(ChatSystem.READ_MAX_LINES)
-
-      val result: Future[List[ChatLine]] = db.run(query.result).map(_.toList)
-      result.pipeTo(sender)
-    }
   }
 
 }

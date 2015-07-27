@@ -22,7 +22,7 @@ object ArimaaServerInit {
         //Initialize in-memory database and create tables for testing
         val db = Database.forConfig("h2mem1")
         Await.result(db.run(DBIO.seq(
-          ChatDB.table.schema.create
+          ChatSystem.table.schema.create
         )), Duration.Inf)
         initialized = true
       }
