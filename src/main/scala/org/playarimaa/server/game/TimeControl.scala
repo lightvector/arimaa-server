@@ -1,5 +1,11 @@
 package org.playarimaa.server.game
 
+object TimeControl {
+  /* Increment and delay are multiplied by this every turn during overtime
+   * If changing this, make sure to update API docs. */
+  OVERTIME_FACTOR_PER_TURN: Double = 1.0 - 1.0 / 30.0
+}
+
 case class TimeControl(
   initialTime: Int,
   increment: Int,
@@ -8,3 +14,27 @@ case class TimeControl(
   maxMoveTime: Int,
   overtimeAfter: Int
 )
+{
+  /* Compute the amount of time left on player clock after a player's turn */
+  def timeLeftAfter(timeAtStartOfTurn: Double, timeUsed: Double, turn: Int) = {
+    val overtimeFactor =
+      if(turn >= overtimeAfter)
+        math.pow(OVERTIME_FACTOR_PER_TURN, turn - overtimeAfter + 1)
+      else
+        1.0
+    val adjIncrement = increment * overtimeFactor
+    val adjDelay = delay * overtimeFactor
+
+    min(maxReserve, timeAtStartOfTurn + adjIncrement - max(timeUsed - adjDelay, 0.0))
+  }
+
+  /* Compute the amount of time left on player clock given the player's whole history
+   * of time usage on all the moves of the game. */
+  def timeLeftFromHistory(timeUsageHistory: List[Double]): Double = {
+    var timeLeft = initialTime
+    timeUsageHistory.zipWithIndex.foreach { case (timeUsed,turn) =>
+      timeLeft = timeLeftAfter(timeLeft,timeUsed,turn)
+    }
+    timeLeft
+  }
+}

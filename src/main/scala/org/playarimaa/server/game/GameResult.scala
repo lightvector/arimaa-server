@@ -3,7 +3,7 @@ import org.playarimaa.server.Timestamp.Timestamp
 import org.playarimaa.board.Player
 
 case class GameResult(
-  winner: Player,
+  winner: Option[Player],
   reason: EndingReason,
   endTime: Timestamp
 )

@@ -14,7 +14,7 @@ class LoginTracker(inactivityTimeout: Double) {
   private var loginData: Map[Username,LoginData] = Map()
   private var lastActive: Timestamp = Timestamp.get
 
-  def findOrAddLogin(username: Username): LoginData = synchronized {
+  private def findOrAddLogin(username: Username): LoginData = synchronized {
     val ld = loginData.getOrElse(username, new LoginData)
     loginData = loginData + (username -> ld)
     ld
@@ -30,7 +30,7 @@ class LoginTracker(inactivityTimeout: Double) {
   }
 
   /* Returns the LoginData for a user if that user is logged in */
-  def getLoginData(username: Username, auth: Auth, now: Timestamp): Option[LoginData] = synchronized {
+  private def getLoginData(username: Username, auth: Auth, now: Timestamp): Option[LoginData] = synchronized {
     loginData.get(username).flatMap { ld =>
       ld.auths.get(auth).flatMap { time =>
         if(now >= time + inactivityTimeout)
