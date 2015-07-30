@@ -21,6 +21,8 @@ object ChatSystem {
   val GET_TIMEOUT: Double = 15.0
   //Timeout for akka ask queries
   val AKKA_TIMEOUT: Timeout = new Timeout(20 seconds)
+  //Period for checking timeouts in a chat even if nothing happens
+  val CHAT_CHECK_TIMEOUT_PERIOD: Double = 120.0
 
   val NO_CHANNEL_MESSAGE = "No such chat channel, or not authorized"
   val NO_LOGIN_MESSAGE = "Not logged in, or timed out due to inactivity"
@@ -135,6 +137,8 @@ object ChatChannel {
     maxTime: Option[Timestamp],
     doWait: Option[Boolean]
   )
+
+
 }
 
 /** An actor that handles an individual channel that people can chat in */
@@ -149,11 +153,17 @@ class ChatChannel(val channel: Channel, val db: Database, val actorSystem: Actor
   //races between writes to the chat and queries to read the new lines posted
   var messagesNotYetInDB: Queue[ChatLine] = Queue()
 
-  //Most recent time anything happened in this channel
+  //Tracks who is logged in to this chat channel
   val logins: LoginTracker = new LoginTracker(ChatSystem.INACTIVITY_TIMEOUT)
+  //Most recent time anything happened in this channel
+  var lastActive = Timestamp.get
+
+  //Whether or not we started the loop that checks timeouts for the chat
+  var timeoutCycleStarted = false
 
   case class Initialized(maxId: Try[Long])
   case class DBWritten(upToId: Long)
+  case class DoTimeouts()
 
   implicit val timeout = ChatSystem.AKKA_TIMEOUT
   import context.dispatcher
@@ -163,6 +173,10 @@ class ChatChannel(val channel: Channel, val db: Database, val actorSystem: Actor
     val query: Rep[Option[Long]] = ChatSystem.table.filter(_.channel === channel).map(_.id).max
     db.run(query.result).map(_.getOrElse(-1L)).onComplete {
       result => self ! Initialized(result)
+    }
+    if(!timeoutCycleStarted) {
+      timeoutCycleStarted = true
+      actorSystem.scheduler.scheduleOnce(ChatSystem.CHAT_CHECK_TIMEOUT_PERIOD seconds, self, DoTimeouts())
     }
   }
 
@@ -180,7 +194,10 @@ class ChatChannel(val channel: Channel, val db: Database, val actorSystem: Actor
 
   def normalReceive: Receive = {
     case ChatChannel.Join(username: Username) =>
-      val auth = logins.login(username, Timestamp.get)
+      val now = Timestamp.get
+      logins.doTimeouts(now)
+      val auth = logins.login(username, now)
+      lastActive = now
       sender ! (auth : Auth)
 
     case ChatChannel.Leave(username: Username, auth: Auth) =>
@@ -220,7 +237,7 @@ class ChatChannel(val channel: Channel, val db: Database, val actorSystem: Actor
       maxTime: Option[Timestamp],
       doWait: Option[Boolean]
     ) =>
-      logins.setLastActive(Timestamp.get)
+      lastActive = Timestamp.get
       val minId_ = minId.getOrElse(nextId - ChatSystem.READ_MAX_LINES)
       val doWait_ = doWait.getOrElse(false)
 
@@ -269,6 +286,12 @@ class ChatChannel(val channel: Channel, val db: Database, val actorSystem: Actor
       messagesNotYetInDB = messagesNotYetInDB.dropWhile { line =>
         line.id <= upToId
       }
+
+    case DoTimeouts() =>
+      val now = Timestamp.get
+      //TODO if nobody is logged in for long enough, then shut down this chat!
+      logins.doTimeouts(now)
+      actorSystem.scheduler.scheduleOnce(ChatSystem.CHAT_CHECK_TIMEOUT_PERIOD seconds, self, DoTimeouts())
   }
 
   def replyWith[T](sender: ActorRef, result: Try[T]) = {
@@ -278,10 +301,13 @@ class ChatChannel(val channel: Channel, val db: Database, val actorSystem: Actor
     }
   }
 
-
   def requiringLogin[T](username: Username, auth: Auth)(f:() => T) : Try[T] = {
-    if(logins.requireLogin(username,auth,Timestamp.get))
+    val now = Timestamp.get
+    logins.doTimeouts(now)
+    if(logins.heartbeat(username,auth,now)) {
+      lastActive = now
       Success(f())
+    }
     else
       Failure(new Exception(ChatSystem.NO_LOGIN_MESSAGE))
   }

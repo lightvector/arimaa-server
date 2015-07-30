@@ -8,11 +8,17 @@ import org.playarimaa.server.RandGen
 import org.playarimaa.server.RandGen.Auth
 import org.playarimaa.server.RandGen.GameID
 import org.playarimaa.server.Accounts.Import._
-import org.playarimaa.board.Player
+import org.playarimaa.server.LoginTracker
 import org.playarimaa.server.Utils._
+import org.playarimaa.board.Player
+import org.playarimaa.board.{GOLD,SILV}
+import org.playarimaa.board.{Game,Notation,StandardNotation}
 
 object Games {
-  val HEARTBEAT_TIMEOUT = 15.0
+  //Time out users from games if they don't heartbeat at least this often
+  val INACTIVITY_TIMEOUT = 15.0
+  //Clean up a game with no creator after this many seconds if there is nobody in it
+  val NO_CREATOR_GAME_CLEANUP_AGE = 600.0
   val STANDARD_TYPE = "standard"
 
   val gameTable = TableQuery[GameTable]
@@ -20,25 +26,17 @@ object Games {
 
 }
 
-case class HeartbeatTime(var lastTime: Timestamp) {
-  def heartbeat =
-    lastTime = Timestamp.get
-  def youngerThan(age: Double, now: Timestamp): Boolean =
-    now - lastTime < age
-}
-
-
-
 class Games(val db: Database)(implicit ec: ExecutionContext) {
 
   //TODO document game lifecycle
 
   case class OpenGameData(
     val meta: GameMetadata,
-    val creator: Username,
-    val creatorHeartbeat: HeartbeatTime,
-    var joined: Map[Username,HeartbeatTime],
-
+    val creator: Option[Username],
+    val creationTime: Timestamp,
+    val logins: LoginTracker,
+    //A map indicating who has accepted to play who
+    var accepted: Map[Username,Username],
     //A flag indicating that this game has been started and will imminently be removed
     var starting: Boolean
   )
@@ -50,15 +48,13 @@ class Games(val db: Database)(implicit ec: ExecutionContext) {
   private var openGames: Map[GameID,OpenGameData] = Map()
 
   case class ActiveGameData(
+    val logins: LoginTracker,
     var meta: GameMetadata,
     var moves: List[MoveInfo],
     var moveStartTime: Timestamp,
     var gTimeThisMove: Double,
     var sTimeThisMove: Double,
-    var gPresent: Boolean,
-    var sPresent: Boolean,
-    var gHeartbeat: HeartbeatTime,
-    var sHeartbeat: HeartbeatTime
+    var game: Game
   )
 
   //Lock protects both the mapping itself and all of the mutable contents.
@@ -66,7 +62,7 @@ class Games(val db: Database)(implicit ec: ExecutionContext) {
   //All active games are in this map, and also any game in this map has an entry in the database
   private var activeGames: Map[GameID,ActiveGameData] = Map()
 
-  def createStandardGame(creator: Username, tc: TimeControl, rated: Boolean): Future[GameID] = {
+  def createStandardGame(creator: Username, tc: TimeControl, rated: Boolean): Future[(GameID,Auth)] = {
     assignGameIdAndAddOpenGame { id: GameID =>
       val now = Timestamp.get
       val meta = GameMetadata(
@@ -81,61 +77,72 @@ class Games(val db: Database)(implicit ec: ExecutionContext) {
         gameType = Games.STANDARD_TYPE,
         tags = List(),
         result = GameResult(
-          player = None,
+          winner = None,
           reason = EndingReason.ADJOURNED,
           endTime = now
         )
       )
-      val openGameData = OpenGameData(
+      val game = OpenGameData(
         meta = meta,
-        creator = creator,
-        creatorHeartbeat = HeartbeatTime(now),
-        joined = List(),
+        creator = Some(creator),
+        creationTime = now,
+        logins = new LoginTracker(Games.INACTIVITY_TIMEOUT),
+        accepted = Map(),
         starting = false
       )
-      openGameData
+      val gameAuth = game.logins.login(creator,now)
+      (game, gameAuth)
     }
   }
 
   /* Generates a GameID that doesn't collide with anything currently in the database
    * or any open games and inserts the specified open game record into the [openGames] map. */
-  private def assignGameIdAndAddOpenGame(f: (GameID => OpenGameData)): Future[GameID] = {
+  private def assignGameIdAndAddOpenGame(f: (GameID => (OpenGameData,Auth))): Future[(GameID,Auth)] = {
     val id = RandGen.genGameID
 
     //Check for collisions by querying the table to see if we have a colliding id
     val query: Rep[Int] = Games.gameTable.filter(_.id === id).length
     db.run(query.result).flatMap { count =>
       var shouldRetry = false
+      var ret: Option[(GameID,Auth)] = None
       openGamesLock.synchronized {
         //We have a collision if the db contains a match, or if we collide against an open game
         shouldRetry = (count != 0) || openGames.contains(id)
-        if(!shouldRetry)
-          openGames = openGames + (id -> f(id))
+        if(!shouldRetry) {
+          val (game,gameAuth) = f(id)
+          openGames = openGames + (id -> game)
+          ret = Some((id,gameAuth))
+        }
       }
       if(shouldRetry)
         assignGameIdAndAddOpenGame(f)
       else
-        Future(id)
+        Future(ret.get)
     }
   }
 
+  //TODO call this in places
   /* Applies the effect of heartbeat timeouts to all open and active games */
   private def applyTimeouts: Unit = {
     //Open games
     openGamesLock.synchronized {
       val now = Timestamp.get
-      openGames = openGames.filter { case (id,data) =>
-        //If this game is starting right now with the current players, then don't time anyone out
-        //or otherwise clean up the open game
-        if(!data.starting)
+      openGames = openGames.filter { case (id,game) =>
+        //TODO report changes on timeout?
+        game.logins.doTimeouts(now)
+        //If this game is starting right now with the current players, then don't clean up the game
+        if(game.starting)
           true
         else {
-          //Any joined players who haven't sent recent heartbeats should be un-joined.
-          data.joined = data.joined.filter { case (_,heartbeat) =>
-            heartbeat.youngerThan(Games.HEARTBEAT_TIMEOUT,now)
+          game.creator match {
+            //No creator - keep the game if anyone is joined or the game is young
+            case None =>
+              game.logins.isAnyoneLoggedIn ||
+              now <= game.logins.lastActiveTime + Games.NO_CREATOR_GAME_CLEANUP_AGE
+            //A user created this game - keep it if the user is joined
+            case Some(creator) =>
+              game.logins.isUserLoggedIn(creator)
           }
-          //Any open games whose creators haven't heartbeated recently can be removed.
-          data.creatorHeartbeat.youngerThan(Games.HEARTBEAT_TIMEOUT,now)
         }
       }
     }
@@ -143,12 +150,9 @@ class Games(val db: Database)(implicit ec: ExecutionContext) {
     //Active games
     activeGamesLock.synchronized {
       val now = Timestamp.get
-      activeGames.foreach { case (_,data) =>
-        //If a player has not heartbeated recently, that player is no longer present in the game.
-        if(data.gPresent.value && !data.gPresent.youngerThan(Games.HEARTBEAT_TIMEOUT,now))
-          data.gPresent.value = false
-        if(data.sPresent.value && !data.sPresent.youngerThan(Games.HEARTBEAT_TIMEOUT,now))
-          data.sPresent.value = false
+      activeGames.foreach { case (_,game) =>
+        //TODO report changes on timeout?
+        game.logins.doTimeouts(now)
       }
     }
   }
@@ -172,88 +176,130 @@ class Games(val db: Database)(implicit ec: ExecutionContext) {
   }
 
   /* Attempt to join an open or active game with the specified id */
-  def join(user: Username, id: GameID): Try[Unit] = {
-    tryOpenAndActive(id) { (data: OpenGameData) =>
-      if(data.creator == user || data.joined.contains(user))
-        Failure(new Exception("Already joined the open game with this id."))
-      else {
-        data.joined = data.joined + (user -> HeartbeatTime(Timestamp.get))
-        Success(())
-      }
-    } { (data: ActiveGameData) =>
-      if(data.meta.gUser.get == user) {
-        if(data.gPresent)
-          Failure(new Exception("Already joined the active game with this id."))
-        else {
-          data.gPresent = true
-          data.gHeartbeat.heartbeat
-          Success(())
-        }
-      }
-      else if(data.meta.sUser.get == user) {
-        if(data.sPresent)
-          Failure(new Exception("Already joined the active game with this id."))
-        else {
-          data.sPresent = true
-          data.sHeartbeat.heartbeat
-          Success(())
-        }
-      }
-      else
+  def join(user: Username, id: GameID): Try[Auth] = {
+    tryOpenAndActive(id) { (game: OpenGameData) =>
+      val now = Timestamp.get
+      game.logins.doTimeouts(now)
+      Success(game.logins.login(user,now))
+    } { (game: ActiveGameData) =>
+      val now = Timestamp.get
+      game.logins.doTimeouts(now)
+      if(game.meta.gUser.get != user && game.meta.sUser.get != user)
         Failure(new Exception("Not one of the players of this game."))
+      else
+        Success(game.logins.login(user,now))
     }
   }
-
-  //TODO redo this in terms of GameAuths that get heartbeated instead?
 
   /* Attempt to heartbeat an open or active game with the specified id */
-  def heartbeat(user: User, id: GameID): Try[Unit] = {
-    tryOpenAndActive(id) { (data: OpenGameData) =>
-      if(data.creator == user) {
-        data.creatorHeartbeat.heartbeat
+  def heartbeat(user: Username, id: GameID, gameAuth: Auth): Try[Unit] = {
+    tryOpenAndActive(id) { (game: OpenGameData) =>
+      val now = Timestamp.get
+      game.logins.doTimeouts(now)
+      if(game.logins.heartbeat(user,gameAuth,now))
         Success(())
-      }
-      else {
-        data.joined.get(user) match {
-          case None => Failure(new Exception("Not joined or timed out with the open game with this id."))
-          case Some(heartbeat) =>
-            heartbeat.heartbeat
-            Success(())
-        }
-      }
-    } { (data: ActiveGameData) =>
-      if(data.meta.gUser.get == user) {
-        if(!data.gPresent)
-          Failure(new Exception("Not joined or timed out with the active game with this id."))
-        else {
-          data.gHeartbeat.heartbeat
-          Success(())
-        }
-      }
-      else if(data.meta.sUser.get == user) {
-        if(!data.sPresent)
-          Failure(new Exception("Not joined or timed out with the active game with this id."))
-        else {
-          data.sHeartbeat.heartbeat
-          Success(())
-        }
-      }
       else
+        Failure(new Exception("Not joined or timed out with the open game with this id."))
+    } { (game: ActiveGameData) =>
+      val now = Timestamp.get
+      game.logins.doTimeouts(now)
+      if(game.meta.gUser.get != user && game.meta.sUser.get != user)
         Failure(new Exception("Not one of the players of this game."))
+      else if(game.logins.heartbeat(user,gameAuth,now))
+        Success(())
+      else
+        Failure(new Exception("Not joined or timed out with the active game with this id."))
     }
   }
 
-  def leave(user: Username, id: GameID) = {
+  def leave(user: Username, id: GameID, gameAuth: Auth): Try[Unit] = {
+    tryOpenAndActive(id) { (game: OpenGameData) =>
+      val now = Timestamp.get
+      game.logins.doTimeouts(now)
+      if(game.logins.heartbeat(user,gameAuth,now)) {
+        game.logins.logout(user,gameAuth,now)
+        Success(())
+      }
+      else
+        Failure(new Exception("Not joined or timed out with the open game with this id."))
+    } { (game: ActiveGameData) =>
+      val now = Timestamp.get
+      game.logins.doTimeouts(now)
+      if(game.meta.gUser.get != user && game.meta.sUser.get != user)
+        Failure(new Exception("Not one of the players of this game."))
+      else if(game.logins.heartbeat(user,gameAuth,now)) {
+        game.logins.logout(user,gameAuth,now)
+        Success(())
+      }
+      else
+        Failure(new Exception("Not joined or timed out with the active game with this id."))
+    }
+  }
 
+  def accept(user: Username, id: GameID, gameAuth: Auth, opponent: Username): Try[Unit] = {
+    openGamesLock.synchronized {
+      openGames.get(id) match {
+        case None => Failure(new Exception("No open game with the given id."))
+        case Some(game) =>
+          //TODO factor out doing timeouts and make it also remove any accepts with timed out users
+          //And same for logouts
+          val now = Timestamp.get
+          game.logins.doTimeouts(now)
+          if(!game.logins.heartbeat(user,gameAuth,now))
+            Failure(new Exception("Not joined or timed out with the open game with this id."))
+          else {
+            game.accepted = game.accepted + (user -> opponent)
+            val shouldBegin = game.creator match {
+              case None => game.accepted.get(user) == Some(opponent) && game.accepted.get(opponent) == Some(user)
+              case Some(creator) => user == creator
+            }
+            if(shouldBegin) {
+              def otherUser(u: Username) = if(u == user) opponent else user
+              game.starting = true
+              val (gUser,sUser) = (game.meta.gUser, game.meta.sUser) match {
+                case (Some(gUser), Some(sUser)) => (gUser,sUser)
+                case (None, Some(sUser)) => (otherUser(sUser),sUser)
+                case (Some(gUser), None) => (gUser,otherUser(gUser))
+                case (None, None) =>
+                  if(RandGen.genBoolean)
+                    (user,opponent)
+                  else
+                    (opponent,user)
+              }
+              //TODO don't ignore?
+              //Ignore return value - just schedule the game to begin
+              beginGame(game.meta,game.logins,gUser,sUser)
+            }
+            Success(())
+          }
+      }
+    }
+  }
+
+  def reject(user: Username, id: GameID, gameAuth: Auth, opponent: Username): Try[Unit] = {
+    openGamesLock.synchronized {
+      openGames.get(id) match {
+        case None => Failure(new Exception("No open game with the given id."))
+        case Some(game) =>
+          //TODO factor out doing timeouts and make it also remove any accepts with timed out users
+          //And same for logouts
+          val now = Timestamp.get
+          game.logins.doTimeouts(now)
+          if(!game.logins.heartbeat(user,gameAuth,now))
+            Failure(new Exception("Not joined or timed out with the open game with this id."))
+          else if(game.creator != Some(user))
+            Failure(new Exception("Not the creator of the game."))
+          else {
+            //TODO should this be distingushed somehow from a timeout for the rejected?
+            Success(game.logins.logoutUser(opponent,now))
+          }
+      }
+    }
   }
 
 
-
-  //TODO accept function
-  //TODO reject function
-
   /* Actually begin an open game and convert it into an active game */
-  private def beginGame(meta: GameMetadata, gUser: Username, sUser: Username): Future[Unit] = {
+  private def beginGame(meta: GameMetadata, logins: LoginTracker, gUser: Username, sUser: Username): Future[Unit] = {
     //Write metadata to DB
     val id = meta.id
 
@@ -261,8 +307,8 @@ class Games(val db: Database)(implicit ec: ExecutionContext) {
     var now = Timestamp.get
     var newMeta = meta.copy(
       startTime = meta.startTime.orElse(Some(now)),
-      gUser = gUser,
-      sUser = sUser,
+      gUser = Some(gUser),
+      sUser = Some(sUser),
       result = meta.result.copy(
         endTime = now
       )
@@ -289,27 +335,37 @@ class Games(val db: Database)(implicit ec: ExecutionContext) {
           )
         )
 
-        val activeGameData = ActiveGameData(
+        val game = ActiveGameData(
+          logins = logins,
           meta = newMeta,
           moves = moves,
           moveStartTime = now,
           gTimeThisMove = computeTimeLeft(newMeta.gTC,moves,GOLD),
           sTimeThisMove = computeTimeLeft(newMeta.sTC,moves,SILV),
-          gPresent = Timed(true,now),
-          sPresent = Timed(true,now)
+          game = initGameFromMoves(moves)
         )
-        activeGames = activeGames + (id -> activeGameData)
+        activeGames = activeGames + (id -> game)
       }
     }
   }
 
   /* Compute the amount of time on a player clock given the move history of the game */
-  private def computeTimeLeft(tc: Timecontrol, moves: List[MoveInfo], player: Player): Double = {
+  private def computeTimeLeft(tc: TimeControl, moves: List[MoveInfo], player: Player): Double = {
     val timeUsageHistory =
       moves.zipWithIndex
         .filter{ case (x,i) => (i % 2 == 0) == (player == GOLD) }
         .map(_._1)
-    tc.timeLeftFromHistory(timeLeftFromHistory)
+        .map(info => info.time - info.start)
+    tc.timeLeftFromHistory(timeUsageHistory)
+  }
+
+  /* Initialize a game from the given move history list */
+  private def initGameFromMoves(moves: List[MoveInfo]): Game = {
+    var game = new Game()
+    moves.foreach { move =>
+      game = game.parseAndMakeMove(move.move, StandardNotation).get
+    }
+    game
   }
 
   /* Load all existing moves for a game from the database */
@@ -328,23 +384,14 @@ class Games(val db: Database)(implicit ec: ExecutionContext) {
 
   /* The game result entered into the database for any unfinished game so that in case the
    * server goes down, any game active at that time appears adjourned without a winner. */
-  private def adjournedResult: Gameresult =
+  private def adjournedResult: GameResult =
     GameResult(
-      player = None,
+      winner = None,
       reason = EndingReason.ADJOURNED,
       endTime = Timestamp.get
     )
 
 }
-
-
-// case class ActiveGameData(
-//   moveStartTime: Timestamp,
-//   gTimeThisMove: Double,
-//   sTimeThisMove: Double,
-//   gPresent: Boolean,
-//   sPresent: Boolean
-// )
 
 case class GameMetadata(
   id: GameID,
@@ -433,8 +480,8 @@ class GameTable(tag: Tag) extends Table[GameMetadata](tag, "gameTable") {
     //Database shape -> Scala object
     { case (id,numPly,startTime,gUser,sUser,gTC,sTC,rated,gameType,tags,result) =>
       GameMetadata(id,numPly,startTime,gUser,sUser,
-        TimeControl.tupled.apply(gTC),
-        TimeControl.tupled.apply(sTC),
+        (TimeControl.apply _).tupled.apply(gTC),
+        (TimeControl.apply _).tupled.apply(sTC),
         rated,gameType,tags,
         GameResult.tupled.apply(result)
       )

@@ -60,10 +60,12 @@ class SiteLogin(val accounts: Accounts)(implicit ec: ExecutionContext) {
 
       val lowercaseName = username.toLowerCase
       val passwordHash = BCrypt.hashpw(password, BCrypt.gensalt)
-      val createdTime = Timestamp.get
+      val now = Timestamp.get
+      val createdTime = now
       val account = Account(lowercaseName,username,email,passwordHash,isBot,createdTime)
       accounts.add(account).recover { case _ => throw new Exception("Username already in use") }.map { case () =>
-        val auth = logins.login(account.username, createdTime)
+        logins.doTimeouts(now)
+        val auth = logins.login(account.username, now)
         auth
       }
     }
@@ -81,14 +83,18 @@ class SiteLogin(val accounts: Accounts)(implicit ec: ExecutionContext) {
           //TODO do this in another thread to limit cost?
           if(!BCrypt.checkpw(password, account.passwordHash))
             fail
-          val auth = logins.login(account.username, Timestamp.get)
+          val now = Timestamp.get
+          logins.doTimeouts(now)
+          val auth = logins.login(account.username, now)
           auth
       }
     }
   }
 
   def requiringLogin[T](username: Username, auth: Auth)(f:() => T) : Try[T] = {
-    if(logins.requireLogin(username,auth,Timestamp.get))
+    val now = Timestamp.get
+    logins.doTimeouts(now)
+    if(logins.heartbeat(username,auth,now))
       Failure(new Exception(NO_LOGIN_MESSAGE))
     else
       Success(f())

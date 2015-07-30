@@ -58,4 +58,10 @@ object RandGen {
     genToken(NUM_AUTH_INTS)
   def genGameID: GameID =
     genToken(NUM_GAME_ID_INTS)
+
+  def genBoolean: Boolean = this.synchronized {
+    if(!initialized)
+      throw new IllegalStateException("RandGen.initialize not called")
+    secureRand.nextBoolean
+  }
 }
