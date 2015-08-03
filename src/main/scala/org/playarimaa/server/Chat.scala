@@ -184,6 +184,7 @@ class ChatChannel(val channel: Channel, val db: Database, val actorSystem: Actor
   def initialReceive: Receive = {
     //Wait for us to have found the maximum chat id
     case Initialized(maxId: Try[Long]) =>
+      //TODO test this
       //Raises an exception in the case where we failed to find the max id
       nextId = maxId.get + 1
       //And begin normal operation
@@ -215,6 +216,7 @@ class ChatChannel(val channel: Channel, val db: Database, val actorSystem: Actor
         messagesNotYetInDB = messagesNotYetInDB.enqueue(line)
 
         //Write to DB and on success clear own memory
+        //TODO log on error
         val query = ChatSystem.table += line
         db.run(DBIO.seq(query)).foreach { _ =>
           self ! DBWritten(line.id)

@@ -38,6 +38,9 @@ trait Notation {
 
   /** Returns the string notation corresponding to [move] on the current board. */
   def write(board: Board, move: Move): Try[String]
+
+  /** Returns the string notation corresponding to the given turn */
+  def turnString(plyNum: Int): String
 }
 
 
@@ -51,5 +54,12 @@ object StandardNotation extends Notation {
   def write(board: Board, move: Move): Try[String] = {
     //TODO
     Failure(new UnsupportedOperationException())
+  }
+
+  def turnString(plyNum: Int): String = {
+    if(plyNum % 2 == 0)
+      (1 + plyNum / 2) + "g"
+    else
+      (1 + plyNum / 2) + "s"
   }
 }
