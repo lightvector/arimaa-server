@@ -161,6 +161,84 @@ class BoardTests extends FlatSpec with Matchers {
     board.step(step).isFailure should be (true)
   }
 
+  it should "do normal placement correctly" in {
+    var board : Try[Board] = Success(new Board())
+    val placements = List(
+      Placement("Ra1"), Placement("Rb1"), Placement("Rc1"), Placement("Rd1"),
+      Placement("Re1"), Placement("Rf1"), Placement("Rg1"), Placement("Rh1"),
+      Placement("Ca2"), Placement("Hb2"), Placement("Dc2"), Placement("Ed2"),
+      Placement("Me2"), Placement("Df2"), Placement("Hg2"), Placement("Ch2")
+    )
+
+    board = board.get.setup(placements)
+    board.isSuccess should be (true)
+  }
+
+  it should "reject setup outside two home rows" in {
+    var board : Try[Board] = Success(new Board())
+    val placements = List(
+      Placement("Ra1"), Placement("Rb1"), Placement("Rc1"), Placement("Rd1"),
+      Placement("Re1"), Placement("Rf1"), Placement("Rg1"), Placement("Rh1"),
+      Placement("Ca2"), Placement("Hb2"), Placement("Dc2"), Placement("Ed2"),
+      Placement("Me2"), Placement("Df2"), Placement("Hg2"), Placement("Ch3")
+    )
+
+    board = board.get.setup(placements)
+    board.isSuccess should be (false)
+  }
+
+  it should "reject setup with wrong color" in {
+    var board : Try[Board] = Success(new Board())
+    val placements = List(
+      Placement("Ra1"), Placement("Rb1"), Placement("Rc1"), Placement("Rd1"),
+      Placement("Re1"), Placement("Rf1"), Placement("Rg1"), Placement("Rh1"),
+      Placement("Ca2"), Placement("Hb2"), Placement("Dc2"), Placement("Ed2"),
+      Placement("Me2"), Placement("Df2"), Placement("Hg2"), Placement("ch2")
+    )
+
+    board = board.get.setup(placements)
+    board.isSuccess should be (false)
+  }
+
+  ignore should "reject setup with two pieces in the same square #1" in {
+    var board : Try[Board] = Success(new Board())
+    val placements = List(
+      Placement("Ra1"), Placement("Rb1"), Placement("Rc1"), Placement("Rd1"),
+      Placement("Re1"), Placement("Rf1"), Placement("Rg1"), Placement("Rh1"),
+      Placement("Ca2"), Placement("Hb2"), Placement("Dc2"), Placement("Ed2"),
+      Placement("Me2"), Placement("Df2"), Placement("Hg2"), Placement("Hg2")
+    )
+
+    board = board.get.setup(placements)
+    board.isSuccess should be (false)
+  }
+
+  ignore should "reject setup with two pieces in the same square #2" in {
+    var board : Try[Board] = Success(new Board())
+    val placements = List(
+      Placement("Ra1"), Placement("Rb1"), Placement("Rc1"), Placement("Rd1"),
+      Placement("Re1"), Placement("Rf1"), Placement("Rg1"), Placement("Rh1"),
+      Placement("Ca2"), Placement("Hb2"), Placement("Dc2"), Placement("Ed2"),
+      Placement("Me2"), Placement("Df2"), Placement("Hg2"), Placement("Mg2")
+    )
+
+    board = board.get.setup(placements)
+    board.isSuccess should be (false)
+  }
+
+  it should "reject setup with too few pieces" in {
+    var board : Try[Board] = Success(new Board())
+    val placements = List(
+      Placement("Ra1"), Placement("Rb1"), Placement("Rc1"), Placement("Rd1"),
+      Placement("Re1"), Placement("Rf1"), Placement("Rg1"), Placement("Rh1"),
+      Placement("Ca2"), Placement("Hb2"), Placement("Dc2"), Placement("Ed2"),
+      Placement("Me2"), Placement("Df2"), Placement("Hg2")
+    )
+
+    board = board.get.setup(placements)
+    board.isSuccess should be (false)
+  }
+
   "Location" should "detect traps correctly" in {
     Location("c3").isTrap should be (true)
     Location("c6").isTrap should be (true)

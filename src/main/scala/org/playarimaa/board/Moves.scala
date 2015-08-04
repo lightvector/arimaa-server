@@ -28,6 +28,16 @@ sealed trait Move
 case class Steps(steps: List[Step]) extends Move
 case class Placements(placements: List[Placement]) extends Move
 
+object Placement {
+  def apply(s: String): Placement = {
+    if (s.length != 3) {
+      throw new IllegalArgumentException()
+    }
+    val newPiece: Piece = Piece(s.charAt(0))
+    val newDest: Location = Location(s.substring(1, 3))
+    Placement(newPiece, newDest)
+  }
+}
 
 /** The interface for a parser for a given notation for Arimaa moves */
 trait Notation {
