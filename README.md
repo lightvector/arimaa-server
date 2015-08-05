@@ -12,3 +12,8 @@ Arimaa server
 
 * lightvector
 * mattj256
+* aaronyzhou
+
+## API
+
+* See https://github.com/lightvector/arimaa-server/wiki/Arimaa-Game-Server-JSON-API for a draft of the API being targeted for implementation.
