@@ -43,8 +43,6 @@ object Games {
   )
 }
 
-//TODO add in sequence triggers everywhere
-
 class Games(val db: Database, val scheduler: Scheduler)(implicit ec: ExecutionContext) {
 
   //Properties/invariants maintained by the implementation of this and of OpenGames and ActiveGames:
@@ -81,14 +79,14 @@ class Games(val db: Database, val scheduler: Scheduler)(implicit ec: ExecutionCo
       openGames.reopenAdjournedGame(id)
   }
 
-  /* Applies the effect of heartbeat timeouts to all open and active games */
-  private def applyTimeouts: Unit = {
-    openGames.applyTimeouts
-    activeGames.applyTimeouts
+  /* Applies the effect of heartbeat/login timeouts to all open and active games */
+  private def applyLoginTimeouts: Unit = {
+    openGames.applyLoginTimeouts
+    activeGames.applyLoginTimeouts
   }
 
   private def checkTimeoutLoop: Unit = {
-    Try(applyTimeouts) match {
+    Try(applyLoginTimeouts) match {
       case Failure(_) =>
         //TODO log exn
         scheduler.scheduleOnce(Games.TIMEOUT_CHECK_PERIOD_IF_ERROR seconds) { checkTimeoutLoop }
@@ -196,7 +194,8 @@ object OpenGames {
   case class GetData(
     creator: Option[Username],
     joined: Set[Username],
-    users: PlayerArray[Option[Username]]
+    users: PlayerArray[Option[Username]],
+    accepted: Map[Username,Username]
   )
 }
 
@@ -217,7 +216,29 @@ class OpenGames(val db: Database)(implicit ec: ExecutionContext) {
     //Fulfilled and replaced on each update - this is the mechanism by which queries can block and wait for chat activity
     var sequencePromise: Promise[Unit],
     var sequence: Long
-  )
+  ) {
+    //Updates the sequence number and trigger anyone who was waiting on this game state to be updated
+    def advanceSequence: Unit = {
+      sequence = sequence + 1
+      sequencePromise.success(())
+      sequencePromise = Promise()
+    }
+
+    //Unaccepts anyone who is logged out at the time of this function call
+    def filterAcceptedByLogins: Unit = {
+      accepted = accepted.filter { case (user1,user2) =>
+        logins.isUserLoggedIn(user1) && !logins.isUserLoggedIn(user2)
+      }
+    }
+
+    def doTimeouts(now: Timestamp): Unit = {
+      val loggedOut = logins.doTimeouts(now)
+      filterAcceptedByLogins
+      if(loggedOut.nonEmpty)
+        advanceSequence
+    }
+  }
+
 
   //All open games are listed in this map, and NOT in the database, unless the game
   //is currently in the process of being started and therefore entered into the database.
@@ -351,25 +372,31 @@ class OpenGames(val db: Database)(implicit ec: ExecutionContext) {
   }
 
   /* Applies the effect of heartbeat timeouts to all open games */
-  def applyTimeouts: Unit = this.synchronized {
+  def applyLoginTimeouts: Unit = this.synchronized {
     val now = Timestamp.get
     openGames = openGames.filter { case (id,game) =>
-      //TODO report changes on timeout?
-      game.logins.doTimeouts(now)
-      //If this game is starting right now with the current players, then don't clean up the game
-      if(game.starting)
-        true
-      else {
-        game.creator match {
-          //No creator - keep the game if anyone is joined or the game is young
-          case None =>
-            game.logins.isAnyoneLoggedIn ||
-            now <= game.logins.lastActiveTime + Games.NO_CREATOR_GAME_CLEANUP_AGE
-          //A user created this game - keep it if the user is joined
-          case Some(creator) =>
-            game.logins.isUserLoggedIn(creator)
+      //Log out any individual users who have been inactive
+      game.doTimeouts(now)
+      //Should we keep this game around, or clean it up it due to timeouts?
+      val shouldKeep =
+        //If this game is starting right now with the current players, then don't clean up the game
+        if(game.starting)
+          true
+        else {
+          game.creator match {
+            //No creator - keep the game if anyone is joined or the game is young
+            case None =>
+              game.logins.isAnyoneLoggedIn ||
+              now <= game.logins.lastActiveTime + Games.NO_CREATOR_GAME_CLEANUP_AGE
+            //A user created this game - keep it if the user is joined
+            case Some(creator) =>
+              game.logins.isUserLoggedIn(creator)
+          }
         }
-      }
+      //Trigger anyone waiting if we're about to clean up this game
+      if(!shouldKeep)
+        game.advanceSequence
+      shouldKeep
     }
   }
 
@@ -378,9 +405,16 @@ class OpenGames(val db: Database)(implicit ec: ExecutionContext) {
    */
   def join(user: Username, id: GameID): Option[Try[Auth]] = this.synchronized {
     openGames.get(id).map { game =>
-      val now = Timestamp.get
-      game.logins.doTimeouts(now)
-      Success(game.logins.login(user,now))
+      //If the game has fixed users specified, then only those users can join
+      if(game.users.forAll(_.nonEmpty) && game.users.forAll(_ != Some(user)))
+        Failure(new Exception("Not one of the players of this game."))
+      else {
+        val now = Timestamp.get
+        game.doTimeouts(now)
+        val auth = game.logins.login(user,now)
+        game.advanceSequence
+        Success(auth)
+      }
     }
   }
 
@@ -391,7 +425,7 @@ class OpenGames(val db: Database)(implicit ec: ExecutionContext) {
   private def ifLoggedInOpt[T](user: Username, id: GameID, gameAuth: Auth)(f: OpenGameData => Try[T]): Option[Try[T]] = {
     openGames.get(id).map { game =>
       val now = Timestamp.get
-      game.logins.doTimeouts(now)
+      game.doTimeouts(now)
       if(!game.logins.heartbeat(user,gameAuth,now))
         Failure(new Exception("Not joined or timed out with the open game with this id."))
       else
@@ -420,6 +454,8 @@ class OpenGames(val db: Database)(implicit ec: ExecutionContext) {
     ifLoggedInOpt(user,id,gameAuth) { game =>
       val now = Timestamp.get
       game.logins.logout(user,gameAuth,now)
+      game.filterAcceptedByLogins
+      game.advanceSequence
       Success(())
     }
   }
@@ -438,6 +474,8 @@ class OpenGames(val db: Database)(implicit ec: ExecutionContext) {
         Failure(new Exception("Game already starting"))
       else {
         game.accepted = game.accepted + (user -> opponent)
+        game.advanceSequence
+
         val shouldBegin = game.creator match {
           case None => game.accepted.get(user) == Some(opponent) && game.accepted.get(opponent) == Some(user)
           case Some(creator) => user == creator
@@ -477,7 +515,10 @@ class OpenGames(val db: Database)(implicit ec: ExecutionContext) {
       else {
         val now = Timestamp.get
         //TODO should this be distingushed somehow from a timeout for the rejected?
-        Success(game.logins.logoutUser(opponent,now))
+        game.logins.logoutUser(opponent,now)
+        game.filterAcceptedByLogins
+        game.advanceSequence
+        Success(())
       }
     }
   }
@@ -487,7 +528,9 @@ class OpenGames(val db: Database)(implicit ec: ExecutionContext) {
    * that every game always is either open or recorded in the database.
    */
   def clearStartedGame(id: GameID): Unit = this.synchronized {
-    assert(openGames.get(id).exists(_.starting))
+    val game = openGames.get(id)
+    assert(game.exists(_.starting))
+    game.get.advanceSequence
     openGames = openGames - id
   }
 
@@ -506,7 +549,8 @@ class OpenGames(val db: Database)(implicit ec: ExecutionContext) {
           openGameData = Some(OpenGames.GetData(
             creator = game.creator,
             joined = game.logins.usersLoggedIn,
-            users = game.users
+            users = game.users,
+            accepted = game.accepted
           )),
           activeGameData = None,
           sequence = Some(game.sequence)
@@ -547,7 +591,20 @@ class ActiveGames(val db: Database, val scheduler: Scheduler) (implicit ec: Exec
     //Fulfilled and replaced on each update - this is the mechanism by which queries can block and wait for chat activity
     var sequencePromise: Promise[Unit],
     var sequence: Long
-  )
+  ) {
+    //Updates the sequence number and trigger anyone who was waiting on this game state to be updated
+    def advanceSequence: Unit = {
+      sequence = sequence + 1
+      sequencePromise.success(())
+      sequencePromise = Promise()
+    }
+
+    def doTimeouts(now: Timestamp): Unit = {
+      val loggedOut = logins.doTimeouts(now)
+      if(loggedOut.nonEmpty)
+        advanceSequence
+    }
+  }
 
   //All active games are in this map, and also any game in this map has an entry in the database
   private var activeGames: Map[GameID,ActiveGameData] = Map()
@@ -566,35 +623,50 @@ class ActiveGames(val db: Database, val scheduler: Scheduler) (implicit ec: Exec
     //Add game to database
     val query: DBIO[Int] = Games.gameTable += meta
     db.run(query).map { case _ =>
-      now = Timestamp.get
-      meta = meta.copy(
-        result = meta.result.copy(
-          endTime = now
+      this.synchronized {
+        now = Timestamp.get
+        meta = meta.copy(
+          result = meta.result.copy(
+            endTime = now
+          )
         )
-      )
 
-      val game = ActiveGameData(
-        logins = data.logins,
-        users = data.users,
-        //Note that this could raise an exception if the moves aren't legal somehow
-        game = new ActiveGame(meta,data.moves,now,db,scheduler),
-        sequencePromise = Promise(),
-        sequence = data.sequence
-      )
-      activeGames = activeGames + (id -> game)
+        //On a game won by timeout, schedule applyLoginTimeouts to happen asynchronously
+        //to report the change in the game back to users and clean up the game
+        val onTimeout = { () =>
+          scheduler.scheduleOnce(0 seconds) {
+            applyLoginTimeouts
+          }
+          ()
+        }
+        val game = ActiveGameData(
+          logins = data.logins,
+          users = data.users,
+          //Note that this could raise an exception if the moves aren't legal somehow
+          game = new ActiveGame(meta,data.moves,now,db,scheduler,onTimeout),
+          sequencePromise = Promise(),
+          sequence = data.sequence
+        )
+        activeGames = activeGames + (id -> game)
+      }
     }
   }
 
-  //TODO cleanup dead games upon winning or something?
-  /* Applies the effect of heartbeat timeouts to all active games */
-  def applyTimeouts: Unit = this.synchronized {
+  /* Applies the effect of heartbeat timeouts to all active games.
+   * Also cleans up games that have ended. */
+  def applyLoginTimeouts: Unit = this.synchronized {
     val now = Timestamp.get
     activeGames = activeGames.filter { case (id,game) =>
-      //TODO report changes on timeout?
-      game.logins.doTimeouts(now)
+      game.doTimeouts(now)
       //Clean up games that have ended
       //TODO maybe add checking and logging for games that never get cleaned up because their db commits hang forever?
-      !game.game.canCleanup
+      if(game.game.canCleanup) {
+        game.advanceSequence
+        false //filter out
+      }
+      else
+        true //keep
+
     }
   }
 
@@ -604,11 +676,14 @@ class ActiveGames(val db: Database, val scheduler: Scheduler) (implicit ec: Exec
   def join(user: Username, id: GameID): Option[Try[Auth]] = this.synchronized {
     activeGames.get(id).map { game =>
       val now = Timestamp.get
-      game.logins.doTimeouts(now)
+      game.doTimeouts(now)
       if(!game.users.contains(user))
         Failure(new Exception("Not one of the players of this game."))
-      else
-        Success(game.logins.login(user,now))
+      else {
+        val auth = game.logins.login(user,now)
+        game.advanceSequence
+        Success(auth)
+      }
     }
   }
 
@@ -619,7 +694,7 @@ class ActiveGames(val db: Database, val scheduler: Scheduler) (implicit ec: Exec
   private def ifLoggedInOpt[T](user: Username, id: GameID, gameAuth: Auth)(f: ActiveGameData => Try[T]): Option[Try[T]] = {
     activeGames.get(id).map { game =>
       val now = Timestamp.get
-      game.logins.doTimeouts(now)
+      game.doTimeouts(now)
       if(!game.users.contains(user))
         Failure(new Exception("Not one of the players of this game."))
       else if(!game.logins.heartbeat(user,gameAuth,now))
@@ -650,6 +725,7 @@ class ActiveGames(val db: Database, val scheduler: Scheduler) (implicit ec: Exec
     ifLoggedInOpt(user,id,gameAuth) { game =>
       val now = Timestamp.get
       game.logins.logout(user,gameAuth,now)
+      game.advanceSequence
       Success(())
     }
   }
@@ -662,14 +738,18 @@ class ActiveGames(val db: Database, val scheduler: Scheduler) (implicit ec: Exec
   private def gameActionUnsynced[T](user: Username, id: GameID, gameAuth: Auth)(f: ((ActiveGame,Player)) => Try[T]): Try[T] = {
     val result =
       this.synchronized {
-        ifLoggedIn(user,id,gameAuth) { g =>
-          val player = lookupPlayer(g,user)
-          Success(g.game,player)
+        ifLoggedIn(user,id,gameAuth) { game =>
+          val player = lookupPlayer(game,user)
+          Success(game,player)
         }
       }
-    result match {
-      case Success((game,player)) => f((game,player))
-      case Failure(exn) => Failure(exn)
+    result.flatMap { case (game,player) =>
+      f((game.game,player)).map { x =>
+        this.synchronized {
+          game.advanceSequence
+        }
+        x
+      }
     }
   }
 
@@ -720,7 +800,8 @@ class ActiveGame(
   private var moves: Vector[MoveInfo],
   val initNow: Timestamp,
   val db: Database,
-  val scheduler: Scheduler
+  val scheduler: Scheduler,
+  val onTimeout: (() => Unit)
 )(implicit ec: ExecutionContext) {
   val notation: Notation = StandardNotation
 
@@ -819,8 +900,10 @@ class ActiveGame(
 
   /* Directly set the game result for a timeout, unless the game is already ended for another reason. */
   private def doLoseByTimeout(now: Timestamp): Unit = this.synchronized {
-    if(meta.result.winner.isEmpty)
+    if(meta.result.winner.isEmpty) {
       declareWinner(getNextPlayer.flip, EndingReason.TIME, now)
+      onTimeout()
+    }
   }
 
   /* Returns true if a timeout occured and sets the game result */
