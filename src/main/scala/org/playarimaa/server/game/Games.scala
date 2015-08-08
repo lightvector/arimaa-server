@@ -285,8 +285,8 @@ class OpenGames(val db: Database)(implicit ec: ExecutionContext) {
       id = reservedID,
       numPly = 0,
       startTime = None,
-      users = Map(GOLD -> None, SILV -> None),
-      tcs = Map(GOLD -> tc, SILV -> tc),
+      users = PlayerArray(gold = None, silv = None),
+      tcs = PlayerArray(gold = tc, silv = tc),
       rated = rated,
       gameType = Games.STANDARD_TYPE,
       tags = List(),
@@ -453,7 +453,7 @@ class OpenGames(val db: Database)(implicit ec: ExecutionContext) {
               else
                 (opponent,user)
           }
-          val users: Map[Player,Username] = Map(GOLD -> gUser, SILV -> sUser)
+          val users: PlayerArray[Username] = PlayerArray(gold = gUser, silv = sUser)
 
           //Flag the game as starting
           game.starting = true
@@ -520,15 +520,15 @@ object ActiveGames {
     meta: GameMetadata,
     moves: Vector[MoveInfo],
     logins: LoginTracker,
-    users: Map[Player,Username],
+    users: PlayerArray[Username],
     sequence: Long
   )
 
   case class GetData(
     moveStartTime: Timestamp,
     timeSpent: Double,
-    timeThisMove: Map[Player,Double],
-    present: Map[Player,Boolean]
+    timeThisMove: PlayerArray[Double],
+    present: PlayerArray[Boolean]
   )
 }
 
@@ -536,7 +536,7 @@ object ActiveGames {
 class ActiveGames(val db: Database, val scheduler: Scheduler) (implicit ec: ExecutionContext) {
   case class ActiveGameData(
     val logins: LoginTracker,
-    val users: Map[Player,Username],
+    val users: PlayerArray[Username],
     val game: ActiveGame,
 
     //Fulfilled and replaced on each update - this is the mechanism by which queries can block and wait for chat activity
@@ -554,7 +554,7 @@ class ActiveGames(val db: Database, val scheduler: Scheduler) (implicit ec: Exec
     var now = Timestamp.get
     var meta: GameMetadata = data.meta.copy(
       startTime = data.meta.startTime.orElse(Some(now)),
-      users = data.users.mapValues(Some(_)),
+      users = data.users.map(Some(_)),
       result = data.meta.result.copy(endTime = now)
     )
 
@@ -600,7 +600,7 @@ class ActiveGames(val db: Database, val scheduler: Scheduler) (implicit ec: Exec
     activeGames.get(id).map { game =>
       val now = Timestamp.get
       game.logins.doTimeouts(now)
-      if(!game.users.values.exists(_ == user))
+      if(!game.users.contains(user))
         Failure(new Exception("Not one of the players of this game."))
       else
         Success(game.logins.login(user,now))
@@ -615,7 +615,7 @@ class ActiveGames(val db: Database, val scheduler: Scheduler) (implicit ec: Exec
     activeGames.get(id).map { game =>
       val now = Timestamp.get
       game.logins.doTimeouts(now)
-      if(!game.users.values.exists(_ == user))
+      if(!game.users.contains(user))
         Failure(new Exception("Not one of the players of this game."))
       else if(!game.logins.heartbeat(user,gameAuth,now))
         Failure(new Exception("Not joined or timed out with the active game with this id."))
@@ -650,7 +650,7 @@ class ActiveGames(val db: Database, val scheduler: Scheduler) (implicit ec: Exec
   }
 
   private def lookupPlayer(game: ActiveGameData, user: Username): Player = {
-    game.users.find { case (_,u) => user == u }.get._1
+    game.users.findPlayer(_ == user).get
   }
 
   /* Performs [f] not synchronized with the ActiveGames. */
@@ -691,7 +691,7 @@ class ActiveGames(val db: Database, val scheduler: Scheduler) (implicit ec: Exec
       if(minSequence.exists(_ > game.sequence))
         Left(game.sequencePromise.future)
       else {
-        val present = game.users.mapValues { user => game.logins.isUserLoggedIn(user) }
+        val present = game.users.map { user => game.logins.isUserLoggedIn(user) }
         val (meta,moves,activeGameData) = game.game.getActiveGetData(present)
         Right(Games.GetData(
           meta = meta,
@@ -722,8 +722,8 @@ class ActiveGame(
   //Time of the start of the current move
   private var moveStartTime: Timestamp = initNow
   //Time left for each player at the start of the move
-  private var timeThisMove: Map[Player,Double] =
-    meta.tcs.map { case (player,tc) => (player,GameUtils.computeTimeLeft(tc,moves,player)) }
+  private var timeThisMove: PlayerArray[Double] =
+    meta.tcs.mapi { case (player,tc) => GameUtils.computeTimeLeft(tc,moves,player) }
   //The game object itself
   private var game: Game = GameUtils.initGameFromMoves(moves,notation)
 
@@ -739,7 +739,7 @@ class ActiveGame(
 
   scheduleNextTimeout(initNow)
 
-  def getActiveGetData(present: Map[Player,Boolean]): (GameMetadata,Vector[MoveInfo],ActiveGames.GetData) = this.synchronized {
+  def getActiveGetData(present: PlayerArray[Boolean]): (GameMetadata,Vector[MoveInfo],ActiveGames.GetData) = this.synchronized {
     ( meta,
       moves,
       ActiveGames.GetData(
@@ -967,10 +967,9 @@ case class GameMetadata(
   id: GameID,
   numPly: Int,
   startTime: Option[Timestamp],
-  //TODO - create a PlayerArray[T] class
   //TODO - express typefully that this option can never be None except for an open game (and will always be Some in the database)
-  users: Map[Player,Option[Username]],
-  tcs: Map[Player,TimeControl],
+  users: PlayerArray[Option[Username]],
+  tcs: PlayerArray[TimeControl],
   rated: Boolean,
   gameType: String,
   tags: List[String],
@@ -1050,10 +1049,10 @@ class GameTable(tag: Tag) extends Table[GameMetadata](tag, "gameTable") {
     //Database shape -> Scala object
     { case (id,numPly,startTime,gUser,sUser,gTC,sTC,rated,gameType,tags,result) =>
       GameMetadata(id,numPly,startTime,
-        Map(GOLD -> gUser, SILV -> sUser),
-        Map(
-          GOLD -> (TimeControl.apply _).tupled.apply(gTC),
-          SILV -> (TimeControl.apply _).tupled.apply(sTC)
+        PlayerArray(gold = gUser, silv = sUser),
+        PlayerArray(
+          gold = (TimeControl.apply _).tupled.apply(gTC),
+          silv = (TimeControl.apply _).tupled.apply(sTC)
         ),
         rated,gameType,tags,
         GameResult.tupled.apply(result)
