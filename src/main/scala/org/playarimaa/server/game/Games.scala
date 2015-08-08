@@ -195,7 +195,8 @@ class Games(val db: Database, val scheduler: Scheduler)(implicit ec: ExecutionCo
 object OpenGames {
   case class GetData(
     creator: Option[Username],
-    joined: Set[Username]
+    joined: Set[Username],
+    users: PlayerArray[Option[Username]]
   )
 }
 
@@ -204,6 +205,7 @@ class OpenGames(val db: Database)(implicit ec: ExecutionContext) {
   case class OpenGameData(
     val meta: GameMetadata,
     val moves: Vector[MoveInfo],
+    val users: PlayerArray[Option[Username]],
     val creator: Option[Username],
     val creationTime: Timestamp,
     val logins: LoginTracker,
@@ -285,7 +287,7 @@ class OpenGames(val db: Database)(implicit ec: ExecutionContext) {
       id = reservedID,
       numPly = 0,
       startTime = None,
-      users = PlayerArray(gold = None, silv = None),
+      users = PlayerArray(gold = "", silv = ""),
       tcs = PlayerArray(gold = tc, silv = tc),
       rated = rated,
       gameType = Games.STANDARD_TYPE,
@@ -295,6 +297,7 @@ class OpenGames(val db: Database)(implicit ec: ExecutionContext) {
     val game = OpenGameData(
       meta = meta,
       moves = Vector(),
+      users = PlayerArray(gold = None, silv = None),
       creator = Some(creator),
       creationTime = now,
       logins = new LoginTracker(Games.INACTIVITY_TIMEOUT),
@@ -325,6 +328,7 @@ class OpenGames(val db: Database)(implicit ec: ExecutionContext) {
             val game = OpenGameData (
               meta = newMeta,
               moves = Vector(),
+              users = meta.users.map(Some(_)),
               creator = None,
               creationTime = now,
               logins = new LoginTracker(Games.INACTIVITY_TIMEOUT),
@@ -443,7 +447,7 @@ class OpenGames(val db: Database)(implicit ec: ExecutionContext) {
         else {
           def otherUser(u: Username): Username = if(u == user) opponent else user
           //Fill in players based on acceptance, randomizing if necessary
-          val (gUser,sUser) = (game.meta.users(GOLD), game.meta.users(SILV)) match {
+          val (gUser,sUser) = (game.users(GOLD), game.users(SILV)) match {
             case (Some(gUser), Some(sUser)) => (gUser,sUser)
             case (None, Some(sUser)) => (otherUser(sUser),sUser)
             case (Some(gUser), None) => (gUser,otherUser(gUser))
@@ -501,7 +505,8 @@ class OpenGames(val db: Database)(implicit ec: ExecutionContext) {
           moves = game.moves,
           openGameData = Some(OpenGames.GetData(
             creator = game.creator,
-            joined = game.logins.usersLoggedIn
+            joined = game.logins.usersLoggedIn,
+            users = game.users
           )),
           activeGameData = None,
           sequence = Some(game.sequence)
@@ -554,7 +559,7 @@ class ActiveGames(val db: Database, val scheduler: Scheduler) (implicit ec: Exec
     var now = Timestamp.get
     var meta: GameMetadata = data.meta.copy(
       startTime = data.meta.startTime.orElse(Some(now)),
-      users = data.users.map(Some(_)),
+      users = data.users,
       result = data.meta.result.copy(endTime = now)
     )
 
@@ -967,8 +972,7 @@ case class GameMetadata(
   id: GameID,
   numPly: Int,
   startTime: Option[Timestamp],
-  //TODO - express typefully that this option can never be None except for an open game (and will always be Some in the database)
-  users: PlayerArray[Option[Username]],
+  users: PlayerArray[Username],
   tcs: PlayerArray[TimeControl],
   rated: Boolean,
   gameType: String,
@@ -1000,8 +1004,8 @@ class GameTable(tag: Tag) extends Table[GameMetadata](tag, "gameTable") {
   def id = column[GameID]("id", O.PrimaryKey)
   def numPly = column[Int]("numPly")
   def startTime = column[Option[Timestamp]]("startTime")
-  def gUser = column[Option[Username]]("gUser")
-  def sUser = column[Option[Username]]("sUser")
+  def gUser = column[Username]("gUser")
+  def sUser = column[Username]("sUser")
 
   def gInitialTime = column[Int]("gInitialTime")
   def gIncrement = column[Int]("gIncrement")
