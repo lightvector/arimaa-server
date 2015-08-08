@@ -56,6 +56,10 @@ class LoginTracker(inactivityTimeout: Double) {
     lastActive
   }
 
+  def usersLoggedIn: Set[Username] = synchronized {
+    loginData.keySet
+  }
+
   /* Same as [isLoggedIn], but also updates a user's last active time for
    * timeout-checking purposes */
   def heartbeat(username: Username, auth: Auth, now: Timestamp): Boolean = synchronized {
