@@ -69,23 +69,23 @@ class ChatSystem(val db: Database, val actorSystem: ActorSystem)(implicit ec: Ex
   }
 
   /** Leave the specified chat channel. Failed if not logged in. */
-  def leave(channel: Channel, username: Username, auth: Auth): Future[Unit] = {
+  def leave(channel: Channel, chatAuth: Auth): Future[Unit] = {
     withChannel(channel) { cc =>
-      (cc ? ChatChannel.Leave(username,auth)).map(_.asInstanceOf[Unit])
+      (cc ? ChatChannel.Leave(chatAuth)).map(_.asInstanceOf[Unit])
     }
   }
 
   /** Post in the specified chat channel. Failed if not logged in. */
-  def post(channel: Channel, username: Username, auth: Auth, text:String): Future[Unit] = {
+  def post(channel: Channel, chatAuth: Auth, text:String): Future[Unit] = {
     withChannel(channel) { cc =>
-      (cc ? ChatChannel.Post(username,auth,text)).map(_.asInstanceOf[Unit])
+      (cc ? ChatChannel.Post(chatAuth,text)).map(_.asInstanceOf[Unit])
     }
   }
 
   /** Heartbeat the specified chat channel to avoid logout from inactivity. Failed if not logged in. */
-  def heartbeat(channel: Channel, username: Username, auth: Auth): Future[Unit] = {
+  def heartbeat(channel: Channel, chatAuth: Auth): Future[Unit] = {
     withChannel(channel) { cc =>
-      (cc ? ChatChannel.Heartbeat(username,auth)).map(_.asInstanceOf[Unit])
+      (cc ? ChatChannel.Heartbeat(chatAuth)).map(_.asInstanceOf[Unit])
     }
   }
 
@@ -119,11 +119,11 @@ object ChatChannel {
   //Replies with Auth
   case class Join(username: Username)
   //Replies with Unit
-  case class Leave(username: Username, auth: Auth)
+  case class Leave(chatAuth: Auth)
   //Replies with Unit
-  case class Post(username: Username, auth: Auth, text:String)
+  case class Post(chatAuth: Auth, text:String)
   //Replies with Unit
-  case class Heartbeat(username: Username, auth: Auth)
+  case class Heartbeat(chatAuth: Auth)
 
   /** [minId] defaults to the current end of chat minus [READ_MAX_LINES]
     * [doWait] defaults to false.
@@ -154,7 +154,7 @@ class ChatChannel(val channel: Channel, val db: Database, val actorSystem: Actor
   var messagesNotYetInDB: Queue[ChatLine] = Queue()
 
   //Tracks who is logged in to this chat channel
-  val logins: LoginTracker = new LoginTracker(ChatSystem.INACTIVITY_TIMEOUT)
+  val logins: LoginTracker = new LoginTracker(None,ChatSystem.INACTIVITY_TIMEOUT)
   //Most recent time anything happened in this channel
   var lastActive = Timestamp.get
 
@@ -197,18 +197,18 @@ class ChatChannel(val channel: Channel, val db: Database, val actorSystem: Actor
     case ChatChannel.Join(username: Username) =>
       val now = Timestamp.get
       logins.doTimeouts(now)
-      val auth = logins.login(username, now)
+      val chatAuth = logins.login(username, now)
       lastActive = now
-      sender ! (auth : Auth)
+      sender ! (chatAuth : Auth)
 
-    case ChatChannel.Leave(username: Username, auth: Auth) =>
-      val result: Try[Unit] = requiringLogin(username,auth) { () =>
-        logins.logout(username,auth,Timestamp.get)
+    case ChatChannel.Leave(chatAuth: Auth) =>
+      val result: Try[Unit] = requiringLogin(chatAuth) { username =>
+        logins.logout(username,chatAuth,Timestamp.get)
       }
       replyWith(sender, result)
 
-    case ChatChannel.Post(username: Username, auth: Auth, text:String) =>
-      val result: Try[Unit] = requiringLogin(username,auth) { () =>
+    case ChatChannel.Post(chatAuth: Auth, text:String) =>
+      val result: Try[Unit] = requiringLogin(chatAuth) { username =>
         val line = ChatLine(nextId, channel, username, text, Timestamp.get)
         nextId = nextId + 1
 
@@ -227,8 +227,8 @@ class ChatChannel(val channel: Channel, val db: Database, val actorSystem: Actor
       }
       replyWith(sender, result)
 
-    case ChatChannel.Heartbeat(username: Username, auth: Auth) =>
-      val result: Try[Unit] = requiringLogin(username,auth) { () => () }
+    case ChatChannel.Heartbeat(chatAuth: Auth) =>
+      val result: Try[Unit] = requiringLogin(chatAuth) { (_ : Username) => () }
       replyWith(sender, result)
 
 
@@ -303,15 +303,15 @@ class ChatChannel(val channel: Channel, val db: Database, val actorSystem: Actor
     }
   }
 
-  def requiringLogin[T](username: Username, auth: Auth)(f:() => T) : Try[T] = {
+  def requiringLogin[T](chatAuth: Auth)(f:Username => T) : Try[T] = {
     val now = Timestamp.get
     logins.doTimeouts(now)
-    if(logins.heartbeat(username,auth,now)) {
+    logins.heartbeatAuth(chatAuth,now) match {
+      case None => Failure(new Exception(ChatSystem.NO_LOGIN_MESSAGE))
+      case Some(username) =>
       lastActive = now
-      Success(f())
+      Success(f(username))
     }
-    else
-      Failure(new Exception(ChatSystem.NO_LOGIN_MESSAGE))
   }
 
 }

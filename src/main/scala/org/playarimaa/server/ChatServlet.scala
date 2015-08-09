@@ -58,13 +58,11 @@ case object ChatServlet {
 
 import org.playarimaa.server.ChatServlet._
 
-class ChatServlet(system: ActorSystem)
+class ChatServlet(system: ActorSystem, ec: ExecutionContext)
     extends WebAppStack with JacksonJsonSupport with FutureSupport {
   //Sets up automatic case class to JSON output serialization
   protected implicit lazy val jsonFormats: Formats = DefaultFormats
-
-  //Execution context for FutureSupport
-  protected implicit def executor: ExecutionContext = system.dispatcher
+  protected implicit def executor: ExecutionContext = ec
 
   val db = Database.forConfig("h2mem1")
   val chat = new ChatSystem(db,system)
@@ -97,12 +95,12 @@ class ChatServlet(system: ActorSystem)
         }
       case Leave =>
         val query = Json.read[Leave.Query](request.body)
-        chat.leave(channel, query.username, query.auth).map { case () =>
+        chat.leave(channel, query.auth).map { case () =>
           Json.write(Leave.Reply("Ok"))
         }
       case Post =>
         val query = Json.read[Post.Query](request.body)
-        chat.post(channel, query.username, query.auth, query.text).map { case () =>
+        chat.post(channel, query.auth, query.text).map { case () =>
           Json.write(Post.Reply("Ok"))
         }
     }

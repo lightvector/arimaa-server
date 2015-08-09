@@ -17,7 +17,7 @@ class ChatServletTests(_system: ActorSystem) extends TestKit(_system) with Scala
   }
 
   ArimaaServerInit.initialize
-  addServlet(new ChatServlet(system), "/*")
+  addServlet(new ChatServlet(system,system.dispatcher), "/*")
 
   val startTime = Timestamp.get
   var bobAuth = ""

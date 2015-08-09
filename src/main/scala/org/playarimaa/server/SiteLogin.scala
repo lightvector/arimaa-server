@@ -34,7 +34,7 @@ import SiteLogin.Constants._
 
 class SiteLogin(val accounts: Accounts)(implicit ec: ExecutionContext) {
 
-  val logins: LoginTracker = new LoginTracker(INACTIVITY_TIMEOUT)
+  val logins: LoginTracker = new LoginTracker(None,INACTIVITY_TIMEOUT)
 
   def validateEmail(email: Email): Unit = {
     if(!email.contains('@'))
@@ -49,7 +49,7 @@ class SiteLogin(val accounts: Accounts)(implicit ec: ExecutionContext) {
   }
 
   //TODO throttle registrations somehow?
-  def register(username: Username, email: Email, password: String, isBot: Boolean): Future[Auth] = {
+  def register(username: Username, email: Email, password: String, isBot: Boolean): Future[(Username,Auth)] = {
     Future(()).flatMap { case () =>
       if(username.length < USERNAME_MIN_LENGTH || username.length > USERNAME_MAX_LENGTH)
         throw new IllegalArgumentException(USERNAME_LENGTH_ERROR)
@@ -66,13 +66,13 @@ class SiteLogin(val accounts: Accounts)(implicit ec: ExecutionContext) {
       accounts.add(account).recover { case _ => throw new Exception("Username already in use") }.map { case () =>
         logins.doTimeouts(now)
         val auth = logins.login(account.username, now)
-        auth
+        (account.username,auth)
       }
     }
   }
 
   //TODO throttle login attempt rate
-  def login(usernameOrEmail: String, password: String): Future[Auth] = {
+  def login(usernameOrEmail: String, password: String): Future[(Username,Auth)] = {
     accounts.getByNameOrEmail(usernameOrEmail).map { account =>
       def fail = throw new IllegalArgumentException("Invalid username/email and password combination.")
       account match {
@@ -86,23 +86,23 @@ class SiteLogin(val accounts: Accounts)(implicit ec: ExecutionContext) {
           val now = Timestamp.get
           logins.doTimeouts(now)
           val auth = logins.login(account.username, now)
-          auth
+          (account.username,auth)
       }
     }
   }
 
-  def requiringLogin[T](username: Username, auth: Auth)(f:() => T) : Try[T] = {
+  def requiringLogin[T](auth: Auth)(f:Username => T) : Try[T] = {
     val now = Timestamp.get
     logins.doTimeouts(now)
-    if(logins.heartbeat(username,auth,now))
-      Failure(new Exception(NO_LOGIN_MESSAGE))
-    else
-      Success(f())
+    logins.heartbeatAuth(auth,now) match {
+      case None => Failure(new Exception(NO_LOGIN_MESSAGE))
+      case Some(username) => Success(f(username))
+    }
   }
 
-  def logout(username: Username, auth: Auth) : Try[Unit] = {
-    requiringLogin(username,auth) { () =>
-      logins.logout(username,auth,Timestamp.get)
+  def logout(auth: Auth) : Try[Unit] = {
+    requiringLogin(auth) { _ =>
+      logins.logoutAuth(auth,Timestamp.get)
     }
   }
 

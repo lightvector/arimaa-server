@@ -6,6 +6,7 @@ import java.security.SecureRandom
 import java.io.IOException
 
 object RandGen {
+  //TODO add chatauth and gameauth
   type Auth = String
   type GameID = String
 

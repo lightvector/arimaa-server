@@ -26,6 +26,10 @@ object Games {
   val TIMEOUT_CHECK_PERIOD = 3.0
   val TIMEOUT_CHECK_PERIOD_IF_ERROR = 60.0
 
+  //Default and max timeout for "get" function
+  val GET_DEFAULT_TIMEOUT = 15.0
+  val GET_MAX_TIMEOUT = 120.0
+
   //Clean up a game with no creator after this many seconds if there is nobody in it
   val NO_CREATOR_GAME_CLEANUP_AGE = 600.0
   val STANDARD_TYPE = "standard"
@@ -43,15 +47,15 @@ object Games {
   )
 }
 
-class Games(val db: Database, val scheduler: Scheduler)(implicit ec: ExecutionContext) {
+class Games(val db: Database, val parentLogins: LoginTracker, val scheduler: Scheduler)(implicit ec: ExecutionContext) {
 
   //Properties/invariants maintained by the implementation of this and of OpenGames and ActiveGames:
   //1. Every game is either open or is recorded in the database (or both)
   //2. If a game is neither active nor open, it cannot become active directly, it must be opened first
   //   (and there is no point during the transition open -> active where a game will appear to be not active yet but also no longer open)
 
-  private val openGames = new OpenGames(db)
-  private val activeGames = new ActiveGames(db, scheduler)
+  private val openGames = new OpenGames(db,parentLogins)
+  private val activeGames = new ActiveGames(db,scheduler)
 
   //TODO upon creation, should we load adjourned games from the DB and start them?
   //Maybe only if they're postal games (some heuristic based on tc?). Do we want to credit any time for them?
@@ -59,10 +63,10 @@ class Games(val db: Database, val scheduler: Scheduler)(implicit ec: ExecutionCo
   //Begin timeout loop on initialization
   checkTimeoutLoop
 
-  def createStandardGame(creator: Username, tc: TimeControl, rated: Boolean): Future[(GameID,Auth)] = {
+  def createStandardGame(creator: Username, auth: Auth, tc: TimeControl, rated: Boolean): Future[(GameID,Auth)] = {
     openGames.reserveNewGameID.map { id =>
-      val auth = openGames.createStandardGame(id,creator,tc,rated)
-      (id,auth)
+      val gameAuth = openGames.createStandardGame(id,creator,auth,tc,rated)
+      (id,gameAuth)
     }
   }
 
@@ -107,23 +111,23 @@ class Games(val db: Database, val scheduler: Scheduler)(implicit ec: ExecutionCo
   }
 
   /* Attempt to join an open or active game with the specified id */
-  def join(user: Username, id: GameID): Try[Auth] = {
-    tryOpenAndActive(id)(_.join(user,id))(_.join(user,id))
+  def join(user: Username, auth: Auth, id: GameID): Try[Auth] = {
+    tryOpenAndActive(id)(_.join(user,auth,id))(_.join(user,auth,id))
   }
 
   /* Attempt to heartbeat an open or active game with the specified id */
-  def heartbeat(user: Username, id: GameID, gameAuth: Auth): Try[Unit] = {
-    tryOpenAndActive(id)(_.heartbeat(user,id,gameAuth))(_.heartbeat(user,id,gameAuth))
+  def heartbeat(id: GameID, gameAuth: Auth): Try[Unit] = {
+    tryOpenAndActive(id)(_.heartbeat(id,gameAuth))(_.heartbeat(id,gameAuth))
   }
 
   /* Attempt to leave an open or active game with the specified id */
-  def leave(user: Username, id: GameID, gameAuth: Auth): Try[Unit] = {
-    tryOpenAndActive(id)(_.leave(user,id,gameAuth))(_.leave(user,id,gameAuth))
+  def leave(id: GameID, gameAuth: Auth): Try[Unit] = {
+    tryOpenAndActive(id)(_.leave(id,gameAuth))(_.leave(id,gameAuth))
   }
 
   /* Accept the joining of a given opponent and starts the game if necessary */
-  def accept(user: Username, id: GameID, gameAuth: Auth, opponent: Username): Try[Unit] = {
-    openGames.accept(user,id,gameAuth,opponent).map { successResult =>
+  def accept(id: GameID, gameAuth: Auth, opponent: Username): Try[Unit] = {
+    openGames.accept(id,gameAuth,opponent).map { successResult =>
       successResult match {
         case None => ()
         case Some(initData) =>
@@ -136,29 +140,29 @@ class Games(val db: Database, val scheduler: Scheduler)(implicit ec: ExecutionCo
     }
   }
 
-  /* Reject the joining of a given opponent */
-  def reject(user: Username, id: GameID, gameAuth: Auth, opponent: Username): Try[Unit] = {
-    openGames.reject(user,id,gameAuth,opponent)
+  /* Decline the joining of a given opponent */
+  def decline(id: GameID, gameAuth: Auth, opponent: Username): Try[Unit] = {
+    openGames.decline(id,gameAuth,opponent)
   }
 
   /* Resign a game */
-  def resign(user: Username, id: GameID, gameAuth: Auth): Try[Unit] = {
-    activeGames.resign(user,id,gameAuth)
+  def resign(id: GameID, gameAuth: Auth): Try[Unit] = {
+    activeGames.resign(id,gameAuth)
   }
 
   /* Make a move in a game */
-  def move(user: Username, id: GameID, gameAuth: Auth, moveStr: String, plyNum: Int): Try[Unit] = {
-    activeGames.move(user,id,gameAuth, moveStr, plyNum: Int)
+  def move(id: GameID, gameAuth: Auth, moveStr: String, plyNum: Int): Try[Unit] = {
+    activeGames.move(id,gameAuth, moveStr, plyNum: Int)
   }
 
   /* Get the state of a game */
-  def get(id: GameID, minSequenceAndTimeout: Option[(Long,Double)]): Future[Games.GetData] = {
-    val timeout = minSequenceAndTimeout.map { case (_,dur) =>
+  def get(id: GameID, minSequence: Option[Long], timeout: Option[Double]): Future[Games.GetData] = {
+    val timeoutFut = minSequence.map { _ =>
+      val dur = math.min(Games.GET_MAX_TIMEOUT, timeout.getOrElse(Games.GET_DEFAULT_TIMEOUT))
       after(dur seconds,scheduler)(Future.failed(new Exception("Future timed out!")))
     }
-    val minSequence = minSequenceAndTimeout.map(_._1)
     def loop: Future[Games.GetData] = {
-      if(timeout.exists(_.isCompleted))
+      if(timeoutFut.exists(_.isCompleted))
         throw new Exception("Done")
       openGames.get(id,minSequence) match {
         case Some(Right(data)) => Future(data)
@@ -182,12 +186,13 @@ class Games(val db: Database, val scheduler: Scheduler)(implicit ec: ExecutionCo
           }
       }
     }
-    timeout match {
+    timeoutFut match {
       case None => loop
-      case Some(timeout) =>
-        Future.firstCompletedOf(Seq(timeout,loop))
+      case Some(timeoutFut) =>
+        Future.firstCompletedOf(Seq(timeoutFut,loop))
     }
   }
+
 }
 
 object OpenGames {
@@ -195,11 +200,11 @@ object OpenGames {
     creator: Option[Username],
     joined: Set[Username],
     users: PlayerArray[Option[Username]],
-    accepted: Map[Username,Username]
+    accepted: Map[Username,Username] //TODO use this in output
   )
 }
 
-class OpenGames(val db: Database)(implicit ec: ExecutionContext) {
+class OpenGames(val db: Database, val parentLogins: LoginTracker)(implicit ec: ExecutionContext) {
 
   case class OpenGameData(
     val meta: GameMetadata,
@@ -301,7 +306,7 @@ class OpenGames(val db: Database)(implicit ec: ExecutionContext) {
   }
 
   /* Creates a new game and joins the game with the creator, unreserving the id after the game is created */
-  def createStandardGame(reservedID: GameID, creator: Username, tc: TimeControl, rated: Boolean): Auth = this.synchronized {
+  def createStandardGame(reservedID: GameID, creator: Username, auth: Auth, tc: TimeControl, rated: Boolean): Auth = this.synchronized {
     assert(reservedGameIDs.contains(reservedID))
     val now = Timestamp.get
     val meta = GameMetadata(
@@ -321,13 +326,13 @@ class OpenGames(val db: Database)(implicit ec: ExecutionContext) {
       users = PlayerArray(gold = None, silv = None),
       creator = Some(creator),
       creationTime = now,
-      logins = new LoginTracker(Games.INACTIVITY_TIMEOUT),
+      logins = new LoginTracker(Some(parentLogins),Games.INACTIVITY_TIMEOUT),
       accepted = Map(),
       starting = false,
       sequencePromise = Promise(),
       sequence = 0L
     )
-    val gameAuth = game.logins.login(creator,now)
+    val gameAuth = game.logins.login(creator,now,Some(auth))
     openGames = openGames + (reservedID -> game)
     releaseGameID(reservedID)
     gameAuth
@@ -352,7 +357,7 @@ class OpenGames(val db: Database)(implicit ec: ExecutionContext) {
               users = meta.users.map(Some(_)),
               creator = None,
               creationTime = now,
-              logins = new LoginTracker(Games.INACTIVITY_TIMEOUT),
+              logins = new LoginTracker(Some(parentLogins),Games.INACTIVITY_TIMEOUT),
               accepted = Map(),
               starting = false,
               sequencePromise = Promise(),
@@ -403,7 +408,7 @@ class OpenGames(val db: Database)(implicit ec: ExecutionContext) {
   /* Attempt to join an open game with the specified id.
    * Returns None if there was no game, Some(Failure(...)) if there was but it failed, and Some(Success(...)) on success.
    */
-  def join(user: Username, id: GameID): Option[Try[Auth]] = this.synchronized {
+  def join(user: Username, auth: Auth, id: GameID): Option[Try[Auth]] = this.synchronized {
     openGames.get(id).map { game =>
       //If the game has fixed users specified, then only those users can join
       if(game.users.forAll(_.nonEmpty) && game.users.forAll(_ != Some(user)))
@@ -411,9 +416,9 @@ class OpenGames(val db: Database)(implicit ec: ExecutionContext) {
       else {
         val now = Timestamp.get
         game.doTimeouts(now)
-        val auth = game.logins.login(user,now)
+        val gameAuth = game.logins.login(user,now,Some(auth))
         game.advanceSequence
-        Success(auth)
+        Success(gameAuth)
       }
     }
   }
@@ -422,36 +427,36 @@ class OpenGames(val db: Database)(implicit ec: ExecutionContext) {
    * Some(Success(...)) otherwise.
    * In the case that the user is logged in, heartbeats the user.
    */
-  private def ifLoggedInOpt[T](user: Username, id: GameID, gameAuth: Auth)(f: OpenGameData => Try[T]): Option[Try[T]] = {
+  private def ifLoggedInOpt[T](id: GameID, gameAuth: Auth)(f: (Username,OpenGameData) => Try[T]): Option[Try[T]] = {
     openGames.get(id).map { game =>
       val now = Timestamp.get
       game.doTimeouts(now)
-      if(!game.logins.heartbeat(user,gameAuth,now))
-        Failure(new Exception("Not joined or timed out with the open game with this id."))
-      else
-        f(game)
+      game.logins.heartbeatAuth(gameAuth,now) match {
+        case None => Failure(new Exception("Not joined or timed out with the open game with this id."))
+        case Some(user) => f(user,game)
+      }
     }
   }
 
   /* Returns Failure(...) if there was no game or the user was not logged in or [f] failed, Success(...) otherwise.
    * In the case that the user is logged in, heartbeats the user.
    */
-  private def ifLoggedIn[T](user: Username, id: GameID, gameAuth: Auth)(f: OpenGameData => Try[T]): Try[T] = {
-    ifLoggedInOpt(user,id,gameAuth)(f).getOrElse(Failure(new Exception("No open game with the given id.")))
+  private def ifLoggedIn[T](id: GameID, gameAuth: Auth)(f: (Username,OpenGameData) => Try[T]): Try[T] = {
+    ifLoggedInOpt(id,gameAuth)(f).getOrElse(Failure(new Exception("No open game with the given id.")))
   }
 
   /* Attempt to heartbeat an open game with the specified id
    * Returns None if there was no game, Some(Failure(...)) if there was but it failed, and Some(Success(...)) on success.
    */
-  def heartbeat(user: Username, id: GameID, gameAuth: Auth): Option[Try[Unit]] = this.synchronized {
-    ifLoggedInOpt(user,id,gameAuth) { _ => Success(()) }
+  def heartbeat(id: GameID, gameAuth: Auth): Option[Try[Unit]] = this.synchronized {
+    ifLoggedInOpt(id,gameAuth) { case _ => Success(()) }
   }
 
   /* Attempt to leave an open game with the specified id
    * Returns None if there was no game, Some(Failure(...)) if there was but it failed, and Some(Success(...)) on success.
    */
-  def leave(user: Username, id: GameID, gameAuth: Auth): Option[Try[Unit]] = this.synchronized {
-    ifLoggedInOpt(user,id,gameAuth) { game =>
+  def leave(id: GameID, gameAuth: Auth): Option[Try[Unit]] = this.synchronized {
+    ifLoggedInOpt(id,gameAuth) { case (user,game) =>
       val now = Timestamp.get
       game.logins.logout(user,gameAuth,now)
       game.filterAcceptedByLogins
@@ -467,8 +472,8 @@ class OpenGames(val db: Database)(implicit ec: ExecutionContext) {
    * NOTE: In the event that a game should begin, one must call [clearStartedGame] after the newly active game is inserted into
    * the database (or otherwise on failure of the game to start for other reasons).
    */
-  def accept(user: Username, id: GameID, gameAuth: Auth, opponent: Username): Try[Option[ActiveGames.InitData]] = this.synchronized {
-    ifLoggedIn(user,id,gameAuth) { game =>
+  def accept(id: GameID, gameAuth: Auth, opponent: Username): Try[Option[ActiveGames.InitData]] = this.synchronized {
+    ifLoggedIn(id,gameAuth) { case (user,game) =>
       //Do nothing if the game is already starting
       if(game.starting)
         Failure(new Exception("Game already starting"))
@@ -505,16 +510,16 @@ class OpenGames(val db: Database)(implicit ec: ExecutionContext) {
     }
   }
 
-  /* Reject the joining of a given opponent. */
-  def reject(user: Username, id: GameID, gameAuth: Auth, opponent: Username): Try[Unit] = this.synchronized {
-    ifLoggedIn(user,id,gameAuth) { game =>
+  /* Decline the joining of a given opponent. */
+  def decline(id: GameID, gameAuth: Auth, opponent: Username): Try[Unit] = this.synchronized {
+    ifLoggedIn(id,gameAuth) { case (user,game) =>
       if(game.starting)
         Failure(new Exception("Game already starting"))
       else if(game.creator != Some(user))
         Failure(new Exception("Not the creator of the game."))
       else {
         val now = Timestamp.get
-        //TODO should this be distingushed somehow from a timeout for the rejected?
+        //TODO should this be distingushed somehow from a timeout for the declined?
         game.logins.logoutUser(opponent,now)
         game.filterAcceptedByLogins
         game.advanceSequence
@@ -561,6 +566,7 @@ class OpenGames(val db: Database)(implicit ec: ExecutionContext) {
   def hasGame(id: GameID): Boolean = this.synchronized {
     openGames.contains(id)
   }
+
 }
 
 
@@ -673,16 +679,16 @@ class ActiveGames(val db: Database, val scheduler: Scheduler) (implicit ec: Exec
   /* Attempt to join an active game with the specified id.
    * Returns None if there was no game, Some(Failure(...)) if there was but it failed, and Some(Success(...)) on success.
    */
-  def join(user: Username, id: GameID): Option[Try[Auth]] = this.synchronized {
+  def join(user: Username, auth: Auth, id: GameID): Option[Try[Auth]] = this.synchronized {
     activeGames.get(id).map { game =>
       val now = Timestamp.get
       game.doTimeouts(now)
       if(!game.users.contains(user))
         Failure(new Exception("Not one of the players of this game."))
       else {
-        val auth = game.logins.login(user,now)
+        val gameAuth = game.logins.login(user,now,Some(auth))
         game.advanceSequence
-        Success(auth)
+        Success(gameAuth)
       }
     }
   }
@@ -691,38 +697,40 @@ class ActiveGames(val db: Database, val scheduler: Scheduler) (implicit ec: Exec
    * Some(Success(...)) otherwise.
    * In the case that the user is logged in, heartbeats the user.
    */
-  private def ifLoggedInOpt[T](user: Username, id: GameID, gameAuth: Auth)(f: ActiveGameData => Try[T]): Option[Try[T]] = {
+  private def ifLoggedInOpt[T](id: GameID, gameAuth: Auth)(f: (Username,ActiveGameData) => Try[T]): Option[Try[T]] = {
     activeGames.get(id).map { game =>
       val now = Timestamp.get
       game.doTimeouts(now)
-      if(!game.users.contains(user))
-        Failure(new Exception("Not one of the players of this game."))
-      else if(!game.logins.heartbeat(user,gameAuth,now))
-        Failure(new Exception("Not joined or timed out with the active game with this id."))
-      else
-        f(game)
+      game.logins.heartbeatAuth(gameAuth,now) match {
+        case None => Failure(new Exception("Not joined or timed out with the active game with this id."))
+        case Some(user) =>
+          if(!game.users.contains(user))
+            Failure(new Exception("Not one of the players of this game."))
+          else
+            f(user,game)
+      }
     }
   }
 
   /* Returns Failure(...) if there was no game or the user was not logged in or [f] failed, Success(...) otherwise.
    * In the case that the user is logged in, heartbeats the user.
    */
-  private def ifLoggedIn[T](user: Username, id: GameID, gameAuth: Auth)(f: ActiveGameData => Try[T]): Try[T] = {
-    ifLoggedInOpt(user,id,gameAuth)(f).getOrElse(Failure(new Exception("No active game with the given id.")))
+  private def ifLoggedIn[T](id: GameID, gameAuth: Auth)(f: (Username,ActiveGameData) => Try[T]): Try[T] = {
+    ifLoggedInOpt(id,gameAuth)(f).getOrElse(Failure(new Exception("No active game with the given id.")))
   }
 
   /* Attempt to heartbeat an active game with the specified id
    * Returns None if there was no game, Some(Failure(...)) if there was but it failed, and Some(Success(...)) on success.
    */
-  def heartbeat(user: Username, id: GameID, gameAuth: Auth): Option[Try[Unit]] = this.synchronized {
-    ifLoggedInOpt(user,id,gameAuth) { _ => Success(()) }
+  def heartbeat(id: GameID, gameAuth: Auth): Option[Try[Unit]] = this.synchronized {
+    ifLoggedInOpt(id,gameAuth) { case _ => Success(()) }
   }
 
   /* Attempt to leave an active game with the specified id
    * Returns None if there was no game, Some(Failure(...)) if there was but it failed, and Some(Success(...)) on success.
    */
-  def leave(user: Username, id: GameID, gameAuth: Auth): Option[Try[Unit]] = this.synchronized {
-    ifLoggedInOpt(user,id,gameAuth) { game =>
+  def leave(id: GameID, gameAuth: Auth): Option[Try[Unit]] = this.synchronized {
+    ifLoggedInOpt(id,gameAuth) { case (user,game) =>
       val now = Timestamp.get
       game.logins.logout(user,gameAuth,now)
       game.advanceSequence
@@ -735,16 +743,16 @@ class ActiveGames(val db: Database, val scheduler: Scheduler) (implicit ec: Exec
   }
 
   /* Performs [f] not synchronized with the ActiveGames. */
-  private def gameActionUnsynced[T](user: Username, id: GameID, gameAuth: Auth)(f: ((ActiveGame,Player)) => Try[T]): Try[T] = {
+  private def gameActionUnsynced[T](id: GameID, gameAuth: Auth)(f: (ActiveGame,Player) => Try[T]): Try[T] = {
     val result =
       this.synchronized {
-        ifLoggedIn(user,id,gameAuth) { game =>
+        ifLoggedIn(id,gameAuth) { case (user,game) =>
           val player = lookupPlayer(game,user)
           Success(game,player)
         }
       }
     result.flatMap { case (game,player) =>
-      f((game.game,player)).map { x =>
+      f(game.game,player).map { x =>
         this.synchronized {
           game.advanceSequence
         }
@@ -754,15 +762,15 @@ class ActiveGames(val db: Database, val scheduler: Scheduler) (implicit ec: Exec
   }
 
   /* Resign a game */
-  def resign(user: Username, id: GameID, gameAuth: Auth): Try[Unit] = {
-    gameActionUnsynced(user,id,gameAuth) { case (game,player) =>
+  def resign(id: GameID, gameAuth: Auth): Try[Unit] = {
+    gameActionUnsynced(id,gameAuth) { case (game,player) =>
       game.resign(player)
     }
   }
 
   /* Make a move in a game */
-  def move(user: Username, id: GameID, gameAuth: Auth, moveStr: String, plyNum: Int): Try[Unit] = this.synchronized {
-    gameActionUnsynced(user,id,gameAuth) { case (game,player) =>
+  def move(id: GameID, gameAuth: Auth, moveStr: String, plyNum: Int): Try[Unit] = this.synchronized {
+    gameActionUnsynced(id,gameAuth) { case (game,player) =>
       game.move(moveStr,player,plyNum)
     }
   }
@@ -792,6 +800,7 @@ class ActiveGames(val db: Database, val scheduler: Scheduler) (implicit ec: Exec
   def hasGame(id: GameID): Boolean = this.synchronized {
     activeGames.contains(id)
   }
+
 }
 
 /* All the non-login-related state for a single active game. */

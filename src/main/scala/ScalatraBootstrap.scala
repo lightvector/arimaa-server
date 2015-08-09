@@ -4,7 +4,8 @@ import org.playarimaa.server._
 import org.playarimaa.server.game._
 import org.scalatra._
 import javax.servlet.ServletContext
-import _root_.akka.actor.{ActorSystem}
+import _root_.akka.actor.ActorSystem
+import scala.concurrent.ExecutionContext
 
 import java.security._
 
@@ -40,6 +41,8 @@ class ScalatraBootstrap extends LifeCycle {
   override def init(context: ServletContext) {
     ArimaaServerInit.initialize
     context.mount(new ArimaaServlet, "/*")
-    context.mount(new ChatServlet(system), "/api/chat/*")
+
+    val chatContext: ExecutionContext = system.dispatcher
+    context.mount(new ChatServlet(system,chatContext), "/api/chat/*")
   }
 }
