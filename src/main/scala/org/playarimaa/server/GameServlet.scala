@@ -50,8 +50,8 @@ object GameServlet {
     case class ActiveGameData(
       moveStartTime: Double,
       timeSpent: Double,
-      gTimeThisMove: Double,
-      sTimeThisMove: Double,
+      gClockBeforeTurn: Double,
+      sClockBeforeTurn: Double,
       gPresent: Boolean,
       sPresent: Boolean
     )
@@ -60,8 +60,8 @@ object GameServlet {
       id: String,
       numPly: Int,
       startTime: Option[Double],
-      gUser: String,
-      sUser: String,
+      gUser: Option[String],
+      sUser: Option[String],
       gTC: TimeControl,
       sTC: TimeControl,
       rated: Boolean,
@@ -81,6 +81,15 @@ object GameServlet {
     case class GameState(
       history: Vector[String],
       moveTimes: Vector[MoveTime],
+      toMove: String,
+      meta: GameMetadata,
+      sequence: Option[Long]
+    )
+    //Uses lists instead of vectors to support deserialization.
+    //TODO - see https://github.com/json4s/json4s/issues/82
+    case class GameStateIn(
+      history: List[String],
+      moveTimes: List[MoveTime],
       toMove: String,
       meta: GameMetadata,
       sequence: Option[Long]
@@ -113,48 +122,49 @@ object GameServlet {
 
   case object Create extends GameroomAction {
     val name = "create"
-    case class Query(auth: Auth, tc: IOTypes.TimeControl, rated: Boolean, gameType: String)
-    case class Reply(gameID: GameID, gameAuth: Auth)
+    case class Query(auth: String, tc: IOTypes.TimeControl, rated: Boolean, gameType: String)
+    case class Reply(gameID: String, gameAuth: String)
   }
   case object Join extends GameAction {
     val name = "join"
-    case class Query(auth: Auth)
-    case class Reply(gameAuth: Auth)
+    case class Query(auth: String)
+    case class Reply(gameAuth: String)
   }
   case object Leave extends GameAction {
     val name = "leave"
-    case class Query(gameAuth: Auth)
+    case class Query(gameAuth: String)
     case class Reply(message: String)
   }
   case object Accept extends GameAction {
     val name = "accept"
-    case class Query(gameAuth: Auth, opponent: Username)
+    case class Query(gameAuth: String, opponent: String)
     case class Reply(message: String)
   }
   case object Decline extends GameAction {
     val name = "decline"
-    case class Query(gameAuth: Auth, opponent: Username)
+    case class Query(gameAuth: String, opponent: String)
     case class Reply(message: String)
   }
   case object Heartbeat extends GameAction {
     val name = "heartbeat"
-    case class Query(gameAuth: Auth)
+    case class Query(gameAuth: String)
     case class Reply(message: String)
   }
   case object Resign extends GameAction {
     val name = "resign"
-    case class Query(gameAuth: Auth)
+    case class Query(gameAuth: String)
     case class Reply(message: String)
   }
   case object Move extends GameAction {
     val name = "move"
-    case class Query(gameAuth: Auth, move: String, plyNum: Int)
+    case class Query(gameAuth: String, move: String, plyNum: Int)
     case class Reply(message: String)
   }
 
   case object GetState {
     case class Query(minSequence: Option[Long], timeout: Option[Int])
     type Reply = IOTypes.GameState
+    type ReplyIn = IOTypes.GameStateIn
 
     def parseQuery(params: Map[String,String]): Query = {
       new Query(
@@ -275,8 +285,8 @@ class GameServlet(val siteLogin: SiteLogin, val games: Games, val ec: ExecutionC
       id = data.meta.id,
       numPly = data.meta.numPly,
       startTime = data.meta.startTime,
-      gUser = data.meta.users(GOLD),
-      sUser = data.meta.users(SILV),
+      gUser = data.openGameData.map(_.users(GOLD)).getOrElse(Some(data.meta.users(GOLD))),
+      sUser = data.openGameData.map(_.users(SILV)).getOrElse(Some(data.meta.users(SILV))),
       gTC = convTC(data.meta.tcs(GOLD)),
       sTC = convTC(data.meta.tcs(SILV)),
       rated = data.meta.rated,
@@ -292,8 +302,8 @@ class GameServlet(val siteLogin: SiteLogin, val games: Games, val ec: ExecutionC
         IOTypes.ActiveGameData(
           moveStartTime = agdata.moveStartTime,
           timeSpent = agdata.timeSpent,
-          gTimeThisMove = agdata.timeThisMove(GOLD),
-          sTimeThisMove = agdata.timeThisMove(SILV),
+          gClockBeforeTurn = agdata.clockBeforeTurn(GOLD),
+          sClockBeforeTurn = agdata.clockBeforeTurn(SILV),
           gPresent = agdata.present(GOLD),
           sPresent = agdata.present(SILV)
         )

@@ -92,12 +92,20 @@ class Games(val db: Database, val parentLogins: LoginTracker, val scheduler: Sch
   private def checkTimeoutLoop: Unit = {
     //This shouldn't normally throw an exception, but in case it does, we don't want to kill the loop,
     //so we instead catch the exception and log it.
-    Try(applyLoginTimeouts) match {
-      case Failure(exn) =>
-        logger.error("Error in checkTimeoutLoop from applyLoginTimeouts: " + exn)
-        scheduler.scheduleOnce(Games.TIMEOUT_CHECK_PERIOD_IF_ERROR seconds) { checkTimeoutLoop }
+    val nextDelay =
+      Try(applyLoginTimeouts) match {
+        case Failure(exn) =>
+          logger.error("Error in checkTimeoutLoop from applyLoginTimeouts: " + exn)
+          Games.TIMEOUT_CHECK_PERIOD_IF_ERROR
       case Success(()) =>
-        scheduler.scheduleOnce(Games.TIMEOUT_CHECK_PERIOD seconds) { checkTimeoutLoop }
+          Games.TIMEOUT_CHECK_PERIOD
+      }
+    try {
+      scheduler.scheduleOnce(nextDelay seconds) { checkTimeoutLoop }
+    }
+    catch {
+      //Thrown when the actorsystem shuts down, ignore
+      case _ : IllegalStateException => ()
     }
   }
 
@@ -584,7 +592,7 @@ object ActiveGames {
   case class GetData(
     moveStartTime: Timestamp,
     timeSpent: Double,
-    timeThisMove: PlayerArray[Double],
+    clockBeforeTurn: PlayerArray[Double],
     present: PlayerArray[Boolean]
   )
 }
@@ -793,8 +801,10 @@ class ActiveGames(val db: Database, val scheduler: Scheduler) (implicit ec: Exec
           meta = meta,
           moves = moves,
           openGameData = None,
-          activeGameData = Some(activeGameData),
-          sequence = Some(game.sequence)
+          //This will be None if the game is ended but is not yet cleaned up
+          activeGameData = activeGameData,
+          //Only provide the sequence number if the game is still going
+          sequence = activeGameData.map { case _ => game.sequence }
         ))
       }
     }
@@ -820,8 +830,8 @@ class ActiveGame(
 
   //Time of the start of the current move
   private var moveStartTime: Timestamp = initNow
-  //Time left for each player at the start of the move
-  private var timeThisMove: PlayerArray[Double] =
+  //Time left for each player before the start of this turn
+  private var clockBeforeTurn: PlayerArray[Double] =
     meta.tcs.mapi { case (player,tc) => GameUtils.computeTimeLeft(tc,moves,player) }
   //The game object itself
   private var game: Game = GameUtils.initGameFromMoves(moves,notation)
@@ -838,16 +848,18 @@ class ActiveGame(
 
   scheduleNextTimeout(initNow)
 
-  def getActiveGetData(present: PlayerArray[Boolean]): (GameMetadata,Vector[MoveInfo],ActiveGames.GetData) = this.synchronized {
-    ( meta,
-      moves,
-      ActiveGames.GetData(
-        moveStartTime = moveStartTime,
-        timeSpent = Timestamp.get - moveStartTime,
-        timeThisMove = timeThisMove,
-        present = present
-      )
-    )
+  def getActiveGetData(present: PlayerArray[Boolean]): (GameMetadata,Vector[MoveInfo],Option[ActiveGames.GetData]) = this.synchronized {
+    val activeGetData =
+      if(gameOver)
+        None
+      else
+        Some(ActiveGames.GetData(
+          moveStartTime = moveStartTime,
+          timeSpent = Timestamp.get - moveStartTime,
+          clockBeforeTurn = clockBeforeTurn,
+          present = present
+        ))
+    (meta,moves,activeGetData)
   }
 
   def getNextPlayer: Player = GameUtils.nextPlayer(meta.numPly)
@@ -889,8 +901,12 @@ class ActiveGame(
     }
   }
 
+  def gameOver: Boolean = this.synchronized {
+    meta.result.winner.nonEmpty
+  }
+
   def canCleanup: Boolean = this.synchronized {
-    meta.result.winner.nonEmpty && metaSaveFinished.isCompleted && moveSaveFinished.isCompleted
+    gameOver && metaSaveFinished.isCompleted && moveSaveFinished.isCompleted
   }
 
   private def declareWinner(player: Player, reason: EndingReason, now: Timestamp): Unit = this.synchronized {
@@ -904,8 +920,7 @@ class ActiveGame(
     val player = getNextPlayer
     val tc = meta.tcs(player)
     val timeSpent = now - moveStartTime
-    val timeAtStartOfTurn = timeThisMove(player)
-    val secondsUntilTimeout = tc.timeLeftInCurrentTurn(timeAtStartOfTurn, timeSpent, meta.numPly)
+    val secondsUntilTimeout = tc.timeLeftUntilTimeout(clockBeforeTurn(player), timeSpent, meta.numPly)
     val plyNum = meta.numPly
     timeoutEvent = Some(scheduler.scheduleOnce(secondsUntilTimeout seconds) {
       if(meta.numPly == plyNum)
@@ -915,17 +930,17 @@ class ActiveGame(
 
   /* Directly set the game result for a timeout, unless the game is already ended for another reason. */
   private def doLoseByTimeout(now: Timestamp): Unit = this.synchronized {
-    if(meta.result.winner.isEmpty) {
+    if(!gameOver) {
       declareWinner(getNextPlayer.flip, EndingReason.TIME, now)
       onTimeout()
     }
   }
 
   /* Returns true if a timeout occured and sets the game result */
-  private def tryLoseByTimeout(timeLeft: Double, timeSpent: Double, now: Timestamp): Boolean = this.synchronized {
+  private def tryLoseByTimeout(clock: Double, timeSpent: Double, now: Timestamp): Boolean = this.synchronized {
     val player = getNextPlayer
     val tc = meta.tcs(player)
-    if(tc.isOutOfTime(timeLeft, timeSpent)) {
+    if(tc.isOutOfTime(clock, timeSpent)) {
       doLoseByTimeout(now)
       true
     }
@@ -933,22 +948,22 @@ class ActiveGame(
       false
   }
 
-  private def timeLeftAndSpent(now: Timestamp): (Double,Double) = this.synchronized {
+  /* Returns the current value of the player's clock and the time spent this turn so far */
+  private def clockAndSpent(now: Timestamp): (Double,Double) = this.synchronized {
     val player = getNextPlayer
     val tc = meta.tcs(player)
     val timeSpent = now - moveStartTime
-    val timeAtStartOfTurn = timeThisMove(player)
-    val timeLeft = tc.timeLeftAfterMove(timeAtStartOfTurn, timeSpent, meta.numPly)
-    (timeLeft,timeSpent)
+    val clock = tc.clockAfterTurn(clockBeforeTurn(player), timeSpent, meta.numPly)
+    (clock,timeSpent)
   }
 
   def resign(player: Player): Try[Unit] = this.synchronized {
-    if(meta.result.winner.nonEmpty)
+    if(gameOver)
       Failure(new Exception("Game is over"))
     else {
       val now = Timestamp.get
-      val (timeLeft,timeSpent) = timeLeftAndSpent(now)
-      if(tryLoseByTimeout(timeLeft,timeSpent,now))
+      val (clock,timeSpent) = clockAndSpent(now)
+      if(tryLoseByTimeout(clock,timeSpent,now))
         Failure(new Exception("Game is over"))
       else {
         declareWinner(player.flip, EndingReason.RESIGNATION, now)
@@ -958,7 +973,7 @@ class ActiveGame(
   }
 
   def move(moveStr: String, player: Player, plyNum: Int): Try[Unit] = this.synchronized {
-    if(meta.result.winner.nonEmpty)
+    if(gameOver)
       Failure(new Exception("Game is over"))
     else if(player != getNextPlayer)
       Failure(new Exception("Tried to make move for " + player + " but current turn is " + notation.turnString(meta.numPly)))
@@ -967,8 +982,8 @@ class ActiveGame(
     else {
       game.parseAndMakeMove(moveStr, notation).flatMap { newGame =>
         val now = Timestamp.get
-        val (timeLeft,timeSpent) = timeLeftAndSpent(now)
-        if(tryLoseByTimeout(timeLeft,timeSpent,now))
+        val (clock,timeSpent) = clockAndSpent(now)
+        if(tryLoseByTimeout(clock,timeSpent,now))
           Failure(new Exception("Game is over"))
         else {
           meta = meta.copy(
@@ -983,7 +998,7 @@ class ActiveGame(
             start = moveStartTime
           )
           moveStartTime = now
-          timeThisMove = timeThisMove + (player -> timeLeft)
+          clockBeforeTurn = clockBeforeTurn + (player -> clock)
           game = newGame
 
           saveMetaToDB
@@ -1019,7 +1034,7 @@ object GameUtils {
         .filter{ case (x,i) => (i % 2 == 0) == (player == GOLD) }
         .map(_._1)
         .map(info => info.time - info.start)
-    tc.timeLeftFromHistory(timeUsageHistory)
+    tc.clockFromHistory(timeUsageHistory)
   }
 
   /* Initialize a game from the given move history list */

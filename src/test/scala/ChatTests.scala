@@ -11,7 +11,7 @@ import slick.driver.H2Driver.api._
 
 class ChatServletTests(_system: ActorSystem) extends TestKit(_system) with ScalatraFlatSpec with BeforeAndAfterAll {
 
-  def this() = this(ActorSystem("MySpec"))
+  def this() = this(ActorSystem("ChatTests"))
 
   override def afterAll {
     TestKit.shutdownActorSystem(system)
