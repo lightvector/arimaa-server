@@ -8,6 +8,7 @@ import scala.concurrent.duration._
 import scala.util.{Try, Success, Failure}
 import org.json4s.{DefaultFormats, Formats}
 import org.json4s.jackson.Serialization
+import org.slf4j.{Logger, LoggerFactory}
 
 import org.playarimaa.server.Timestamp.Timestamp
 import org.playarimaa.server.Accounts.Import._
@@ -40,16 +41,16 @@ case object GameServlet {
     case class GameResult(
       winner: String,
       reason: String,
-      endTime: Timestamp
+      endTime: Double
     )
 
     case class OpenGameData(
-      creator: Option[Username],
-      joined: List[Username]
+      creator: Option[String],
+      joined: Set[String]
     )
 
     case class ActiveGameData(
-      moveStartTime: Timestamp,
+      moveStartTime: Double,
       timeSpent: Double,
       gTimeThisMove: Double,
       sTimeThisMove: Double,
@@ -58,11 +59,11 @@ case object GameServlet {
     )
 
     case class GameMetadata(
-      id: GameID,
+      id: String,
       numPly: Int,
-      startTime: Option[Timestamp],
-      gUser: Username,
-      sUser: Username,
+      startTime: Option[Double],
+      gUser: String,
+      sUser: String,
       gTC: TimeControl,
       sTC: TimeControl,
       rated: Boolean,
@@ -71,12 +72,12 @@ case object GameServlet {
       openGameData: Option[OpenGameData],
       activeGameData: Option[ActiveGameData],
       result: Option[GameResult],
-      now: Timestamp
+      now: Double
     )
 
     case class MoveTime(
-      start: Timestamp,
-      time: Timestamp
+      start: Double,
+      time: Double
     )
 
     case class GameState(
@@ -172,8 +173,10 @@ import org.playarimaa.server.GameServlet._
 class GameServlet(val siteLogin: SiteLogin, val games: Games, val ec: ExecutionContext)
     extends WebAppStack with JacksonJsonSupport with FutureSupport {
   //Sets up automatic case class to JSON output serialization
-  protected implicit lazy val jsonFormats: Formats = DefaultFormats
+  protected implicit lazy val jsonFormats: Formats = Json.formats
   protected implicit def executor: ExecutionContext = ec
+
+  val logger =  LoggerFactory.getLogger(getClass)
 
   //Before every action runs, set the content type to be in JSON format.
   before() {
@@ -284,7 +287,7 @@ class GameServlet(val siteLogin: SiteLogin, val games: Games, val ec: ExecutionC
       openGameData = data.openGameData.map { ogdata =>
         IOTypes.OpenGameData(
           creator = ogdata.creator,
-          joined = ogdata.joined.toList
+          joined = ogdata.joined
         )
       },
       activeGameData = data.activeGameData.map { agdata =>
@@ -323,8 +326,7 @@ class GameServlet(val siteLogin: SiteLogin, val games: Games, val ec: ExecutionC
   def handleGetState(id: GameID, params: Map[String,String]) = {
     val query = GetState.parseQuery(params)
     games.get(id, query.minSequence, query.timeout.map(_.toDouble)).map { data =>
-      val reply = convState(data)
-      Json.write(reply)
+      convState(data)
     }
   }
 

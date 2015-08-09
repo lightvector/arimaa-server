@@ -1,18 +1,18 @@
 
 //Note that the Scalatra web framework appears to expect this bootstrap file to be in the root package.
-import org.playarimaa.server._
-import org.playarimaa.server.game._
-import org.scalatra._
+import org.scalatra.LifeCycle
 import javax.servlet.ServletContext
-import _root_.akka.actor.ActorSystem
-import scala.concurrent.{ExecutionContext}
+import akka.actor.ActorSystem
 import java.util.concurrent.Executors
-
-import java.security._
-
+import scala.concurrent.ExecutionContext
 import scala.concurrent.Await
 import scala.concurrent.duration.Duration
 import slick.driver.H2Driver.api._
+import org.slf4j.{Logger, LoggerFactory}
+
+import org.playarimaa.server._
+import org.playarimaa.server.game._
+
 
 object ArimaaServerInit {
   private var initialized = false
@@ -39,6 +39,7 @@ object ArimaaServerInit {
 
 class ScalatraBootstrap extends LifeCycle {
   val actorSystem = ActorSystem()
+  val logger =  LoggerFactory.getLogger(getClass)
 
   override def init(context: ServletContext) {
     ArimaaServerInit.initialize
@@ -50,7 +51,9 @@ class ScalatraBootstrap extends LifeCycle {
       def execute(runnable: Runnable) {
         threadPool.submit(runnable)
       }
-      def reportFailure(t: Throwable) {}
+      def reportFailure(t: Throwable) {
+        logger.error(t.toString)
+      }
     }
 
     val db = Database.forConfig("h2mem1")

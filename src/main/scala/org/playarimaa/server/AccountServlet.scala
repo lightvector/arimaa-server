@@ -55,7 +55,7 @@ import org.playarimaa.server.AccountServlet._
 class AccountServlet(val siteLogin: SiteLogin, val ec: ExecutionContext)
     extends WebAppStack with JacksonJsonSupport with FutureSupport {
   //Sets up automatic case class to JSON output serialization
-  protected implicit lazy val jsonFormats: Formats = DefaultFormats
+  protected implicit lazy val jsonFormats: Formats = Json.formats
   protected implicit def executor: ExecutionContext = ec
 
   //Before every action runs, set the content type to be in JSON format.

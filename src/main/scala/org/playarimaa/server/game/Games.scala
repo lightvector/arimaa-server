@@ -4,6 +4,7 @@ import scala.concurrent.duration._
 import scala.language.postfixOps
 import scala.util.{Try, Success, Failure}
 import slick.driver.H2Driver.api._
+import org.slf4j.{Logger, LoggerFactory}
 import org.playarimaa.server.Timestamp
 import org.playarimaa.server.Timestamp.Timestamp
 import org.playarimaa.server.RandGen
@@ -56,6 +57,7 @@ class Games(val db: Database, val parentLogins: LoginTracker, val scheduler: Sch
 
   private val openGames = new OpenGames(db,parentLogins)
   private val activeGames = new ActiveGames(db,scheduler)
+  val logger =  LoggerFactory.getLogger(getClass)
 
   //TODO upon creation, should we load adjourned games from the DB and start them?
   //Maybe only if they're postal games (some heuristic based on tc?). Do we want to credit any time for them?
@@ -90,9 +92,11 @@ class Games(val db: Database, val parentLogins: LoginTracker, val scheduler: Sch
   }
 
   private def checkTimeoutLoop: Unit = {
+    //This shouldn't normally throw an exception, but in case it does, we don't want to kill the loop,
+    //so we instead catch the exception and log it.
     Try(applyLoginTimeouts) match {
-      case Failure(_) =>
-        //TODO log exn
+      case Failure(exn) =>
+        logger.error("Error in checkTimeoutLoop from applyLoginTimeouts: " + exn)
         scheduler.scheduleOnce(Games.TIMEOUT_CHECK_PERIOD_IF_ERROR seconds) { checkTimeoutLoop }
       case Success(()) =>
         scheduler.scheduleOnce(Games.TIMEOUT_CHECK_PERIOD seconds) { checkTimeoutLoop }
@@ -614,6 +618,7 @@ class ActiveGames(val db: Database, val scheduler: Scheduler) (implicit ec: Exec
 
   //All active games are in this map, and also any game in this map has an entry in the database
   private var activeGames: Map[GameID,ActiveGameData] = Map()
+  val logger =  LoggerFactory.getLogger(getClass)
 
   def addGame(data: ActiveGames.InitData): Future[Unit] = {
     val id = data.meta.id
@@ -649,7 +654,7 @@ class ActiveGames(val db: Database, val scheduler: Scheduler) (implicit ec: Exec
           logins = data.logins,
           users = data.users,
           //Note that this could raise an exception if the moves aren't legal somehow
-          game = new ActiveGame(meta,data.moves,now,db,scheduler,onTimeout),
+          game = new ActiveGame(meta,data.moves,now,db,scheduler,onTimeout,logger),
           sequencePromise = Promise(),
           sequence = data.sequence
         )
@@ -810,7 +815,8 @@ class ActiveGame(
   val initNow: Timestamp,
   val db: Database,
   val scheduler: Scheduler,
-  val onTimeout: (() => Unit)
+  val onTimeout: (() => Unit),
+  val logger: Logger //borrows a logger so that we don't create a new one on every game
 )(implicit ec: ExecutionContext) {
   val notation: Notation = StandardNotation
 
@@ -854,13 +860,11 @@ class ActiveGame(
       val query: DBIO[Int] = Games.gameTable.filter(_.id === metaToSave.id).update(metaToSave)
       db.run(query).resultMap { result =>
         result match {
-          //TODO log exn
-          case Failure(_) => ()
+          case Failure(exn) =>
+            logger.error("Error saving game metadata to db: " + exn)
           case Success(numRowsUpdated) =>
-            //TODO LOG
-            if(numRowsUpdated != 1) {
-            }
-            ()
+            if(numRowsUpdated != 1)
+              logger.error("Error saving game metadata to db, " + numRowsUpdated + " row updated when only 1 expected")
         }
       }
     }
@@ -874,9 +878,13 @@ class ActiveGame(
         val query: DBIO[Option[Int]] = Games.movesTable ++= newMoves
         db.run(query).resultMap { result =>
           result match {
-            //TODO log exn
-            case Failure(_) => ()
-            case Success(_) => ()
+            case Failure(exn) =>
+              logger.error("Error saving game moves to db: " + exn)
+            case Success(None) =>
+              logger.error("Error saving game moves to db, no rows inserted")
+            case Success(Some(numRowsInserted)) =>
+              if(numRowsInserted <= 0)
+                logger.error("Error saving game moves to db, " + numRowsInserted + " rows inserted when >= 1 expected")
           }
         }
       }
