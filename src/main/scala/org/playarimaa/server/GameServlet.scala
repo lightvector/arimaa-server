@@ -27,6 +27,10 @@ object GameServlet {
   object IOTypes {
     case class SimpleError(error: String)
 
+    case class ShortUserInfo(
+      name: String
+    )
+
     case class TimeControl(
       initialTime: Int,
       increment: Option[Int],
@@ -43,8 +47,8 @@ object GameServlet {
     )
 
     case class OpenGameData(
-      creator: Option[String],
-      joined: Set[String]
+      creator: Option[ShortUserInfo],
+      joined: List[ShortUserInfo]
     )
 
     case class ActiveGameData(
@@ -60,8 +64,8 @@ object GameServlet {
       id: String,
       numPly: Int,
       startTime: Option[Double],
-      gUser: Option[String],
-      sUser: Option[String],
+      gUser: Option[ShortUserInfo],
+      sUser: Option[ShortUserInfo],
       gTC: TimeControl,
       sTC: TimeControl,
       rated: Boolean,
@@ -122,12 +126,12 @@ object GameServlet {
 
   case object Create extends GameroomAction {
     val name = "create"
-    case class Query(auth: String, tc: IOTypes.TimeControl, rated: Boolean, gameType: String)
+    case class Query(siteAuth: String, tc: IOTypes.TimeControl, rated: Boolean, gameType: String)
     case class Reply(gameID: String, gameAuth: String)
   }
   case object Join extends GameAction {
     val name = "join"
-    case class Query(auth: String)
+    case class Query(siteAuth: String)
     case class Reply(gameAuth: String)
   }
   case object Leave extends GameAction {
@@ -204,7 +208,7 @@ class GameServlet(val siteLogin: SiteLogin, val games: Games, val ec: ExecutionC
         pass()
       case Some(Create) =>
         val query = Json.read[Create.Query](request.body)
-        siteLogin.requiringLogin(query.auth) { username =>
+        siteLogin.requiringLogin(query.siteAuth) { username =>
           query.gameType match {
             case "standard" =>
               val tc = TimeControl(
@@ -215,7 +219,7 @@ class GameServlet(val siteLogin: SiteLogin, val games: Games, val ec: ExecutionC
                 maxMoveTime = query.tc.maxMoveTime,
                 overtimeAfter = query.tc.overtimeAfter
               )
-              games.createStandardGame(username, query.auth, tc, query.rated).map { case (gameID,gameAuth) =>
+              games.createStandardGame(username, query.siteAuth, tc, query.rated).map { case (gameID,gameAuth) =>
                 Create.Reply(gameID,gameAuth)
               }
             case _ =>
@@ -231,8 +235,8 @@ class GameServlet(val siteLogin: SiteLogin, val games: Games, val ec: ExecutionC
         pass()
       case Some(Join) =>
         val query = Json.read[Join.Query](request.body)
-        siteLogin.requiringLogin(query.auth) { username =>
-          games.join(username,query.auth,id).map { gameAuth =>
+        siteLogin.requiringLogin(query.siteAuth) { username =>
+          games.join(username,query.siteAuth,id).map { gameAuth =>
             Join.Reply(gameAuth)
           }
         }.get.get
@@ -280,13 +284,17 @@ class GameServlet(val siteLogin: SiteLogin, val games: Games, val ec: ExecutionC
     )
   }
 
+  def convUser(username: Username): IOTypes.ShortUserInfo = {
+    IOTypes.ShortUserInfo(username)
+  }
+
   def convMeta(data: Games.GetData): IOTypes.GameMetadata = {
     IOTypes.GameMetadata(
       id = data.meta.id,
       numPly = data.meta.numPly,
       startTime = data.meta.startTime,
-      gUser = data.openGameData.map(_.users(GOLD)).getOrElse(Some(data.meta.users(GOLD))),
-      sUser = data.openGameData.map(_.users(SILV)).getOrElse(Some(data.meta.users(SILV))),
+      gUser = data.openGameData.map(_.users(GOLD)).getOrElse(Some(data.meta.users(GOLD))).map(convUser(_)),
+      sUser = data.openGameData.map(_.users(SILV)).getOrElse(Some(data.meta.users(SILV))).map(convUser(_)),
       gTC = convTC(data.meta.tcs(GOLD)),
       sTC = convTC(data.meta.tcs(SILV)),
       rated = data.meta.rated,
@@ -294,8 +302,8 @@ class GameServlet(val siteLogin: SiteLogin, val games: Games, val ec: ExecutionC
       tags = data.meta.tags,
       openGameData = data.openGameData.map { ogdata =>
         IOTypes.OpenGameData(
-          creator = ogdata.creator,
-          joined = ogdata.joined
+          creator = ogdata.creator.map(convUser(_)),
+          joined = ogdata.joined.toList.sorted.map(convUser(_))
         )
       },
       activeGameData = data.activeGameData.map { agdata =>

@@ -5,10 +5,13 @@ import akka.actor.{ActorSystem}
 import akka.testkit.{TestKit, ImplicitSender}
 import slick.driver.H2Driver.api._
 
+import org.playarimaa.server.CommonTypes._
 import org.playarimaa.server._
 import org.playarimaa.server.game._
 import org.playarimaa.board.Player
 import org.playarimaa.board.{GOLD,SILV}
+
+import org.playarimaa.server.GameServlet.IOTypes
 
 //TODO - note that there is a memory leak when running this test in SBT
 //See github issue #49
@@ -32,7 +35,7 @@ class GameServletTests(_system: ActorSystem) extends TestKit(_system) with Scala
   addServlet(new GameServlet(siteLogin,games,mainEC), "/games/*")
 
   val startTime = Timestamp.get
-  val tc = GameServlet.IOTypes.TimeControl(
+  val tc = IOTypes.TimeControl(
     initialTime = 300,
     increment = Some(10),
     delay = Some(1),
@@ -54,13 +57,13 @@ class GameServletTests(_system: ActorSystem) extends TestKit(_system) with Scala
     post("/accounts/register", Json.write(AccountServlet.Register.Query("Bob","bob@domainname.com","password",false))) {
       status should equal (200)
       val reply = Json.read[AccountServlet.Register.Reply](body)
-      bobSiteAuth = reply.auth
+      bobSiteAuth = reply.siteAuth
       (bobSiteAuth.length > 10) should be (true)
     }
     post("/accounts/register", Json.write(AccountServlet.Register.Query("Alice","alice@domainname.com","password",false))) {
       status should equal (200)
       val reply = Json.read[AccountServlet.Register.Reply](body)
-      aliceSiteAuth = reply.auth
+      aliceSiteAuth = reply.siteAuth
       (aliceSiteAuth.length > 10) should be (true)
     }
 
@@ -87,8 +90,8 @@ class GameServletTests(_system: ActorSystem) extends TestKit(_system) with Scala
       state.meta.rated should equal (true)
       state.meta.gameType should equal ("standard")
       state.meta.tags should equal (List())
-      state.meta.openGameData.get.creator should equal (Some("Bob"))
-      state.meta.openGameData.get.joined should equal (Set("Bob"))
+      state.meta.openGameData.get.creator should equal (Some(IOTypes.ShortUserInfo("Bob")))
+      state.meta.openGameData.get.joined should equal (List(IOTypes.ShortUserInfo("Bob")))
       state.meta.activeGameData should equal (None)
       state.meta.result should equal (None)
       state.sequence.exists(_ > sequence) should equal (true)
@@ -121,8 +124,8 @@ class GameServletTests(_system: ActorSystem) extends TestKit(_system) with Scala
       state.meta.gameType should equal ("standard")
       state.meta.tags should equal (List())
       state.meta.openGameData.nonEmpty should equal (true)
-      state.meta.openGameData.get.creator should equal (Some("Bob"))
-      state.meta.openGameData.get.joined should equal (Set("Alice","Bob"))
+      state.meta.openGameData.get.creator should equal (Some(IOTypes.ShortUserInfo("Bob")))
+      state.meta.openGameData.get.joined should equal (List(IOTypes.ShortUserInfo("Alice"),IOTypes.ShortUserInfo("Bob")))
       state.meta.activeGameData should equal (None)
       state.meta.result should equal (None)
       state.sequence.exists(_ > sequence) should equal (true)
@@ -149,8 +152,8 @@ class GameServletTests(_system: ActorSystem) extends TestKit(_system) with Scala
       state.meta.id should equal (gameID)
       state.meta.numPly should equal (0)
       state.meta.startTime.nonEmpty should equal (true)
-      state.meta.gUser.exists(user => user == "Alice" || user == "Bob") should equal (true)
-      state.meta.sUser.exists(user => user == "Alice" || user == "Bob" && user != state.meta.gUser.get) should equal (true)
+      state.meta.gUser.exists(user => user.name == "Alice" || user.name == "Bob") should equal (true)
+      state.meta.sUser.exists(user => user.name == "Alice" || user.name == "Bob" && user != state.meta.gUser.get) should equal (true)
       state.meta.gTC should equal (tc)
       state.meta.sTC should equal (tc)
       state.meta.rated should equal (true)
@@ -184,8 +187,8 @@ class GameServletTests(_system: ActorSystem) extends TestKit(_system) with Scala
       state.meta.id should equal (gameID)
       state.meta.numPly should equal (0)
       state.meta.startTime.nonEmpty should equal (true)
-      state.meta.gUser.exists(user => user == "Alice" || user == "Bob") should equal (true)
-      state.meta.sUser.exists(user => user == "Alice" || user == "Bob" && user != state.meta.gUser.get) should equal (true)
+      state.meta.gUser.exists(user => user.name == "Alice" || user.name == "Bob") should equal (true)
+      state.meta.sUser.exists(user => user.name == "Alice" || user.name == "Bob" && user != state.meta.gUser.get) should equal (true)
       state.meta.gTC should equal (tc)
       state.meta.sTC should equal (tc)
       state.meta.rated should equal (true)

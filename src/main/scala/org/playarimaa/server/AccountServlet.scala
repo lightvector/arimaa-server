@@ -35,16 +35,16 @@ object AccountServlet {
   case object Register extends Action {
     val name = "register"
     case class Query(username: String, email: String, password: String, isBot: Boolean)
-    case class Reply(username: String, auth: String)
+    case class Reply(username: String, siteAuth: String)
   }
   case object Login extends Action {
     val name = "login"
     case class Query(username: String, password: String)
-    case class Reply(username: String, auth: String)
+    case class Reply(username: String, siteAuth: String)
   }
   case object Logout extends Action {
     val name = "logout"
-    case class Query(auth: String)
+    case class Query(siteAuth: String)
     case class Reply(message: String)
   }
 }
@@ -72,17 +72,17 @@ class AccountServlet(val siteLogin: SiteLogin, val ec: ExecutionContext)
         pass()
       case Some(Register) =>
         val query = Json.read[Register.Query](request.body)
-        siteLogin.register(query.username, query.email, query.password, query.isBot).map { case (username,auth) =>
-          Json.write(Register.Reply(username, auth))
+        siteLogin.register(query.username, query.email, query.password, query.isBot).map { case (username,siteAuth) =>
+          Json.write(Register.Reply(username, siteAuth))
         }
       case Some(Login) =>
         val query = Json.read[Login.Query](request.body)
-        siteLogin.login(query.username, query.password).map { case (username,auth) =>
-          Json.write(Login.Reply(username, auth))
+        siteLogin.login(query.username, query.password).map { case (username,siteAuth) =>
+          Json.write(Login.Reply(username, siteAuth))
         }
       case Some(Logout) =>
         val query = Json.read[Logout.Query](request.body)
-        siteLogin.logout(query.auth).map { case () =>
+        siteLogin.logout(query.siteAuth).map { case () =>
           Json.write(Logout.Reply("Ok"))
         }.get
     }
