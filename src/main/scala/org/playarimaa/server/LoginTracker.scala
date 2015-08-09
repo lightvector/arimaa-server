@@ -1,7 +1,6 @@
 package org.playarimaa.server
+import org.playarimaa.server.CommonTypes._
 import org.playarimaa.server.Timestamp.Timestamp
-import org.playarimaa.server.RandGen.Auth
-import org.playarimaa.server.Accounts.Import._
 
 /* Implements a basic login system with support for timeouts.
  * [inactivityTimeout] specifies how old to require a login is to time it out

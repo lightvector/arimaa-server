@@ -9,12 +9,11 @@ import scala.util.{Try, Success, Failure}
 import org.json4s.{DefaultFormats, Formats}
 import org.json4s.jackson.Serialization
 
+import org.playarimaa.server.CommonTypes._
 import org.playarimaa.server.Timestamp.Timestamp
-import org.playarimaa.server.Accounts.Import._
-import org.playarimaa.server.RandGen.Auth
 import org.playarimaa.server.Utils._
 
-case object AccountServlet {
+object AccountServlet {
 
   object IOTypes {
     case class SimpleError(error: String)
@@ -35,17 +34,17 @@ case object AccountServlet {
 
   case object Register extends Action {
     val name = "register"
-    case class Query(username: Username, email: Email, password: String, isBot: Boolean)
-    case class Reply(username: Username, auth: Auth)
+    case class Query(username: String, email: String, password: String, isBot: Boolean)
+    case class Reply(username: String, auth: String)
   }
   case object Login extends Action {
     val name = "login"
-    case class Query(username: Username, password: String)
-    case class Reply(username: Username, auth: Auth)
+    case class Query(username: String, password: String)
+    case class Reply(username: String, auth: String)
   }
   case object Logout extends Action {
     val name = "logout"
-    case class Query(auth: Auth)
+    case class Query(auth: String)
     case class Reply(message: String)
   }
 }

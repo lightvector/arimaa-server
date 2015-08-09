@@ -13,9 +13,10 @@ import akka.pattern.{ask, pipe, after}
 import akka.util.Timeout
 import slick.driver.H2Driver.api.Database
 
+import org.playarimaa.server.CommonTypes._
 import org.playarimaa.server.Timestamp.Timestamp
 
-case object ChatServlet {
+object ChatServlet {
 
   object IOTypes {
     case class SimpleError(error: String)

@@ -8,9 +8,8 @@ import akka.actor.{Actor, ActorRef, ActorSystem, Props, Stash}
 import akka.pattern.{ask, pipe, after}
 import akka.util.Timeout
 import slick.driver.H2Driver.api._
+import org.playarimaa.server.CommonTypes._
 import org.playarimaa.server.Timestamp.Timestamp
-import org.playarimaa.server.RandGen.Auth
-import org.playarimaa.server.Accounts.Import._
 
 object ChatSystem {
   //Leave chat if it's been this many seconds with no activity
@@ -63,27 +62,27 @@ class ChatSystem(val db: Database, val actorSystem: ActorSystem)(implicit ec: Ex
   }
 
   /** Join the specified chat channel */
-  def join(channel: Channel, username: Username): Future[Auth] = {
+  def join(channel: Channel, username: Username): Future[ChatAuth] = {
     val cc = openChannel(channel)
-    (cc ? ChatChannel.Join(username)).map(_.asInstanceOf[Auth])
+    (cc ? ChatChannel.Join(username)).map(_.asInstanceOf[ChatAuth])
   }
 
   /** Leave the specified chat channel. Failed if not logged in. */
-  def leave(channel: Channel, chatAuth: Auth): Future[Unit] = {
+  def leave(channel: Channel, chatAuth: ChatAuth): Future[Unit] = {
     withChannel(channel) { cc =>
       (cc ? ChatChannel.Leave(chatAuth)).map(_.asInstanceOf[Unit])
     }
   }
 
   /** Post in the specified chat channel. Failed if not logged in. */
-  def post(channel: Channel, chatAuth: Auth, text:String): Future[Unit] = {
+  def post(channel: Channel, chatAuth: ChatAuth, text:String): Future[Unit] = {
     withChannel(channel) { cc =>
       (cc ? ChatChannel.Post(chatAuth,text)).map(_.asInstanceOf[Unit])
     }
   }
 
   /** Heartbeat the specified chat channel to avoid logout from inactivity. Failed if not logged in. */
-  def heartbeat(channel: Channel, chatAuth: Auth): Future[Unit] = {
+  def heartbeat(channel: Channel, chatAuth: ChatAuth): Future[Unit] = {
     withChannel(channel) { cc =>
       (cc ? ChatChannel.Heartbeat(chatAuth)).map(_.asInstanceOf[Unit])
     }
@@ -116,14 +115,14 @@ object ChatChannel {
 
   //ACTOR MESSAGES---------------------------------------------------------
 
-  //Replies with Auth
+  //Replies with ChatAuth
   case class Join(username: Username)
   //Replies with Unit
-  case class Leave(chatAuth: Auth)
+  case class Leave(chatAuth: ChatAuth)
   //Replies with Unit
-  case class Post(chatAuth: Auth, text:String)
+  case class Post(chatAuth: ChatAuth, text:String)
   //Replies with Unit
-  case class Heartbeat(chatAuth: Auth)
+  case class Heartbeat(chatAuth: ChatAuth)
 
   /** [minId] defaults to the current end of chat minus [READ_MAX_LINES]
     * [doWait] defaults to false.
@@ -199,15 +198,15 @@ class ChatChannel(val channel: Channel, val db: Database, val actorSystem: Actor
       logins.doTimeouts(now)
       val chatAuth = logins.login(username, now)
       lastActive = now
-      sender ! (chatAuth : Auth)
+      sender ! (chatAuth : ChatAuth)
 
-    case ChatChannel.Leave(chatAuth: Auth) =>
+    case ChatChannel.Leave(chatAuth: ChatAuth) =>
       val result: Try[Unit] = requiringLogin(chatAuth) { username =>
         logins.logout(username,chatAuth,Timestamp.get)
       }
       replyWith(sender, result)
 
-    case ChatChannel.Post(chatAuth: Auth, text:String) =>
+    case ChatChannel.Post(chatAuth: ChatAuth, text:String) =>
       val result: Try[Unit] = requiringLogin(chatAuth) { username =>
         val line = ChatLine(nextId, channel, username, text, Timestamp.get)
         nextId = nextId + 1
@@ -227,7 +226,7 @@ class ChatChannel(val channel: Channel, val db: Database, val actorSystem: Actor
       }
       replyWith(sender, result)
 
-    case ChatChannel.Heartbeat(chatAuth: Auth) =>
+    case ChatChannel.Heartbeat(chatAuth: ChatAuth) =>
       val result: Try[Unit] = requiringLogin(chatAuth) { (_ : Username) => () }
       replyWith(sender, result)
 
@@ -303,7 +302,7 @@ class ChatChannel(val channel: Channel, val db: Database, val actorSystem: Actor
     }
   }
 
-  def requiringLogin[T](chatAuth: Auth)(f:Username => T) : Try[T] = {
+  def requiringLogin[T](chatAuth: ChatAuth)(f:Username => T) : Try[T] = {
     val now = Timestamp.get
     logins.doTimeouts(now)
     logins.heartbeatAuth(chatAuth,now) match {

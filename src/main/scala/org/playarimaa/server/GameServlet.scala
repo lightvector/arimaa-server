@@ -10,10 +10,8 @@ import org.json4s.{DefaultFormats, Formats}
 import org.json4s.jackson.Serialization
 import org.slf4j.{Logger, LoggerFactory}
 
+import org.playarimaa.server.CommonTypes._
 import org.playarimaa.server.Timestamp.Timestamp
-import org.playarimaa.server.Accounts.Import._
-import org.playarimaa.server.RandGen.Auth
-import org.playarimaa.server.RandGen.GameID
 import org.playarimaa.server.Utils._
 
 import org.playarimaa.server.game.Games
@@ -24,7 +22,7 @@ import org.playarimaa.board.{GOLD,SILV}
 
 //TODO: Guard against nans or other weird values when reading floats?
 
-case object GameServlet {
+object GameServlet {
 
   object IOTypes {
     case class SimpleError(error: String)
