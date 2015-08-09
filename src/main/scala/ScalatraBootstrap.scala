@@ -5,7 +5,8 @@ import org.playarimaa.server.game._
 import org.scalatra._
 import javax.servlet.ServletContext
 import _root_.akka.actor.ActorSystem
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext}
+import java.util.concurrent.Executors
 
 import java.security._
 
@@ -26,7 +27,8 @@ object ArimaaServerInit {
         Await.result(db.run(DBIO.seq(
           ( ChatSystem.table.schema ++
             Games.gameTable.schema ++
-            Games.movesTable.schema
+            Games.movesTable.schema ++
+            Accounts.table.schema
           ).create
         )), Duration.Inf)
         initialized = true
@@ -36,13 +38,29 @@ object ArimaaServerInit {
 }
 
 class ScalatraBootstrap extends LifeCycle {
-  val system = ActorSystem()
+  val actorSystem = ActorSystem()
 
   override def init(context: ServletContext) {
     ArimaaServerInit.initialize
     context.mount(new ArimaaServlet, "/*")
 
-    val chatContext: ExecutionContext = system.dispatcher
-    context.mount(new ChatServlet(system,chatContext), "/api/chat/*")
+    val actorEC: ExecutionContext = actorSystem.dispatcher
+    val mainEC: ExecutionContext = new ExecutionContext {
+      val threadPool = Executors.newFixedThreadPool(4) //TODO don't fix this number
+      def execute(runnable: Runnable) {
+        threadPool.submit(runnable)
+      }
+      def reportFailure(t: Throwable) {}
+    }
+
+    val db = Database.forConfig("h2mem1")
+    val accounts = new Accounts(db)(mainEC)
+    val siteLogin = new SiteLogin(accounts)(mainEC)
+    val scheduler = actorSystem.scheduler
+    val games = new Games(db,siteLogin.logins,scheduler)(mainEC)
+
+    context.mount(new ChatServlet(actorSystem,db,actorEC), "/api/chat/*")
+    context.mount(new AccountServlet(siteLogin,mainEC), "/api/accounts/*")
+    context.mount(new GameServlet(siteLogin,games,mainEC), "/api/games/*")
   }
 }

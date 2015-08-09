@@ -58,13 +58,12 @@ case object ChatServlet {
 
 import org.playarimaa.server.ChatServlet._
 
-class ChatServlet(system: ActorSystem, ec: ExecutionContext)
+class ChatServlet(system: ActorSystem, db: Database, ec: ExecutionContext)
     extends WebAppStack with JacksonJsonSupport with FutureSupport {
   //Sets up automatic case class to JSON output serialization
   protected implicit lazy val jsonFormats: Formats = DefaultFormats
   protected implicit def executor: ExecutionContext = ec
 
-  val db = Database.forConfig("h2mem1")
   val chat = new ChatSystem(db,system)
 
   //Before every action runs, set the content type to be in JSON format.

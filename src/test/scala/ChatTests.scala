@@ -4,6 +4,7 @@ import org.scalatest.FunSuiteLike
 import org.playarimaa.server._
 import akka.actor.{ActorSystem}
 import akka.testkit.{TestKit, ImplicitSender}
+import slick.driver.H2Driver.api._
 
 //TODO - note that there is a memory leak when running this test in SBT
 //See github issue #49
@@ -17,7 +18,8 @@ class ChatServletTests(_system: ActorSystem) extends TestKit(_system) with Scala
   }
 
   ArimaaServerInit.initialize
-  addServlet(new ChatServlet(system,system.dispatcher), "/*")
+  val db = Database.forConfig("h2mem1")
+  addServlet(new ChatServlet(system,db,system.dispatcher), "/*")
 
   val startTime = Timestamp.get
   var bobAuth = ""
