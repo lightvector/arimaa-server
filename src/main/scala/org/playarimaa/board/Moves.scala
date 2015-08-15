@@ -26,7 +26,7 @@ object Step {
         val dir = Direction(s(3))
         Step(piece,src,dir)
       }
-    }.tagFailure("Error when parsing step '" + s + "':")
+    }.tagFailure("Error parsing step '" + s + "':")
   }
 }
 
@@ -50,7 +50,7 @@ object Placement {
         val dest = Location(s.substring(1,3))
         Placement(piece, dest)
       }
-    }.tagFailure("Error when parsing placement '" + s + "':")
+    }.tagFailure("Error parsing placement '" + s + "':")
   }
 }
 
@@ -76,7 +76,7 @@ object Capture {
         val src = Location(s.substring(1,3))
         Capture(piece,src)
       }
-    }.tagFailure("Error when parsing capture '" + s + "':")
+    }.tagFailure("Error parsing capture '" + s + "':")
   }
 }
 
@@ -123,16 +123,16 @@ object StandardNotation extends Notation {
         case Nil => Success(Placements(placements.reverse))
         case token :: tokens =>
           Placement.ofString(token).flatMap { placement =>
-            read(tokens, placements :+ placement)
+            read(tokens, placement :: placements)
           }
       }
     }
-    val tokens = moveStr.split("")
-    read(tokens.toList,List()).tagFailure("Error parsing move '" + moveStr + "':").flatMap { placements =>
+    val tokens = moveStr.split(" ")
+    read(tokens.toList,List()).flatMap { placements =>
       board.setup(placements,gameType).map { board =>
-        (placements,board)
+        (placements,board.endTurn)
       }
-    }
+    }.tagFailure("Error parsing setup move '" + moveStr + "':")
   }
 
   def readSteps(board: Board, moveStr: String): Try[(Move,Board)] = {
@@ -203,14 +203,14 @@ object StandardNotation extends Notation {
               val (newBoard,caps) = board.resolveCaps
               readCaps(tokens,caps).flatMap { tokens =>
                 //And loop!
-                readStep(newBoard, tokens, steps :+ step, newPushLocAndPower, newPullLocAndPower)
+                readStep(newBoard, tokens, step :: steps, newPushLocAndPower, newPullLocAndPower)
               }
             }
           }
       }
     }
 
-    val tokens = moveStr.split("")
+    val tokens = moveStr.split(" ")
     readStep(board,tokens.toList,List(),None,None).tagFailure("Error parsing move '" + moveStr + "':")
   }
 

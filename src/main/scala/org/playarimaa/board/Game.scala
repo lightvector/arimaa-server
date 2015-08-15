@@ -124,7 +124,10 @@ class Game private (
     val player = board.player
     val opponent = player.flip
 
-    if(isGoalFor(board,opponent))
+    //Nobody can win based on position state during setup
+    if(boards.length <= 2)
+      None
+    else if(isGoalFor(board,opponent))
       Some(opponent,Game.GOAL)
     else if(isGoalFor(board,player))
       Some(player,Game.GOAL)

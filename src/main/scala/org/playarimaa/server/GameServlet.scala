@@ -130,12 +130,16 @@ object GameServlet {
       siteAuth: String,
       tc: IOTypes.TimeControl,
       rated: Boolean,
+      gUser: Option[String],
+      sUser: Option[String],
       gameType: String
     )
     case class HandicapQuery(
       siteAuth: String,
       gTC: IOTypes.TimeControl,
       sTC: IOTypes.TimeControl,
+      gUser: Option[String],
+      sUser: Option[String],
       gameType: String
     )
     case class Reply(gameID: String, gameAuth: String)
@@ -193,7 +197,7 @@ object GameServlet {
 
 import org.playarimaa.server.GameServlet._
 
-class GameServlet(val siteLogin: SiteLogin, val games: Games, val ec: ExecutionContext)
+class GameServlet(val accounts: Accounts, val siteLogin: SiteLogin, val games: Games, val ec: ExecutionContext)
     extends WebAppStack with JacksonJsonSupport with FutureSupport {
   //Sets up automatic case class to JSON output serialization
   protected implicit lazy val jsonFormats: Formats = Json.formats
@@ -213,6 +217,17 @@ class GameServlet(val siteLogin: SiteLogin, val games: Games, val ec: ExecutionC
     GameAction.all.find(_.name == action)
   }
 
+  def maybeGetUser(user: Option[String]): Future[Option[Username]] = {
+    user match {
+      case None => Future(None)
+      case Some(user) =>
+        accounts.getByName(user).flatMap {
+          case None => Future.failed(new Exception("Unknown user: " + user))
+          case Some(acct) => Future(Some(acct.username))
+        }
+    }
+  }
+
   def handleGameroomAction(params: Map[String,String]) = {
     getGameroomAction(params("action")) match {
       case None =>
@@ -226,19 +241,27 @@ class GameServlet(val siteLogin: SiteLogin, val games: Games, val ec: ExecutionC
           }
 
         query match {
-          case Success(Create.StandardQuery(siteAuth,tc,rated,"standard")) =>
+          case Success(Create.StandardQuery(siteAuth,tc,rated,gUser,sUser,"standard")) =>
             siteLogin.requiringLogin(siteAuth) { username =>
               val timeControl = tcOfIOTC(tc)
-              games.createStandardGame(username, siteAuth, timeControl, rated).map { case (gameID,gameAuth) =>
-                Create.Reply(gameID,gameAuth)
+              maybeGetUser(gUser).flatMap { gUser =>
+                maybeGetUser(sUser).flatMap { sUser =>
+                  games.createStandardGame(username, siteAuth, timeControl, rated, gUser, sUser).map { case (gameID,gameAuth) =>
+                    Create.Reply(gameID,gameAuth)
+                  }
+                }
               }
             }.get
-          case Success(Create.HandicapQuery(siteAuth,gTC,sTC,"handicap")) =>
+          case Success(Create.HandicapQuery(siteAuth,gTC,sTC,gUser,sUser,"handicap")) =>
             siteLogin.requiringLogin(siteAuth) { username =>
               val gTimeControl = tcOfIOTC(gTC)
               val sTimeControl = tcOfIOTC(sTC)
-              games.createHandicapGame(username, siteAuth, gTimeControl, sTimeControl).map { case (gameID,gameAuth) =>
-                Create.Reply(gameID,gameAuth)
+              maybeGetUser(gUser).flatMap { gUser =>
+                maybeGetUser(sUser).flatMap { sUser =>
+                  games.createHandicapGame(username, siteAuth, gTimeControl, sTimeControl, gUser, sUser).map { case (gameID,gameAuth) =>
+                    Create.Reply(gameID,gameAuth)
+                  }
+                }
               }
             }.get
           case Success(_) =>

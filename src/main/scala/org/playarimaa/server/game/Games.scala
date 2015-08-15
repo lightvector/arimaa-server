@@ -61,15 +61,30 @@ class Games(val db: Database, val parentLogins: LoginTracker, val scheduler: Sch
   //Begin timeout loop on initialization
   checkTimeoutLoop
 
-  def createStandardGame(creator: Username, siteAuth: SiteAuth, tc: TimeControl, rated: Boolean): Future[(GameID,GameAuth)] = {
+  def createStandardGame(
+    creator: Username,
+    siteAuth: SiteAuth,
+    tc: TimeControl,
+    rated: Boolean,
+    gUser: Option[Username],
+    sUser: Option[Username]
+  ): Future[(GameID,GameAuth)] = {
     openGames.reserveNewGameID.map { id =>
-      val gameAuth = openGames.createStandardGame(id,creator,siteAuth,tc,rated)
+      val gameAuth = openGames.createStandardGame(id,creator,siteAuth,tc,rated,gUser,sUser)
       (id,gameAuth)
     }
   }
-  def createHandicapGame(creator: Username, siteAuth: SiteAuth, gTC: TimeControl, sTC: TimeControl): Future[(GameID,GameAuth)] = {
+
+  def createHandicapGame(
+    creator: Username,
+    siteAuth: SiteAuth,
+    gTC: TimeControl,
+    sTC: TimeControl,
+    gUser: Option[Username],
+    sUser: Option[Username]
+  ): Future[(GameID,GameAuth)] = {
     openGames.reserveNewGameID.map { id =>
-      val gameAuth = openGames.createHandicapGame(id,creator,siteAuth,gTC,sTC)
+      val gameAuth = openGames.createHandicapGame(id,creator,siteAuth,gTC,sTC,gUser,sUser)
       (id,gameAuth)
     }
   }
@@ -325,6 +340,7 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker)(implicit ec: E
     creator: Username,
     siteAuth: SiteAuth,
     tcs: PlayerArray[TimeControl],
+    users: PlayerArray[Option[Username]],
     rated: Boolean,
     gameType: GameType
   ): GameAuth = this.synchronized {
@@ -334,7 +350,7 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker)(implicit ec: E
       id = reservedID,
       numPly = 0,
       startTime = None,
-      users = PlayerArray(gold = "", silv = ""),
+      users = users.map(_.getOrElse("")),
       tcs = tcs,
       rated = rated,
       gameType = gameType,
@@ -344,7 +360,7 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker)(implicit ec: E
     val game = OpenGameData(
       meta = meta,
       moves = Vector(),
-      users = PlayerArray(gold = None, silv = None),
+      users = users,
       creator = Some(creator),
       creationTime = now,
       logins = new LoginTracker(Some(parentLogins),Games.INACTIVITY_TIMEOUT),
@@ -359,11 +375,31 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker)(implicit ec: E
     gameAuth
   }
 
-  def createStandardGame(reservedID: GameID, creator: Username, siteAuth: SiteAuth, tc: TimeControl, rated: Boolean): GameAuth =
-    createGame(reservedID, creator, siteAuth, PlayerArray(gold = tc, silv = tc), rated, GameType.STANDARD)
+  def createStandardGame(
+    reservedID: GameID,
+    creator: Username,
+    siteAuth: SiteAuth,
+    tc: TimeControl,
+    rated: Boolean,
+    gUser: Option[Username],
+    sUser: Option[Username]
+  ): GameAuth = {
+    val users = PlayerArray(gold = gUser, silv = sUser)
+    createGame(reservedID, creator, siteAuth, PlayerArray(gold = tc, silv = tc), users, rated, GameType.STANDARD)
+  }
 
-  def createHandicapGame(reservedID: GameID, creator: Username, siteAuth: SiteAuth, gTC: TimeControl, sTC: TimeControl): GameAuth =
-    createGame(reservedID, creator, siteAuth, PlayerArray(gold = gTC, silv = sTC), rated = false, GameType.HANDICAP)
+  def createHandicapGame(
+    reservedID: GameID,
+    creator: Username,
+    siteAuth: SiteAuth,
+    gTC: TimeControl,
+    sTC: TimeControl,
+    gUser: Option[Username],
+    sUser: Option[Username]
+  ): GameAuth = {
+    val users = PlayerArray(gold = gUser, silv = sUser)
+    createGame(reservedID, creator, siteAuth, PlayerArray(gold = gTC, silv = sTC), users, rated = false, GameType.HANDICAP)
+  }
 
   /* Reopens an existing adjourned game, unreserving the id regardless of success or failure */
   def reopenAdjournedGame(reservedID: GameID): Future[Unit] = {
