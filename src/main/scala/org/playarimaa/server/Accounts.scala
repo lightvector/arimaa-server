@@ -2,18 +2,12 @@ package org.playarimaa.server
 import scala.concurrent.{ExecutionContext, Future, Promise, future}
 import scala.util.{Try, Success, Failure}
 import slick.driver.H2Driver.api._
+import org.playarimaa.server.CommonTypes._
 import org.playarimaa.server.Timestamp.Timestamp
 
 object Accounts {
-  object Import {
-    type Username = String
-    type Email = String
-  }
-
   val table = TableQuery[AccountTable]
 }
-
-import Accounts.Import._
 
 case class Account(
   lowercaseName: Username,

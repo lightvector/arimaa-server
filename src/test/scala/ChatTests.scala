@@ -4,20 +4,22 @@ import org.scalatest.FunSuiteLike
 import org.playarimaa.server._
 import akka.actor.{ActorSystem}
 import akka.testkit.{TestKit, ImplicitSender}
+import slick.driver.H2Driver.api._
 
 //TODO - note that there is a memory leak when running this test in SBT
 //See github issue #49
 
 class ChatServletTests(_system: ActorSystem) extends TestKit(_system) with ScalatraFlatSpec with BeforeAndAfterAll {
 
-  def this() = this(ActorSystem("MySpec"))
+  def this() = this(ActorSystem("ChatTests"))
 
   override def afterAll {
     TestKit.shutdownActorSystem(system)
   }
 
   ArimaaServerInit.initialize
-  addServlet(new ChatServlet(system), "/*")
+  val db = Database.forConfig("h2mem1")
+  addServlet(new ChatServlet(system,db,system.dispatcher), "/*")
 
   val startTime = Timestamp.get
   var bobAuth = ""
@@ -92,7 +94,7 @@ class ChatServletTests(_system: ActorSystem) extends TestKit(_system) with Scala
   it should "reject posts with invalid auth" in {
     post("/main/post", Json.write(ChatServlet.Post.Query("Bob",bobAuth + "x" ,"Hello world"))) {
       status should equal (200)
-      val reply = Json.read[ChatServlet.SimpleError](body)
+      val reply = Json.read[ChatServlet.IOTypes.SimpleError](body)
     }
 
     get("/main") {
@@ -110,7 +112,7 @@ class ChatServletTests(_system: ActorSystem) extends TestKit(_system) with Scala
     }
     post("/main/post", Json.write(ChatServlet.Post.Query("Bob",bobAuth + "x" ,"Hello world"))) {
       status should equal (200)
-      val reply = Json.read[ChatServlet.SimpleError](body)
+      val reply = Json.read[ChatServlet.IOTypes.SimpleError](body)
     }
     get("/main") {
       status should equal (200)

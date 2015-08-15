@@ -5,10 +5,9 @@ import scala.io.Codec
 import java.security.SecureRandom
 import java.io.IOException
 
-object RandGen {
-  type Auth = String
-  type GameID = String
+import org.playarimaa.server.CommonTypes._
 
+object RandGen {
   val NUM_SEED_BYTES = 32
   val NUM_AUTH_INTS = 3
   val NUM_GAME_ID_INTS = 2
