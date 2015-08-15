@@ -67,7 +67,7 @@ class GameServletTests(_system: ActorSystem) extends TestKit(_system) with Scala
       (aliceSiteAuth.length > 10) should be (true)
     }
 
-    post("/games/actions/create", Json.write(GameServlet.Create.Query(bobSiteAuth,Some(tc),None,None,Some(true),"standard"))) {
+    post("/games/actions/create", Json.write(GameServlet.Create.StandardQuery(bobSiteAuth,tc,true,"standard"))) {
       status should equal (200)
       val reply = Json.read[GameServlet.Create.Reply](body)
       gameID = reply.gameID
@@ -168,7 +168,7 @@ class GameServletTests(_system: ActorSystem) extends TestKit(_system) with Scala
       state.meta.result should equal (None)
       state.sequence.exists(_ > sequence) should equal (true)
       sequence = state.sequence.get
-      bobPlayer = if(state.meta.gUser == Some("Bob")) GOLD else SILV
+      bobPlayer = if(state.meta.gUser == Some(IOTypes.ShortUserInfo("Bob"))) GOLD else SILV
     }
   }
 

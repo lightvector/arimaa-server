@@ -126,12 +126,16 @@ object GameServlet {
 
   case object Create extends GameroomAction {
     val name = "create"
-    case class Query(
+    case class StandardQuery(
       siteAuth: String,
-      tc: Option[IOTypes.TimeControl],
-      gTC: Option[IOTypes.TimeControl],
-      sTC: Option[IOTypes.TimeControl],
-      rated: Option[Boolean],
+      tc: IOTypes.TimeControl,
+      rated: Boolean,
+      gameType: String
+    )
+    case class HandicapQuery(
+      siteAuth: String,
+      gTC: IOTypes.TimeControl,
+      sTC: IOTypes.TimeControl,
       gameType: String
     )
     case class Reply(gameID: String, gameAuth: String)
@@ -214,28 +218,34 @@ class GameServlet(val siteLogin: SiteLogin, val games: Games, val ec: ExecutionC
       case None =>
         pass()
       case Some(Create) =>
-        val query = Json.read[Create.Query](request.body)
-        siteLogin.requiringLogin(query.siteAuth) { username =>
-          (GameType.ofString(query.gameType), query) match {
-            case (Success(GameType.STANDARD), Create.Query(siteAuth,Some(tc),None,None,Some(rated),_)) =>
+        val query =
+          Try(Json.read[Create.StandardQuery](request.body)).recoverWith { case _ =>
+            Try(Json.read[Create.HandicapQuery](request.body)).recoverWith { case _ =>
+              Failure(new Exception("Unknown game type or invalid fields"))
+            }
+          }
+
+        query match {
+          case Success(Create.StandardQuery(siteAuth,tc,rated,"standard")) =>
+            siteLogin.requiringLogin(siteAuth) { username =>
               val timeControl = tcOfIOTC(tc)
               games.createStandardGame(username, siteAuth, timeControl, rated).map { case (gameID,gameAuth) =>
                 Create.Reply(gameID,gameAuth)
               }
-            case (Success(GameType.HANDICAP), Create.Query(siteAuth,None,Some(gTC),Some(sTC),None,_)) =>
+            }.get
+          case Success(Create.HandicapQuery(siteAuth,gTC,sTC,"handicap")) =>
+            siteLogin.requiringLogin(siteAuth) { username =>
               val gTimeControl = tcOfIOTC(gTC)
               val sTimeControl = tcOfIOTC(sTC)
               games.createHandicapGame(username, siteAuth, gTimeControl, sTimeControl).map { case (gameID,gameAuth) =>
                 Create.Reply(gameID,gameAuth)
               }
-            case (Success(GameType.DIRECTSETUP), _) =>
-              IOTypes.SimpleError("GameType directsetup not yet implemented")
-            case (Success(gt),_) =>
-              IOTypes.SimpleError("Invalid fields provided for GameType " + gt)
-            case (Failure(err),_) =>
-              IOTypes.SimpleError(err.getMessage)
-          }
-        }.get
+            }.get
+          case Success(_) =>
+            IOTypes.SimpleError("Bug: unknown game create success type")
+          case Failure(err) =>
+            IOTypes.SimpleError(err.getMessage)
+        }
     }
   }
 
