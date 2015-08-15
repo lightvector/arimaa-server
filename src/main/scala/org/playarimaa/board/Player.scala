@@ -17,6 +17,10 @@ sealed trait Player {
 object Player {
   val values = List(GOLD,SILV)
 
+  def apply(c: Char): Player = {
+    ofChar(c).get
+  }
+
   def ofChar(c: Char): Try[Player] =
     c match {
       case 'g' => Success(GOLD)

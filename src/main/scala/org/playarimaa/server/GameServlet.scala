@@ -17,8 +17,8 @@ import org.playarimaa.server.Utils._
 import org.playarimaa.server.game.Games
 import org.playarimaa.server.game.GameUtils
 import org.playarimaa.server.game.{EndingReason, GameResult, TimeControl}
-import org.playarimaa.board.Player
-import org.playarimaa.board.{GOLD,SILV}
+import org.playarimaa.board.{Player,GOLD,SILV}
+import org.playarimaa.board.GameType
 
 //TODO: Guard against nans or other weird values when reading floats?
 
@@ -126,7 +126,14 @@ object GameServlet {
 
   case object Create extends GameroomAction {
     val name = "create"
-    case class Query(siteAuth: String, tc: IOTypes.TimeControl, rated: Boolean, gameType: String)
+    case class Query(
+      siteAuth: String,
+      tc: Option[IOTypes.TimeControl],
+      gTC: Option[IOTypes.TimeControl],
+      sTC: Option[IOTypes.TimeControl],
+      rated: Option[Boolean],
+      gameType: String
+    )
     case class Reply(gameID: String, gameAuth: String)
   }
   case object Join extends GameAction {
@@ -209,21 +216,24 @@ class GameServlet(val siteLogin: SiteLogin, val games: Games, val ec: ExecutionC
       case Some(Create) =>
         val query = Json.read[Create.Query](request.body)
         siteLogin.requiringLogin(query.siteAuth) { username =>
-          query.gameType match {
-            case "standard" =>
-              val tc = TimeControl(
-                initialTime = query.tc.initialTime,
-                increment = query.tc.increment.getOrElse(0),
-                delay = query.tc.delay.getOrElse(0),
-                maxReserve = query.tc.maxReserve,
-                maxMoveTime = query.tc.maxMoveTime,
-                overtimeAfter = query.tc.overtimeAfter
-              )
-              games.createStandardGame(username, query.siteAuth, tc, query.rated).map { case (gameID,gameAuth) =>
+          (GameType.ofString(query.gameType), query) match {
+            case (Success(GameType.STANDARD), Create.Query(siteAuth,Some(tc),None,None,Some(rated),_)) =>
+              val timeControl = tcOfIOTC(tc)
+              games.createStandardGame(username, siteAuth, timeControl, rated).map { case (gameID,gameAuth) =>
                 Create.Reply(gameID,gameAuth)
               }
-            case _ =>
-              IOTypes.SimpleError("Unsupported game type: " + query.gameType)
+            case (Success(GameType.HANDICAP), Create.Query(siteAuth,None,Some(gTC),Some(sTC),None,_)) =>
+              val gTimeControl = tcOfIOTC(gTC)
+              val sTimeControl = tcOfIOTC(sTC)
+              games.createHandicapGame(username, siteAuth, gTimeControl, sTimeControl).map { case (gameID,gameAuth) =>
+                Create.Reply(gameID,gameAuth)
+              }
+            case (Success(GameType.DIRECTSETUP), _) =>
+              IOTypes.SimpleError("GameType directsetup not yet implemented")
+            case (Success(gt),_) =>
+              IOTypes.SimpleError("Invalid fields provided for GameType " + gt)
+            case (Failure(err),_) =>
+              IOTypes.SimpleError(err.getMessage)
           }
         }.get
     }
@@ -273,6 +283,17 @@ class GameServlet(val siteLogin: SiteLogin, val games: Games, val ec: ExecutionC
     }
   }
 
+  def tcOfIOTC(tc: IOTypes.TimeControl): TimeControl = {
+    TimeControl(
+      initialTime = tc.initialTime,
+      increment = tc.increment.getOrElse(0),
+      delay = tc.delay.getOrElse(0),
+      maxReserve = tc.maxReserve,
+      maxMoveTime = tc.maxMoveTime,
+      overtimeAfter = tc.overtimeAfter
+    )
+  }
+
   def convTC(tc: TimeControl): IOTypes.TimeControl = {
     IOTypes.TimeControl(
       initialTime = tc.initialTime,
@@ -298,7 +319,7 @@ class GameServlet(val siteLogin: SiteLogin, val games: Games, val ec: ExecutionC
       gTC = convTC(data.meta.tcs(GOLD)),
       sTC = convTC(data.meta.tcs(SILV)),
       rated = data.meta.rated,
-      gameType = data.meta.gameType,
+      gameType = data.meta.gameType.toString,
       tags = data.meta.tags,
       openGameData = data.openGameData.map { ogdata =>
         IOTypes.OpenGameData(

@@ -35,7 +35,7 @@ object Location {
       || s(1) < '1'
       || s(1) >= ('1' + Board.SIZE)
     ) {
-      return Failure(new IllegalArgumentException("Error parsing location string: " + s))
+      return Failure(new IllegalArgumentException("Error parsing location: " + s))
     }
 
     val x = s(0) - 'a'

@@ -12,6 +12,10 @@ sealed trait PieceType extends Ordered[PieceType] {
 object PieceType {
   val values = List(RAB,CAT,DOG,HOR,CAM,ELE)
 
+  def apply(c: Char): PieceType = {
+    ofChar(c).get
+  }
+
   def ofChar(c: Char): Try[PieceType] =
     c.toLower match {
       case 'r' => Success(RAB)

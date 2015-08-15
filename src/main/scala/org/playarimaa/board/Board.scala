@@ -38,11 +38,14 @@ class Board(
       }
   }
 
+  /** Returns true if there is a piece at [loc] owned by [p] */
   def isOwnedBy(loc: Location, p: Player): Boolean =
     this(loc) match {
       case Empty | OffBoard => false
       case HasPiece(piece) => piece.owner == p
     }
+
+  /** Returns true if there is a piece at [loc] stronger than [pt] */
   def isStrongerThan(loc: Location, pt: PieceType): Boolean =
     this(loc) match {
       case Empty | OffBoard => false
@@ -68,16 +71,13 @@ class Board(
     }
 
   /**
-   * Primitive method called to add a new piece to the board.
-   * If the location is not a trap and is currently empty, returns a new board with the piece added.
-   * Otherwise returns an error.
-   */
+    * Primitive method called to add a new piece to the board.
+    * If the location is currently empty, returns a new board with the piece added.
+    * Otherwise returns an error.
+    */
   def add(piece: Piece, loc: Location): Try[Board] = {
-    if (loc.isTrap) {
-      return Failure(new IllegalArgumentException("Bad location: " + loc))
-    }
     this(loc) match {
-      case OffBoard=> Failure(new IllegalArgumentException("Bad location: " + loc))
+      case OffBoard => Failure(new IllegalArgumentException("Bad location: " + loc))
       case HasPiece(p) => Failure(new IllegalStateException("Square " + loc + " already occupied with " + p))
       case Empty => {
         val newPieces = pieces  + (loc -> piece)
@@ -87,10 +87,10 @@ class Board(
   }
 
   /**
-   * Primitive method called to remove a piece from the board.
-   * If there is currently the correct piece at the correct location, returns a new board with the piece removed.
-   * Otherwise returns an error.
-   */
+    * Primitive method called to remove a piece from the board.
+    * If there is currently the correct piece at the correct location, returns a new board with the piece removed.
+    * Otherwise returns an error.
+    */
   def remove(piece: Piece, loc: Location): Try[Board] = {
     this(loc) match {
       case OffBoard => Failure(new IllegalArgumentException("Bad location: " + loc))
@@ -99,9 +99,9 @@ class Board(
         if (p == piece) {
           val newPieces = pieces  - loc
           Success(new Board(newPieces, player, stepsLeft))
-        } else {
-          Failure(new IllegalArgumentException("Location " + loc + " has " + p + ", trying to remove " + piece))
         }
+        else
+          Failure(new IllegalArgumentException("Location " + loc + " has " + p + ", trying to remove " + piece))
       }
     }
   }
@@ -110,31 +110,11 @@ class Board(
     new Board(pieces, p, stepsLeft)
   }
 
-  def setStepsLeft(s: Int): Board = {
-    if (s < 0 || s > Board.STEPS_PER_TURN) {
-      throw new IllegalArgumentException("Invalid steps left: " + s)
-    }
-    new Board(pieces, player, s)
-  }
-
-  /**
-   * Performs the setup (first) move in an Arimaa game.
-   * @param placements the gold pieces to place.  Must include all 16 gold pieces.  Must be on squares a1-a8 and b1-b8.
-   * @return a new board representing the board position, if successful.  Otherwise Failure.
-   */
-  def setup(placements: Seq[Placement]): Try[Board] = {
-    if (placements.length != 16) {
-      return Failure(new IllegalArgumentException("Wrong number of pieces: was " + placements.length + ", should be 16."))
-    }
-    placements.foreach{ placement =>
-      if (placement.dest.y > 1) {
-        return Failure(new IllegalArgumentException("Illegal square: " + placement))
-      }
-      if (placement.piece.owner != GOLD) {
-        return Failure(new IllegalArgumentException("Illegal player: " + placement))
-      }
-    }
-    place(placements)
+  def setStepsLeft(s: Int): Try[Board] = {
+    if (s < 0 || s > Board.STEPS_PER_TURN)
+      Failure(new IllegalArgumentException("Invalid steps left: " + s))
+    else
+      Success(new Board(pieces, player, s))
   }
 
   /** Make the specified placements, returning the new board.
@@ -156,27 +136,54 @@ class Board(
     else Success(newBoard)
   }
 
-  def step(step: Step): Try[Board] = {
-    // TODO
-    // 1. capture detection: suicide step
-    // 2. capture detection: friendly abandonment
-    // 3. "remove" and "add" must be atomic: either both succeed or both fail. (Needs test)
-
-    val piece = step.piece
-    val fromSquare = step.src
-    val toSquare = step.dest
-
-    if (stepsLeft <= 0) {
-      return Failure(new IllegalArgumentException("No steps left."))
+  /**
+    * Validates and performs the setup move in an Arimaa game.
+    * @param p which player to place pieces for
+    * @param placements the pieces to place
+    * @param gameType type of game for determining setup legality
+    * @return a new board representing the board position, if successful.  Otherwise Failure.
+    */
+  def setup(placements: Placements, gameType: GameType): Try[Board] = {
+    val allowWholeBoardSetup = gameType.allowWholeBoardSetup
+    val allowPartialSetup = gameType.allowPartialSetup
+    placements.placements.foreach { placement =>
+      if(placement.piece.owner != player)
+        return Failure(new IllegalArgumentException("Illegal piece owner: " + placement))
+      if(!gameType.allowWholeBoardSetup) {
+        if(player match { case GOLD => placement.dest.y > 1  case SILV => placement.dest.y < Board.SIZE-2 })
+          return Failure(new IllegalArgumentException("Illegal location: " + placement))
+      }
     }
+    Board.PIECE_DISTRIBUTION.foreach { case (pt,max) =>
+      val count = placements.placements.count(_.piece.pieceType == pt)
+      if(count > max || (!allowPartialSetup && count < max))
+        return Failure(new IllegalArgumentException("Illegal number of pieces of type: " + pt.lowercaseChar))
+    }
+    place(placements.placements)
+  }
 
-    remove(piece, fromSquare).flatMap { board =>
-      board.add(piece, toSquare).flatMap { board =>
-        Success(board.setStepsLeft(stepsLeft - 1))
+  /** Validates and performs a single step in an Arimaa game.
+    * Does NOT resolve captures - this should be handled with a separate call to [resolveCaps]. */
+  def step(step: Step): Try[Board] = {
+    val piece = step.piece
+    val src = step.src
+    val dest = step.dest
+
+    if (stepsLeft <= 0)
+      return Failure(new IllegalArgumentException("No steps left."))
+    if (piece.owner == player && isFrozen(src))
+      return Failure(new IllegalArgumentException("Piece at " + src + " is frozen"))
+    if (piece.owner == player && piece.pieceType == RAB && !Board.canRabbitGoInDir(player,step.dir))
+      return Failure(new IllegalArgumentException("Illegal backwards rabbit step."))
+
+    remove(piece, src).flatMap { board =>
+      board.add(piece, dest).flatMap { board =>
+        board.setStepsLeft(stepsLeft - 1)
       }
     }
   }
 
+  /** Removes all undefended pieces on traps and returns a list of the resulting captures. */
   def resolveCaps: (Board, List[Capture]) = {
     var captures : List[Capture] = List()
     var newBoard = this
@@ -195,8 +202,20 @@ class Board(
     (newBoard, captures)
   }
 
+  /** Flips the player to move and refills the count of available steps that turn */
   def endTurn: Board =
     new Board(pieces, player.flip, Board.STEPS_PER_TURN)
+
+
+  /** Performs a step and resolves captures without error checking, throwing if there are problems. */
+  def stepAndResolveNoCheck(src: Location, dir: Direction): Board = {
+    val dest = src(dir)
+    val piece = pieces(src)
+    val newPieces = (pieces - src) + (dest -> piece)
+    val newBoard = new Board(newPieces, player, stepsLeft - 1)
+    newBoard.resolveCaps._1
+  }
+
 
   def toStringAei : String = {
     val returnVal : StringBuilder = new StringBuilder
@@ -213,7 +232,7 @@ class Board(
     returnVal.append("]")
     returnVal.toString
   }
-  
+
   override def toString = {
     toStringAei
   }
@@ -229,6 +248,21 @@ object Board {
     Location(5,5)
   )
 
+  val PIECE_DISTRIBUTION: List[(PieceType,Int)] = List(
+    (RAB,8),
+    (CAT,2),
+    (DOG,2),
+    (HOR,2),
+    (CAM,1),
+    (ELE,1)
+  )
+
   def isOutOfBounds(loc: Location): Boolean =
     loc.x < 0 || loc.x >= SIZE || loc.y < 0 || loc.y >= SIZE
+
+  def isGoal(player: Player, loc: Location): Boolean =
+    (player == GOLD && loc.y == SIZE-1) || (player == SILV && loc.y == 0)
+
+  def canRabbitGoInDir(player: Player, dir: Direction): Boolean =
+    !(dir == NORTH && player == SILV) && !(dir == SOUTH && player == GOLD)
 }

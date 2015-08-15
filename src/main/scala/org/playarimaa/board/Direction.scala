@@ -7,10 +7,23 @@ sealed trait Direction {
 
   override def toString: String =
     char.toString
+
+  def flip: Direction = {
+    this match {
+      case SOUTH => NORTH
+      case NORTH => SOUTH
+      case WEST => EAST
+      case EAST => WEST
+    }
+  }
 }
 
 object Direction {
   val values = List(SOUTH,WEST,EAST,NORTH)
+
+  def apply(c: Char): Direction = {
+    ofChar(c).get
+  }
 
   def ofChar(c: Char): Try[Direction] =
     c match {

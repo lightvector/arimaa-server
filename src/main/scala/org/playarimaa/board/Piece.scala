@@ -1,5 +1,6 @@
 package org.playarimaa.board
 import scala.util.{Try, Success, Failure}
+import org.playarimaa.board.Utils._
 
 sealed trait Piece {
   val owner: Player
@@ -54,7 +55,7 @@ object Piece {
     PieceType.ofChar(c).map { pt =>
       val player = if(c.isUpper) GOLD else SILV
       Piece(player,pt)
-    }
+    }.tagFailure("Error when parsing piece '" + c + "':")
 }
 
 case object GOLD_RAB extends Piece {val owner = GOLD; val pieceType = RAB}
