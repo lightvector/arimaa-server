@@ -117,6 +117,26 @@ class Board(
     new Board(pieces, player, s)
   }
 
+  /**
+   * Performs the setup (first) move in an Arimaa game.
+   * @param placements the gold pieces to place.  Must include all 16 gold pieces.  Must be on squares a1-a8 and b1-b8.
+   * @return a new board representing the board position, if successful.  Otherwise Failure.
+   */
+  def setup(placements: Seq[Placement]): Try[Board] = {
+    if (placements.length != 16) {
+      return Failure(new IllegalArgumentException("Wrong number of pieces: was " + placements.length + ", should be 16."))
+    }
+    placements.foreach{ placement =>
+      if (placement.dest.y > 1) {
+        return Failure(new IllegalArgumentException("Illegal square: " + placement))
+      }
+      if (placement.piece.owner != GOLD) {
+        return Failure(new IllegalArgumentException("Illegal player: " + placement))
+      }
+    }
+    place(placements)
+  }
+
   /** Make the specified placements, returning the new board.
     * Returns Error if placements are not on unique empty locations
     * OR if the resulting position has an unguarded piece on a trap
