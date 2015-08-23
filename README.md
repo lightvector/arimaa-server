@@ -16,12 +16,12 @@ Arimaa server
 
 Note that to avoid memory leaks via Java's permanent generation in a long-running sbt process,
 you may need to edit your sbt configuration (i.e. the sbt script installed at ~/bin/sbt) if
-you have Java 1.7 or earlier. If you do encounter out-of-memory issues in sbt, try adding the
-following flags:
+you have Java 1.7 or earlier. If you do encounter out-of-memory issues in sbt, try editing the script
+to call Java with the following flags:
 
     -XX:+CMSClassUnloadingEnabled
     -XX:+UseConcMarkSweepGC
-    -XX:MaxPermSize=1G"
+    -XX:MaxPermSize=1G
 
 ## Contributors
 
