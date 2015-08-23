@@ -228,7 +228,7 @@ class GameServlet(val accounts: Accounts, val siteLogin: SiteLogin, val games: G
     }
   }
 
-  def handleGameroomAction(params: Map[String,String]) = {
+  def handleGameroomAction(params: Map[String,String]) : AnyRef = {
     getGameroomAction(params("action")) match {
       case None =>
         pass()
@@ -272,7 +272,7 @@ class GameServlet(val accounts: Accounts, val siteLogin: SiteLogin, val games: G
     }
   }
 
-  def handleGameAction(id: GameID, params: Map[String,String]) = {
+  def handleGameAction(id: GameID, params: Map[String,String]) : AnyRef = {
     getGameAction(params("action")) match {
       case None =>
         pass()
@@ -393,7 +393,7 @@ class GameServlet(val accounts: Accounts, val siteLogin: SiteLogin, val games: G
     )
   }
 
-  def handleGetState(id: GameID, params: Map[String,String]) = {
+  def handleGetState(id: GameID, params: Map[String,String]) : AnyRef = {
     val query = GetState.parseQuery(params)
     games.get(id, query.minSequence, query.timeout.map(_.toDouble)).map { data =>
       convState(data)

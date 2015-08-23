@@ -66,7 +66,7 @@ class AccountServlet(val siteLogin: SiteLogin, val ec: ExecutionContext)
     Action.all.find(_.name == action)
   }
 
-  def handleAction(params: Map[String,String]) = {
+  def handleAction(params: Map[String,String]) : AnyRef = {
     getAction(params("action")) match {
       case None =>
         pass()

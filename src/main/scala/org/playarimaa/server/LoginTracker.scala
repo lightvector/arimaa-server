@@ -53,7 +53,7 @@ class LoginTracker(val parent: Option[LoginTracker], val inactivityTimeout: Doub
 
       val ld = findOrAddLoginData(username)
       ld.auths = ld.auths + (auth -> now)
-      userAndParentAuth = userAndParentAuth + (auth -> (username,parentAuth))
+      userAndParentAuth = userAndParentAuth + (auth -> ((username,parentAuth)))
       ld.lastActive = now
       lastActive = now
       auth

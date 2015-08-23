@@ -8,6 +8,7 @@ import akka.actor.{Actor, ActorRef, ActorSystem, Props, Stash}
 import akka.pattern.{ask, pipe, after}
 import akka.util.Timeout
 import slick.driver.H2Driver.api._
+import slick.lifted.{PrimaryKey,ProvenShape}
 import org.playarimaa.server.CommonTypes._
 import org.playarimaa.server.Timestamp.Timestamp
 
@@ -167,7 +168,7 @@ class ChatChannel(val channel: Channel, val db: Database, val actorSystem: Actor
   implicit val timeout = ChatSystem.AKKA_TIMEOUT
   import context.dispatcher
 
-  override def preStart = {
+  override def preStart : Unit = {
     //Find the maximum chat id in this channel from the database
     val query: Rep[Option[Long]] = ChatSystem.table.filter(_.channel === channel).map(_.id).max
     db.run(query.result).map(_.getOrElse(-1L)).onComplete {
@@ -179,7 +180,7 @@ class ChatChannel(val channel: Channel, val db: Database, val actorSystem: Actor
     }
   }
 
-  def receive = initialReceive
+  def receive : Receive = initialReceive
   def initialReceive: Receive = {
     //Wait for us to have found the maximum chat id
     case Initialized(maxId: Try[Long]) =>
@@ -295,7 +296,7 @@ class ChatChannel(val channel: Channel, val db: Database, val actorSystem: Actor
       actorSystem.scheduler.scheduleOnce(ChatSystem.CHAT_CHECK_TIMEOUT_PERIOD seconds, self, DoTimeouts())
   }
 
-  def replyWith[T](sender: ActorRef, result: Try[T]) = {
+  def replyWith[T](sender: ActorRef, result: Try[T]) : Unit = {
     result match {
       case Failure(e) => sender ! akka.actor.Status.Failure(e)
       case Success(x) => sender ! x
@@ -316,12 +317,12 @@ class ChatChannel(val channel: Channel, val db: Database, val actorSystem: Actor
 }
 
 class ChatTable(tag: Tag) extends Table[ChatLine](tag, "chatTable") {
-  def id = column[Long]("id")
-  def channel = column[String]("channel")
-  def username = column[String]("username")
-  def text = column[String]("text")
-  def timestamp = column[Double]("time")
+  def id : Rep[Long] = column[Long]("id")
+  def channel : Rep[String] = column[String]("channel")
+  def username : Rep[String] = column[String]("username")
+  def text : Rep[String] = column[String]("text")
+  def timestamp : Rep[Double] = column[Double]("time")
 
   //The * projection (e.g. select * ...) auto-transforms the tuple to the case class
-  def * = (id, channel, username, text, timestamp) <> (ChatLine.tupled, ChatLine.unapply)
+  def * : ProvenShape[ChatLine] = (id, channel, username, text, timestamp) <> (ChatLine.tupled, ChatLine.unapply)
 }

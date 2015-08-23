@@ -128,15 +128,15 @@ class Game private (
     if(boards.length <= 2)
       None
     else if(isGoalFor(board,opponent))
-      Some(opponent,Game.GOAL)
+      Some((opponent,Game.GOAL))
     else if(isGoalFor(board,player))
-      Some(player,Game.GOAL)
+      Some((player,Game.GOAL))
     else if(isEliminated(board,player))
-      Some(opponent,Game.ELIMINATION)
+      Some((opponent,Game.ELIMINATION))
     else if(isEliminated(board,opponent))
-      Some(player,Game.ELIMINATION)
+      Some((player,Game.ELIMINATION))
     else if(!hasLegalMove(board,player))
-      Some(opponent,Game.IMMOBILIZATION)
+      Some((opponent,Game.IMMOBILIZATION))
     else
       None
   }

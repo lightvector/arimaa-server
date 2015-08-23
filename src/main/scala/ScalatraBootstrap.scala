@@ -16,11 +16,11 @@ import org.playarimaa.server.game._
 
 object ArimaaServerInit {
   private var initialized = false
-  def initialize = {
+  def initialize() : Unit = {
     this.synchronized {
       if(!initialized) {
         //Initalize CSPRNG on startup
-        RandGen.initialize
+        RandGen.initialize()
 
         //Initialize in-memory database and create tables for testing
         val db = Database.forConfig("h2mem1")
@@ -41,8 +41,8 @@ class ScalatraBootstrap extends LifeCycle {
   val actorSystem = ActorSystem()
   val logger =  LoggerFactory.getLogger(getClass)
 
-  override def init(context: ServletContext) {
-    ArimaaServerInit.initialize
+  override def init(context: ServletContext): Unit = {
+    ArimaaServerInit.initialize()
     context.mount(new ArimaaServlet, "/*")
 
     val actorEC: ExecutionContext = actorSystem.dispatcher
