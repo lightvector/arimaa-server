@@ -1,0 +1,213 @@
+/*************************
+
+THIS FILE IS NO LONGER IN USE!
+
+**************************/
+body {
+  background-color: #000; }
+
+footer {
+  bottom: 0;
+  width: 100%;
+  position: fixed;
+  text-align: center; }
+
+.animal {
+  background: url("../images/animals_60x60.png") no-repeat top left;
+  width: 80px;
+  height: 80px; }
+
+.animal.GoldRabbit {
+  background-position: 0 0; }
+
+.animal.GoldCat {
+  background-position: 0 -80px; }
+
+.animal.GoldDog {
+  background-position: 0 -160px; }
+
+.animal.GoldHorse {
+  background-position: 0 -240px; }
+
+.animal.GoldCamel {
+  background-position: 0 -320px; }
+
+.animal.GoldElephant {
+  background-position: 0 -400px; }
+
+.animal.SilverRabbit {
+  background-position: 0 -480px; }
+
+.animal.SilverCat {
+  background-position: 0 -560px; }
+
+.animal.SilverDog {
+  background-position: 0 -640px; }
+
+.animal.SilverHorse {
+  background-position: 0 -720px; }
+
+.animal.SilverCamel {
+  background-position: 0 -800px; }
+
+.animal.SilverElephant {
+  background-position: 0 -880px; }
+
+.btn {
+  font-family: Arial;
+  color: #ffffff;
+  font-size: 12px;
+  background: #3498db;
+  /*padding: 10px 20px 10px 20px;*/
+  border: solid #1f628d 2px;
+  text-decoration: none;
+  margin: 0px; }
+
+.nav {
+  position: absolute;
+  top: 0px;
+  width: 90%;
+  color: #333333; }
+
+.signin {
+  float: right;
+  margin: 3px; }
+
+.register {
+  float: right;
+  margin: 3px; }
+
+body {
+  background-color: #eeeeee;
+  font-family: "Segoe WPC","Segoe UI","HelveticaNeue-Light",Helvetica,Arial,"Arial Unicode MS",Sans-Serif; }
+
+#content {
+  margin: auto;
+  margin-top: 60px;
+  width: 1068px; }
+
+#board_container {
+  background-color: #000; }
+
+#board {
+  float: left;
+  width: 480px;
+  height: 480px;
+  border: 3px solid #115391; }
+
+div.row div {
+  width: 60px;
+  height: 60px; }
+
+div.row div.bl {
+  background-color: #aaaaaa; }
+
+div.row div.wh {
+  background-color: #eeeeee; }
+
+div.row div {
+  float: left; }
+
+div.row:after {
+  content: ".";
+  height: 0;
+  visibility: hidden;
+  display: block;
+  clear: both; }
+
+div.side {
+  height: 486px;
+  float: left;
+  margin-left: 3px; }
+
+div.moveList {
+  background-color: #8bc4e0;
+  height: 400px; }
+
+table.moveList {
+  /*display: table;*/
+  /*height: 360px;*/
+  width: 100%; }
+
+table.moveList thead, table.moveList tbody {
+  float: left;
+  width: 100%; }
+
+table.moveList tbody {
+  overflow: auto; }
+
+table.moveList tr {
+  width: 100%;
+  display: table;
+  text-align: left; }
+
+table.moveList tr:hover {
+  background: #8b9ae0;
+  cursor: pointer; }
+
+table.moveList th, table.moveList td {
+  width: 20px;
+  padding-left: 3px;
+  vertical-align: top;
+  font-size: 13px; }
+
+table.moveList td + td {
+  /* 2nd column */
+  padding-right: 3px;
+  width: 220px;
+  font-size: 14px; }
+
+table.moveList tr.selected {
+  background: #8b9ae0; }
+
+.step_nav {
+  float: left;
+  width: 137px;
+  margin-right: 3px; }
+
+.step_btn {
+  font-family: Arial;
+  color: #ffffff;
+  font-size: 12px;
+  background: #3498db;
+  /*padding: 10px 20px 10px 20px;*/
+  border: solid #1f628d 2px;
+  text-decoration: none;
+  margin: 0px;
+  width: 30px; }
+
+.send_btn {
+  font-family: Arial;
+  color: #ffffff;
+  font-size: 12px;
+  background: #3498db;
+  /*padding: 10px 20px 10px 20px;*/
+  border: solid #1f628d 2px;
+  text-decoration: none;
+  margin-top: 3px;
+  margin-bottom: 3px;
+  width: 137px;
+  height: 30px; }
+
+.player_info {
+  height: 38px;
+  border: solid 2px #123525; }
+
+.player_name {
+  font-size: 12px; }
+
+.time {
+  font-style: bold; }
+
+#gold_info {
+  background-color: #faffe0; }
+
+#silver_info {
+  background-color: #ca9eff; }
+
+#moveNavRow {
+  float: bottom;
+  text-align: center; }
+
+div.left_side {
+  float: left; }

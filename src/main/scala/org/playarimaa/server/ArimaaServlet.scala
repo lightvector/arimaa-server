@@ -38,10 +38,29 @@ class ArimaaServlet extends WebAppStack with JacksonJsonSupport with ScalateSupp
   }
 
   //curl -i http://localhost:8080/
+  //eventually, we'll only need this and do some client side routing to determine which page to render
   get("/") {
-    //
     contentType="text/html"
-    jade("/WEB-INF/views/index.jade", "layout"->"/WEB-INF/layouts/default.jade")
+    val path = "/board.html"
+    new java.io.File( getServletContext().getResource(path).getFile )
+  }
+
+  get("/login") {
+    contentType="text/html"
+    val path = "/board.html"
+    new java.io.File( getServletContext().getResource(path).getFile )
+  }
+
+  get("/register") {
+    contentType="text/html"
+    val path = "/board.html"
+    new java.io.File( getServletContext().getResource(path).getFile )
+  }
+
+  get("/game/:gameid") {
+    contentType="text/html"
+    val path = "/board.html"
+    new java.io.File( getServletContext().getResource(path).getFile )
   }
 
   get("/chat") {
