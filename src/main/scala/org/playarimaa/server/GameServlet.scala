@@ -17,8 +17,8 @@ import org.playarimaa.server.Utils._
 import org.playarimaa.server.game.Games
 import org.playarimaa.server.game.GameUtils
 import org.playarimaa.server.game.{EndingReason, GameResult, TimeControl}
-import org.playarimaa.board.Player
-import org.playarimaa.board.{GOLD,SILV}
+import org.playarimaa.board.{Player,GOLD,SILV}
+import org.playarimaa.board.GameType
 
 //TODO: Guard against nans or other weird values when reading floats?
 
@@ -126,7 +126,22 @@ object GameServlet {
 
   case object Create extends GameroomAction {
     val name = "create"
-    case class Query(siteAuth: String, tc: IOTypes.TimeControl, rated: Boolean, gameType: String)
+    case class StandardQuery(
+      siteAuth: String,
+      tc: IOTypes.TimeControl,
+      rated: Boolean,
+      gUser: Option[String],
+      sUser: Option[String],
+      gameType: String
+    )
+    case class HandicapQuery(
+      siteAuth: String,
+      gTC: IOTypes.TimeControl,
+      sTC: IOTypes.TimeControl,
+      gUser: Option[String],
+      sUser: Option[String],
+      gameType: String
+    )
     case class Reply(gameID: String, gameAuth: String)
   }
   case object Join extends GameAction {
@@ -182,7 +197,7 @@ object GameServlet {
 
 import org.playarimaa.server.GameServlet._
 
-class GameServlet(val siteLogin: SiteLogin, val games: Games, val ec: ExecutionContext)
+class GameServlet(val accounts: Accounts, val siteLogin: SiteLogin, val games: Games, val ec: ExecutionContext)
     extends WebAppStack with JacksonJsonSupport with FutureSupport {
   //Sets up automatic case class to JSON output serialization
   protected implicit lazy val jsonFormats: Formats = Json.formats
@@ -202,30 +217,58 @@ class GameServlet(val siteLogin: SiteLogin, val games: Games, val ec: ExecutionC
     GameAction.all.find(_.name == action)
   }
 
+  def maybeGetUser(user: Option[String]): Future[Option[Username]] = {
+    user match {
+      case None => Future(None)
+      case Some(user) =>
+        accounts.getByName(user).flatMap {
+          case None => Future.failed(new Exception("Unknown user: " + user))
+          case Some(acct) => Future(Some(acct.username))
+        }
+    }
+  }
+
   def handleGameroomAction(params: Map[String,String]) = {
     getGameroomAction(params("action")) match {
       case None =>
         pass()
       case Some(Create) =>
-        val query = Json.read[Create.Query](request.body)
-        siteLogin.requiringLogin(query.siteAuth) { username =>
-          query.gameType match {
-            case "standard" =>
-              val tc = TimeControl(
-                initialTime = query.tc.initialTime,
-                increment = query.tc.increment.getOrElse(0),
-                delay = query.tc.delay.getOrElse(0),
-                maxReserve = query.tc.maxReserve,
-                maxMoveTime = query.tc.maxMoveTime,
-                overtimeAfter = query.tc.overtimeAfter
-              )
-              games.createStandardGame(username, query.siteAuth, tc, query.rated).map { case (gameID,gameAuth) =>
-                Create.Reply(gameID,gameAuth)
-              }
-            case _ =>
-              IOTypes.SimpleError("Unsupported game type: " + query.gameType)
+        val query =
+          Try(Json.read[Create.StandardQuery](request.body)).recoverWith { case _ =>
+            Try(Json.read[Create.HandicapQuery](request.body)).recoverWith { case _ =>
+              Failure(new Exception("Unknown game type or invalid fields"))
+            }
           }
-        }.get
+
+        query match {
+          case Success(Create.StandardQuery(siteAuth,tc,rated,gUser,sUser,"standard")) =>
+            siteLogin.requiringLogin(siteAuth) { username =>
+              val timeControl = tcOfIOTC(tc)
+              maybeGetUser(gUser).flatMap { gUser =>
+                maybeGetUser(sUser).flatMap { sUser =>
+                  games.createStandardGame(username, siteAuth, timeControl, rated, gUser, sUser).map { case (gameID,gameAuth) =>
+                    Create.Reply(gameID,gameAuth)
+                  }
+                }
+              }
+            }.get
+          case Success(Create.HandicapQuery(siteAuth,gTC,sTC,gUser,sUser,"handicap")) =>
+            siteLogin.requiringLogin(siteAuth) { username =>
+              val gTimeControl = tcOfIOTC(gTC)
+              val sTimeControl = tcOfIOTC(sTC)
+              maybeGetUser(gUser).flatMap { gUser =>
+                maybeGetUser(sUser).flatMap { sUser =>
+                  games.createHandicapGame(username, siteAuth, gTimeControl, sTimeControl, gUser, sUser).map { case (gameID,gameAuth) =>
+                    Create.Reply(gameID,gameAuth)
+                  }
+                }
+              }
+            }.get
+          case Success(_) =>
+            IOTypes.SimpleError("Bug: unknown game create success type")
+          case Failure(err) =>
+            IOTypes.SimpleError(err.getMessage)
+        }
     }
   }
 
@@ -273,6 +316,17 @@ class GameServlet(val siteLogin: SiteLogin, val games: Games, val ec: ExecutionC
     }
   }
 
+  def tcOfIOTC(tc: IOTypes.TimeControl): TimeControl = {
+    TimeControl(
+      initialTime = tc.initialTime,
+      increment = tc.increment.getOrElse(0),
+      delay = tc.delay.getOrElse(0),
+      maxReserve = tc.maxReserve,
+      maxMoveTime = tc.maxMoveTime,
+      overtimeAfter = tc.overtimeAfter
+    )
+  }
+
   def convTC(tc: TimeControl): IOTypes.TimeControl = {
     IOTypes.TimeControl(
       initialTime = tc.initialTime,
@@ -298,7 +352,7 @@ class GameServlet(val siteLogin: SiteLogin, val games: Games, val ec: ExecutionC
       gTC = convTC(data.meta.tcs(GOLD)),
       sTC = convTC(data.meta.tcs(SILV)),
       rated = data.meta.rated,
-      gameType = data.meta.gameType,
+      gameType = data.meta.gameType.toString,
       tags = data.meta.tags,
       openGameData = data.openGameData.map { ogdata =>
         IOTypes.OpenGameData(

@@ -29,7 +29,11 @@ object ArimaaServerBuild extends Build {
         "org.slf4j" % "slf4j-simple" % "1.7.5",
         "com.h2database" % "h2" % "1.3.170",
         "org.mindrot" % "jbcrypt" % "0.3m"
-      )
+      ),
+
+      //Full backtraces
+      testOptions in Test += Tests.Argument("-oF")
+
     ) ++ jetty()
   )
 }

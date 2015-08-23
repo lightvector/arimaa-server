@@ -11,9 +11,8 @@ import org.playarimaa.server.Timestamp.Timestamp
 import org.playarimaa.server.RandGen
 import org.playarimaa.server.LoginTracker
 import org.playarimaa.server.Utils._
-import org.playarimaa.board.Player
-import org.playarimaa.board.{GOLD,SILV}
-import org.playarimaa.board.{Game,Notation,StandardNotation}
+import org.playarimaa.board.{Player,GOLD,SILV}
+import org.playarimaa.board.{Game,Notation,StandardNotation,GameType}
 import akka.actor.{Scheduler,Cancellable}
 import akka.pattern.{after}
 
@@ -31,7 +30,6 @@ object Games {
 
   //Clean up a game with no creator after this many seconds if there is nobody in it
   val NO_CREATOR_GAME_CLEANUP_AGE = 600.0
-  val STANDARD_TYPE = "standard"
 
   val gameTable = TableQuery[GameTable]
   val movesTable = TableQuery[MovesTable]
@@ -63,9 +61,30 @@ class Games(val db: Database, val parentLogins: LoginTracker, val scheduler: Sch
   //Begin timeout loop on initialization
   checkTimeoutLoop
 
-  def createStandardGame(creator: Username, siteAuth: SiteAuth, tc: TimeControl, rated: Boolean): Future[(GameID,GameAuth)] = {
+  def createStandardGame(
+    creator: Username,
+    siteAuth: SiteAuth,
+    tc: TimeControl,
+    rated: Boolean,
+    gUser: Option[Username],
+    sUser: Option[Username]
+  ): Future[(GameID,GameAuth)] = {
     openGames.reserveNewGameID.map { id =>
-      val gameAuth = openGames.createStandardGame(id,creator,siteAuth,tc,rated)
+      val gameAuth = openGames.createStandardGame(id,creator,siteAuth,tc,rated,gUser,sUser)
+      (id,gameAuth)
+    }
+  }
+
+  def createHandicapGame(
+    creator: Username,
+    siteAuth: SiteAuth,
+    gTC: TimeControl,
+    sTC: TimeControl,
+    gUser: Option[Username],
+    sUser: Option[Username]
+  ): Future[(GameID,GameAuth)] = {
+    openGames.reserveNewGameID.map { id =>
+      val gameAuth = openGames.createHandicapGame(id,creator,siteAuth,gTC,sTC,gUser,sUser)
       (id,gameAuth)
     }
   }
@@ -316,24 +335,32 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker)(implicit ec: E
   }
 
   /* Creates a new game and joins the game with the creator, unreserving the id after the game is created */
-  def createStandardGame(reservedID: GameID, creator: Username, siteAuth: SiteAuth, tc: TimeControl, rated: Boolean): GameAuth = this.synchronized {
+  private def createGame(
+    reservedID: GameID,
+    creator: Username,
+    siteAuth: SiteAuth,
+    tcs: PlayerArray[TimeControl],
+    users: PlayerArray[Option[Username]],
+    rated: Boolean,
+    gameType: GameType
+  ): GameAuth = this.synchronized {
     assert(reservedGameIDs.contains(reservedID))
     val now = Timestamp.get
     val meta = GameMetadata(
       id = reservedID,
       numPly = 0,
       startTime = None,
-      users = PlayerArray(gold = "", silv = ""),
-      tcs = PlayerArray(gold = tc, silv = tc),
+      users = users.map(_.getOrElse("")),
+      tcs = tcs,
       rated = rated,
-      gameType = Games.STANDARD_TYPE,
+      gameType = gameType,
       tags = List(),
       result = GameUtils.adjournedResult(now)
     )
     val game = OpenGameData(
       meta = meta,
       moves = Vector(),
-      users = PlayerArray(gold = None, silv = None),
+      users = users,
       creator = Some(creator),
       creationTime = now,
       logins = new LoginTracker(Some(parentLogins),Games.INACTIVITY_TIMEOUT),
@@ -346,6 +373,32 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker)(implicit ec: E
     openGames = openGames + (reservedID -> game)
     releaseGameID(reservedID)
     gameAuth
+  }
+
+  def createStandardGame(
+    reservedID: GameID,
+    creator: Username,
+    siteAuth: SiteAuth,
+    tc: TimeControl,
+    rated: Boolean,
+    gUser: Option[Username],
+    sUser: Option[Username]
+  ): GameAuth = {
+    val users = PlayerArray(gold = gUser, silv = sUser)
+    createGame(reservedID, creator, siteAuth, PlayerArray(gold = tc, silv = tc), users, rated, GameType.STANDARD)
+  }
+
+  def createHandicapGame(
+    reservedID: GameID,
+    creator: Username,
+    siteAuth: SiteAuth,
+    gTC: TimeControl,
+    sTC: TimeControl,
+    gUser: Option[Username],
+    sUser: Option[Username]
+  ): GameAuth = {
+    val users = PlayerArray(gold = gUser, silv = sUser)
+    createGame(reservedID, creator, siteAuth, PlayerArray(gold = gTC, silv = sTC), users, rated = false, GameType.HANDICAP)
   }
 
   /* Reopens an existing adjourned game, unreserving the id regardless of success or failure */
@@ -834,7 +887,7 @@ class ActiveGame(
   private var clockBeforeTurn: PlayerArray[Double] =
     meta.tcs.mapi { case (player,tc) => GameUtils.computeTimeLeft(tc,moves,player) }
   //The game object itself
-  private var game: Game = GameUtils.initGameFromMoves(moves,notation)
+  private var game: Game = GameUtils.initGameFromMoves(moves,notation,meta.gameType)
 
   //Synchronization and tracking state ------------------------------------------------------
 
@@ -1038,8 +1091,8 @@ object GameUtils {
   }
 
   /* Initialize a game from the given move history list */
-  def initGameFromMoves(moves: Seq[MoveInfo], notation: Notation): Game = {
-    var game = new Game()
+  def initGameFromMoves(moves: Seq[MoveInfo], notation: Notation, gameType: GameType): Game = {
+    var game = new Game(gameType)
     moves.foreach { move =>
       game = game.parseAndMakeMove(move.move, notation).get
     }
@@ -1088,7 +1141,7 @@ case class GameMetadata(
   users: PlayerArray[Username],
   tcs: PlayerArray[TimeControl],
   rated: Boolean,
-  gameType: String,
+  gameType: GameType,
   tags: List[String],
   result: GameResult
 )
@@ -1136,7 +1189,7 @@ class GameTable(tag: Tag) extends Table[GameMetadata](tag, "gameTable") {
   def sOvertimeAfter = column[Option[Int]]("sOvertimeAfter")
 
   def rated = column[Boolean]("rated")
-  def gameType = column[String]("gameType")
+  def gameType = column[GameType]("gameType")
   def tags = column[List[String]]("tags")
 
   def winner = column[Option[Player]]("winner")
@@ -1154,6 +1207,10 @@ class GameTable(tag: Tag) extends Table[GameMetadata](tag, "gameTable") {
   implicit val endingReasonMapper = MappedColumnType.base[EndingReason, String] (
     { reason => reason.toString },
     { str => EndingReason.ofString(str).get }
+  )
+  implicit val gameTypeMapper = MappedColumnType.base[GameType, String] (
+    { gt => gt.toString },
+    { str => GameType.ofString(str).get }
   )
 
   def * = (

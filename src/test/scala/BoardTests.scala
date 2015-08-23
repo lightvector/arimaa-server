@@ -136,14 +136,14 @@ class BoardTests extends FlatSpec with Matchers {
   }
 
   it should "step pieces to empty squares correctly. (no captures, no errors)" in {
-    var board = new Board().add(GOLD_RAB, Location.ofString("a8").get).get
-    board.toStringAei should be("[R                                                               ]")
-    val step = new Step(GOLD_RAB, Location.ofString("a8").get, EAST)
+    var board = new Board().add(SILV_RAB, Location.ofString("a8").get).get
+    board.toStringAei should be("[r                                                               ]")
+    val step = new Step(SILV_RAB, Location.ofString("a8").get, EAST)
     board = board.step(step).get
-    board.toStringAei should be("[ R                                                              ]")
-    val step2 = new Step(GOLD_RAB, Location.ofString("b8").get, SOUTH)
+    board.toStringAei should be("[ r                                                              ]")
+    val step2 = new Step(SILV_RAB, Location.ofString("b8").get, SOUTH)
     board = board.step(step2).get
-    board.toStringAei should be("[         R                                                      ]")
+    board.toStringAei should be("[         r                                                      ]")
   }
 
   it should "give an error if you try to step a piece off the board" in {
@@ -163,79 +163,54 @@ class BoardTests extends FlatSpec with Matchers {
 
   it should "do normal placement correctly" in {
     var board : Try[Board] = Success(new Board())
-    val placements = List(
-      Placement("Ra1"), Placement("Rb1"), Placement("Rc1"), Placement("Rd1"),
-      Placement("Re1"), Placement("Rf1"), Placement("Rg1"), Placement("Rh1"),
-      Placement("Ca2"), Placement("Hb2"), Placement("Dc2"), Placement("Ed2"),
-      Placement("Me2"), Placement("Df2"), Placement("Hg2"), Placement("Ch2")
-    )
-
-    board = board.get.setup(placements)
+    val placements = Placements.ofStringList(List(
+      "Ra1", "Rb1", "Rc1", "Rd1", "Re1", "Rf1", "Rg1", "Rh1", "Ca2", "Hb2", "Dc2", "Ed2", "Me2", "Df2", "Hg2", "Ch2"
+    ))
+    board = board.get.setup(placements, GameType.STANDARD)
     board.isSuccess should be (true)
   }
 
   it should "reject setup outside two home rows" in {
     var board : Try[Board] = Success(new Board())
-    val placements = List(
-      Placement("Ra1"), Placement("Rb1"), Placement("Rc1"), Placement("Rd1"),
-      Placement("Re1"), Placement("Rf1"), Placement("Rg1"), Placement("Rh1"),
-      Placement("Ca2"), Placement("Hb2"), Placement("Dc2"), Placement("Ed2"),
-      Placement("Me2"), Placement("Df2"), Placement("Hg2"), Placement("Ch3")
-    )
-
-    board = board.get.setup(placements)
+    val placements = Placements.ofStringList(List(
+      "Ra1", "Rb1", "Rc1", "Rd1", "Re1", "Rf1", "Rg1", "Rh1", "Ca2", "Hb2", "Dc2", "Ed2", "Me2", "Df2", "Hg2", "Ch3"
+    ))
+    board = board.get.setup(placements, GameType.STANDARD)
     board.isSuccess should be (false)
   }
 
   it should "reject setup with wrong color" in {
     var board : Try[Board] = Success(new Board())
-    val placements = List(
-      Placement("Ra1"), Placement("Rb1"), Placement("Rc1"), Placement("Rd1"),
-      Placement("Re1"), Placement("Rf1"), Placement("Rg1"), Placement("Rh1"),
-      Placement("Ca2"), Placement("Hb2"), Placement("Dc2"), Placement("Ed2"),
-      Placement("Me2"), Placement("Df2"), Placement("Hg2"), Placement("ch2")
-    )
-
-    board = board.get.setup(placements)
+    val placements = Placements.ofStringList(List(
+      "Ra1", "Rb1", "Rc1", "Rd1", "Re1", "Rf1", "Rg1", "Rh1", "Ca2", "Hb2", "Dc2", "Ed2", "Me2", "Df2", "Hg2", "ch2"
+    ))
+    board = board.get.setup(placements, GameType.STANDARD)
+    board.isSuccess should be (false)
+  }
+  it should "reject setup with two pieces in the same square #1" in {
+    var board : Try[Board] = Success(new Board())
+    val placements = Placements.ofStringList(List(
+      "Ra1", "Rb1", "Rc1", "Rd1", "Re1", "Rf1", "Rg1", "Rh1", "Ca2", "Hb2", "Dc2", "Ed2", "Me2", "Df2", "Hg2", "Hg2"
+    ))
+    board = board.get.setup(placements, GameType.STANDARD)
     board.isSuccess should be (false)
   }
 
-  ignore should "reject setup with two pieces in the same square #1" in {
+  it should "reject setup with two pieces in the same square #2" in {
     var board : Try[Board] = Success(new Board())
-    val placements = List(
-      Placement("Ra1"), Placement("Rb1"), Placement("Rc1"), Placement("Rd1"),
-      Placement("Re1"), Placement("Rf1"), Placement("Rg1"), Placement("Rh1"),
-      Placement("Ca2"), Placement("Hb2"), Placement("Dc2"), Placement("Ed2"),
-      Placement("Me2"), Placement("Df2"), Placement("Hg2"), Placement("Hg2")
-    )
-
-    board = board.get.setup(placements)
-    board.isSuccess should be (false)
-  }
-
-  ignore should "reject setup with two pieces in the same square #2" in {
-    var board : Try[Board] = Success(new Board())
-    val placements = List(
-      Placement("Ra1"), Placement("Rb1"), Placement("Rc1"), Placement("Rd1"),
-      Placement("Re1"), Placement("Rf1"), Placement("Rg1"), Placement("Rh1"),
-      Placement("Ca2"), Placement("Hb2"), Placement("Dc2"), Placement("Ed2"),
-      Placement("Me2"), Placement("Df2"), Placement("Hg2"), Placement("Mg2")
-    )
-
-    board = board.get.setup(placements)
+    val placements = Placements.ofStringList(List(
+      "Ra1", "Rb1", "Rc1", "Rd1", "Re1", "Rf1", "Rg1", "Rh1", "Ca2", "Hb2", "Dc2", "Ed2", "Me2", "Df2", "Hg2", "Mg2"
+    ))
+    board = board.get.setup(placements, GameType.STANDARD)
     board.isSuccess should be (false)
   }
 
   it should "reject setup with too few pieces" in {
     var board : Try[Board] = Success(new Board())
-    val placements = List(
-      Placement("Ra1"), Placement("Rb1"), Placement("Rc1"), Placement("Rd1"),
-      Placement("Re1"), Placement("Rf1"), Placement("Rg1"), Placement("Rh1"),
-      Placement("Ca2"), Placement("Hb2"), Placement("Dc2"), Placement("Ed2"),
-      Placement("Me2"), Placement("Df2"), Placement("Hg2")
-    )
-
-    board = board.get.setup(placements)
+    val placements = Placements.ofStringList(List(
+      "Ra1", "Rb1", "Rc1", "Rd1", "Re1", "Rf1", "Rg1", "Rh1", "Ca2", "Hb2", "Dc2", "Ed2", "Me2", "Df2", "Hg2"
+    ))
+    board = board.get.setup(placements, GameType.STANDARD)
     board.isSuccess should be (false)
   }
 
