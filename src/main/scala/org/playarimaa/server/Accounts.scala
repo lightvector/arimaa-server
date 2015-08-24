@@ -32,7 +32,7 @@ class Accounts(val db: Database)(implicit ec: ExecutionContext) {
     val query = Accounts.table.filter(_.lowercaseName === lowercaseName)
     db.run(query.result).flatMap { result =>
       result.headOption match {
-        case Some(account) => Future(Some(account))
+        case Some(account) => Future.successful(Some(account))
         case None =>
           val query = Accounts.table.filter(_.email === usernameOrEmail)
           db.run(query.result).map(_.headOption)

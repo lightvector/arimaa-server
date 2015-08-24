@@ -276,11 +276,11 @@ class ChatChannel(val channel: Channel, val db: Database, val parentLogins: Logi
 
         if(doWait_ && lines.isEmpty) {
           val result = nextMessage.future.map { x => List(x).filter(isOk) }
-          val timeout = akka.pattern.after(ChatSystem.GET_TIMEOUT seconds, actorSystem.scheduler)(Future(List()))
+          val timeout = akka.pattern.after(ChatSystem.GET_TIMEOUT seconds, actorSystem.scheduler)(Future.successful(List()))
           Future.firstCompletedOf(List(result,timeout))
         }
         else {
-          Future(lines)
+          Future.successful(lines)
         }
       }
       result pipeTo sender

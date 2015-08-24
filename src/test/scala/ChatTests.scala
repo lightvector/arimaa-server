@@ -10,6 +10,7 @@ import scala.concurrent.ExecutionContext
 import org.playarimaa.server.CommonTypes._
 import org.playarimaa.server._
 import org.playarimaa.server.chat._
+import org.playarimaa.server.game._
 import org.playarimaa.board.Utils._
 
 class ChatServletTests(_system: ActorSystem) extends TestKit(_system) with ScalatraFlatSpec with BeforeAndAfterAll {
@@ -33,9 +34,10 @@ class ChatServletTests(_system: ActorSystem) extends TestKit(_system) with Scala
   val accounts = new Accounts(db)(mainEC)
   val siteLogin = new SiteLogin(accounts,cryptEC)(mainEC)
   val scheduler = actorSystem.scheduler
+  val games = new Games(db,siteLogin.logins,scheduler)(mainEC)
   val chat = new ChatSystem(db,siteLogin.logins,actorSystem)(actorEC)
   addServlet(new AccountServlet(siteLogin,mainEC), "/accounts/*")
-  addServlet(new ChatServlet(accounts,siteLogin,chat,actorEC), "/*")
+  addServlet(new ChatServlet(accounts,siteLogin,chat,games,actorEC), "/*")
 
   val startTime = Timestamp.get
   var bobSiteAuth = ""

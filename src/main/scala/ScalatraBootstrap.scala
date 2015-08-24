@@ -78,7 +78,7 @@ class ScalatraBootstrap extends LifeCycle {
     val games = new Games(db,siteLogin.logins,scheduler)(mainEC)
     val chat = new ChatSystem(db,siteLogin.logins,actorSystem)(actorEC)
 
-    context.mount(new ChatServlet(accounts,siteLogin,chat,actorEC), "/api/chat/*")
+    context.mount(new ChatServlet(accounts,siteLogin,chat,games,actorEC), "/api/chat/*")
     context.mount(new AccountServlet(siteLogin,mainEC), "/api/accounts/*")
     context.mount(new GameServlet(accounts,siteLogin,games,mainEC), "/api/games/*")
   }

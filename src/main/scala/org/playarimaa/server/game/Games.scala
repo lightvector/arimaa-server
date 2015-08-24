@@ -103,6 +103,15 @@ class Games(val db: Database, val parentLogins: LoginTracker, val scheduler: Sch
       openGames.reopenAdjournedGame(id)
   }
 
+  /* Returns true if there is any open, active, or finished game with this id */
+  def gameExists(id: GameID): Future[Boolean] = {
+    if(openGames.gameExists(id) || activeGames.gameExists(id))
+      Future.successful(true)
+    else
+      //TODO cache this to avoid banging on the database all the time?
+      GameUtils.gameExists(db,id)
+  }
+
   /* Applies the effect of heartbeat/login timeouts to all open and active games */
   private def applyLoginTimeouts(): Unit = {
     openGames.applyLoginTimeouts()
@@ -195,11 +204,11 @@ class Games(val db: Database, val parentLogins: LoginTracker, val scheduler: Sch
       if(timeoutFut.exists(_.isCompleted))
         throw new Exception("Done")
       openGames.get(id,minSequence) match {
-        case Some(Right(data)) => Future(data)
+        case Some(Right(data)) => Future.successful(data)
         case Some(Left(fut)) => fut.flatMap { case () => loop }
         case None =>
           activeGames.get(id,minSequence) match {
-            case Some(Right(data)) => Future(data)
+            case Some(Right(data)) => Future.successful(data)
             case Some(Left(fut)) => fut.flatMap { case () => loop }
             case None =>
               GameUtils.loadMetaFromDB(db,id).flatMap { meta =>
@@ -282,6 +291,11 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker)(implicit ec: E
   //Reserving an id prevents new games from being opened OR started that have this id.
   private var reservedGameIDs: Set[GameID] = Set()
 
+  /* Returns true if there is an open game with this id */
+  def gameExists(id: GameID): Boolean = this.synchronized {
+    openGames.contains(id)
+  }
+
   /* Try to reserve a game id for a game that is about to be opened, so that nothing else attempts
    * to open a game with this id in the meantime.
    * Returns true and reserves if the id is not already reserved and there is no open game with this id.
@@ -317,7 +331,7 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker)(implicit ec: E
               reserveNewGameID
             }
             else
-              Future(id)
+              Future.successful(id)
         }
       }
     }
@@ -328,7 +342,7 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker)(implicit ec: E
     this.synchronized {
       assert(reservedGameIDs.contains(id))
       if(openGames.contains(id))
-        return Future(true)
+        return Future.successful(true)
     }
     //Otherwise, query the database to check if we've used it for an older game
     val query: Rep[Int] = Games.gameTable.filter(_.id === id).length
@@ -680,6 +694,11 @@ class ActiveGames(val db: Database, val scheduler: Scheduler) (implicit ec: Exec
   private var activeGames: Map[GameID,ActiveGameData] = Map()
   val logger =  LoggerFactory.getLogger(getClass)
 
+  /* Returns true if there is an active game with this id */
+  def gameExists(id: GameID): Boolean = this.synchronized {
+    activeGames.contains(id)
+  }
+
   def addGame(data: ActiveGames.InitData): Future[Unit] = {
     val id = data.meta.id
 
@@ -897,8 +916,8 @@ class ActiveGame(
   //The last timeout event we've scheduled to happen
   private var timeoutEvent: Option[Cancellable] = None
   //Future that represent the finishing of writing metadata and moves to the DB
-  private var metaSaveFinished: Future[Unit] = Future(())
-  private var moveSaveFinished: Future[Unit] = Future(())
+  private var metaSaveFinished: Future[Unit] = Future.successful(())
+  private var moveSaveFinished: Future[Unit] = Future.successful(())
 
   scheduleNextTimeout(initNow)
 
@@ -1100,8 +1119,15 @@ object GameUtils {
     game
   }
 
+  /* Returns true if this game exists in the database */
+  def gameExists(db: Database, id: GameID)(implicit ec: ExecutionContext): Future[Boolean] = {
+    val query: Rep[Boolean] = Games.gameTable.filter(_.id === id).exists
+    db.run(query.result).map { x => !x }
+  }
+
+  /* Load the metadata for a game from the database */
   def loadMetaFromDB(db: Database, id: GameID)(implicit ec: ExecutionContext): Future[GameMetadata] = {
-    val query = Games.gameTable.filter(_.id === id)
+    val query: Rep[Seq[GameMetadata]] = Games.gameTable.filter(_.id === id)
     db.run(query.result).map(_.toList).map { metas =>
       metas match {
         case Nil => throw new Exception("No game found with the given id")
@@ -1113,7 +1139,7 @@ object GameUtils {
 
   /* Load all existing moves for a game from the database */
   def loadMovesFromDB(db: Database, id: GameID)(implicit ec: ExecutionContext): Future[Vector[MoveInfo]] = {
-    val query = Games.movesTable.filter(_.gameID === id).sortBy(_.ply)
+    val query: Rep[Seq[MoveInfo]] = Games.movesTable.filter(_.gameID === id).sortBy(_.ply)
     db.run(query.result).map(_.toVector)
   }
 

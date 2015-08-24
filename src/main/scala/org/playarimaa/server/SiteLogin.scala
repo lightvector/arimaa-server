@@ -50,7 +50,7 @@ class SiteLogin(val accounts: Accounts, val cryptEC: ExecutionContext)(implicit 
 
   //TODO throttle registrations somehow?
   def register(username: Username, email: Email, password: String, isBot: Boolean): Future[(Username,SiteAuth)] = {
-    Future(()).flatMap { case () =>
+    Future.successful(()).flatMap { case () =>
       if(username.length < USERNAME_MIN_LENGTH || username.length > USERNAME_MAX_LENGTH)
         throw new IllegalArgumentException(USERNAME_LENGTH_ERROR)
       if(!username.forall(USERNAME_CHARS.contains(_)))
