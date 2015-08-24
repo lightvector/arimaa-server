@@ -1,6 +1,6 @@
 package org.playarimaa.server.game
 import scala.concurrent.{ExecutionContext, Future, Promise, future}
-import scala.concurrent.duration._
+import scala.concurrent.duration.{DurationInt, DurationDouble}
 import scala.language.postfixOps
 import scala.util.{Try, Success, Failure}
 import slick.driver.H2Driver.api._

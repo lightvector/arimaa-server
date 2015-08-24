@@ -2,7 +2,7 @@ package org.playarimaa.server
 import scala.collection.immutable.Queue
 import scala.language.postfixOps
 import scala.concurrent.{ExecutionContext, Future, Promise, future}
-import scala.concurrent.duration._
+import scala.concurrent.duration.{DurationInt, DurationDouble}
 import scala.util.{Try, Success, Failure}
 import akka.actor.{Actor, ActorRef, ActorSystem, Props, Stash}
 import akka.pattern.{ask, pipe, after}

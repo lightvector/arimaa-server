@@ -48,10 +48,10 @@ class ScalatraBootstrap extends LifeCycle {
     val actorEC: ExecutionContext = actorSystem.dispatcher
     val mainEC: ExecutionContext = new ExecutionContext {
       val threadPool = Executors.newFixedThreadPool(4) //TODO don't fix this number
-      def execute(runnable: Runnable) {
+      def execute(runnable: Runnable): Unit = {
         threadPool.submit(runnable)
       }
-      def reportFailure(t: Throwable) {
+      def reportFailure(t: Throwable): Unit = {
         logger.error(t.toString)
       }
     }

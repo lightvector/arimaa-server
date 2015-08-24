@@ -209,7 +209,7 @@ class GameServletTests(_system: ActorSystem) extends TestKit(_system) with Scala
     }
   }
 
-  def beginAliceBobGame: Unit = {
+  def beginAliceBobGame(): Unit = {
     post("/games/actions/create", Json.write(GameServlet.Create.StandardQuery(bobSiteAuth,tc,true,Some("alice"),Some("bob"),"standard"))) {
       status should equal (200)
       val reply = readJson[GameServlet.Create.Reply](body)
@@ -237,7 +237,7 @@ class GameServletTests(_system: ActorSystem) extends TestKit(_system) with Scala
 
   it should "allow users to play a game" in {
     //Fritzlein v Chessandgo 2015 Arimaa WC
-    beginAliceBobGame
+    beginAliceBobGame()
     sendMove(aliceGameAuth,"Ra1 Rb1 Rc1 Dd1 De1 Rf1 Rg1 Rh1 Ra2 Hb2 Cc2 Ed2 Me2 Cf2 Hg2 Rh2",0)
     sendMove(bobGameAuth,  "ha7 mb7 cc7 dd7 ee7 df7 hg7 rh7 ra8 rb8 rc8 rd8 ce8 rf8 rg8 rh8",1)
     sendMove(aliceGameAuth,"Ed2n Ed3n Ed4n Hg2n",2)

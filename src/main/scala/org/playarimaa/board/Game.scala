@@ -72,7 +72,7 @@ class Game private (
       //Check if there exists a piece that can a make a legal move
       board.pieces.exists { case (src,piece) =>
         //Piece must be owned by us and unfrozen and have a direction it can move
-        piece.owner == p && !board.isFrozen(src) && Direction.values.exists { case dir =>
+        piece.owner == p && !board.isFrozen(src) && Direction.values.exists { case dir: Direction =>
           //Direction must be okay if it's a rabbit
           (piece.pieceType != RAB || Board.canRabbitGoInDir(p,dir)) && {
             val dest = src(dir)
@@ -84,7 +84,7 @@ class Game private (
                 //Regular step
                 hasLegalMove(board.stepAndResolveNoCheck(src,dir), p) ||
                 //Pull
-                Direction.values.exists { case pullFromDir =>
+                Direction.values.exists { case pullFromDir: Direction =>
                   val pullSrc = src(pullFromDir)
                   //Pull is possible if there is a pullee...
                   board(pullSrc) match {
