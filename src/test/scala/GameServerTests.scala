@@ -30,9 +30,10 @@ class GameServletTests(_system: ActorSystem) extends TestKit(_system) with Scala
   ArimaaServerInit.initialize
   val actorSystem = system
   val mainEC: ExecutionContext = ExecutionContext.Implicits.global
+  val cryptEC: ExecutionContext = mainEC
   val db = ArimaaServerInit.createDB("h2memgame")
   val accounts = new Accounts(db)(mainEC)
-  val siteLogin = new SiteLogin(accounts)(mainEC)
+  val siteLogin = new SiteLogin(accounts,cryptEC)(mainEC)
   val scheduler = actorSystem.scheduler
   val games = new Games(db,siteLogin.logins,scheduler)(mainEC)
   addServlet(new AccountServlet(siteLogin,mainEC), "/accounts/*")
