@@ -1,9 +1,10 @@
 package org.playarimaa.server.game
 import scala.concurrent.{ExecutionContext, Future, Promise, future}
-import scala.concurrent.duration._
+import scala.concurrent.duration.{DurationInt, DurationDouble}
 import scala.language.postfixOps
 import scala.util.{Try, Success, Failure}
 import slick.driver.H2Driver.api._
+import slick.lifted.{PrimaryKey,ProvenShape}
 import org.slf4j.{Logger, LoggerFactory}
 import org.playarimaa.server.CommonTypes._
 import org.playarimaa.server.Timestamp
@@ -59,7 +60,7 @@ class Games(val db: Database, val parentLogins: LoginTracker, val scheduler: Sch
   //Maybe only if they're postal games (some heuristic based on tc?). Do we want to credit any time for them?
 
   //Begin timeout loop on initialization
-  checkTimeoutLoop
+  checkTimeoutLoop()
 
   def createStandardGame(
     creator: Username,
@@ -103,16 +104,16 @@ class Games(val db: Database, val parentLogins: LoginTracker, val scheduler: Sch
   }
 
   /* Applies the effect of heartbeat/login timeouts to all open and active games */
-  private def applyLoginTimeouts: Unit = {
-    openGames.applyLoginTimeouts
-    activeGames.applyLoginTimeouts
+  private def applyLoginTimeouts(): Unit = {
+    openGames.applyLoginTimeouts()
+    activeGames.applyLoginTimeouts()
   }
 
-  private def checkTimeoutLoop: Unit = {
+  private def checkTimeoutLoop(): Unit = {
     //This shouldn't normally throw an exception, but in case it does, we don't want to kill the loop,
     //so we instead catch the exception and log it.
     val nextDelay =
-      Try(applyLoginTimeouts) match {
+      Try(applyLoginTimeouts()) match {
         case Failure(exn) =>
           logger.error("Error in checkTimeoutLoop from applyLoginTimeouts: " + exn)
           Games.TIMEOUT_CHECK_PERIOD_IF_ERROR
@@ -120,7 +121,7 @@ class Games(val db: Database, val parentLogins: LoginTracker, val scheduler: Sch
           Games.TIMEOUT_CHECK_PERIOD
       }
     try {
-      scheduler.scheduleOnce(nextDelay seconds) { checkTimeoutLoop }
+      scheduler.scheduleOnce(nextDelay seconds) { checkTimeoutLoop() }
     }
     catch {
       //Thrown when the actorsystem shuts down, ignore
@@ -252,14 +253,14 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker)(implicit ec: E
     var sequence: Long
   ) {
     //Updates the sequence number and trigger anyone who was waiting on this game state to be updated
-    def advanceSequence: Unit = {
+    def advanceSequence(): Unit = {
       sequence = sequence + 1
       sequencePromise.success(())
       sequencePromise = Promise()
     }
 
     //Unaccepts anyone who is logged out at the time of this function call
-    def filterAcceptedByLogins: Unit = {
+    def filterAcceptedByLogins(): Unit = {
       accepted = accepted.filter { case (user1,user2) =>
         logins.isUserLoggedIn(user1) && !logins.isUserLoggedIn(user2)
       }
@@ -267,9 +268,9 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker)(implicit ec: E
 
     def doTimeouts(now: Timestamp): Unit = {
       val loggedOut = logins.doTimeouts(now)
-      filterAcceptedByLogins
+      filterAcceptedByLogins()
       if(loggedOut.nonEmpty)
-        advanceSequence
+        advanceSequence()
     }
   }
 
@@ -440,7 +441,7 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker)(implicit ec: E
   }
 
   /* Applies the effect of heartbeat timeouts to all open games */
-  def applyLoginTimeouts: Unit = this.synchronized {
+  def applyLoginTimeouts(): Unit = this.synchronized {
     val now = Timestamp.get
     openGames = openGames.filter { case (id,game) =>
       //Log out any individual users who have been inactive
@@ -463,7 +464,7 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker)(implicit ec: E
         }
       //Trigger anyone waiting if we're about to clean up this game
       if(!shouldKeep)
-        game.advanceSequence
+        game.advanceSequence()
       shouldKeep
     }
   }
@@ -480,7 +481,7 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker)(implicit ec: E
         val now = Timestamp.get
         game.doTimeouts(now)
         val gameAuth = game.logins.login(user,now,Some(siteAuth))
-        game.advanceSequence
+        game.advanceSequence()
         Success(gameAuth)
       }
     }
@@ -522,8 +523,8 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker)(implicit ec: E
     ifLoggedInOpt(id,gameAuth) { case (user,game) =>
       val now = Timestamp.get
       game.logins.logout(user,gameAuth,now)
-      game.filterAcceptedByLogins
-      game.advanceSequence
+      game.filterAcceptedByLogins()
+      game.advanceSequence()
       Success(())
     }
   }
@@ -542,7 +543,7 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker)(implicit ec: E
         Failure(new Exception("Game already starting"))
       else {
         game.accepted = game.accepted + (user -> opponent)
-        game.advanceSequence
+        game.advanceSequence()
 
         val shouldBegin = game.creator match {
           case None => game.accepted.get(user) == Some(opponent) && game.accepted.get(opponent) == Some(user)
@@ -584,8 +585,8 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker)(implicit ec: E
         val now = Timestamp.get
         //TODO should this be distingushed somehow from a timeout for the declined?
         game.logins.logoutUser(opponent,now)
-        game.filterAcceptedByLogins
-        game.advanceSequence
+        game.filterAcceptedByLogins()
+        game.advanceSequence()
         Success(())
       }
     }
@@ -598,7 +599,7 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker)(implicit ec: E
   def clearStartedGame(id: GameID): Unit = this.synchronized {
     val game = openGames.get(id)
     assert(game.exists(_.starting))
-    game.get.advanceSequence
+    game.get.advanceSequence()
     openGames = openGames - id
   }
 
@@ -662,7 +663,7 @@ class ActiveGames(val db: Database, val scheduler: Scheduler) (implicit ec: Exec
     var sequence: Long
   ) {
     //Updates the sequence number and trigger anyone who was waiting on this game state to be updated
-    def advanceSequence: Unit = {
+    def advanceSequence(): Unit = {
       sequence = sequence + 1
       sequencePromise.success(())
       sequencePromise = Promise()
@@ -671,7 +672,7 @@ class ActiveGames(val db: Database, val scheduler: Scheduler) (implicit ec: Exec
     def doTimeouts(now: Timestamp): Unit = {
       val loggedOut = logins.doTimeouts(now)
       if(loggedOut.nonEmpty)
-        advanceSequence
+        advanceSequence()
     }
   }
 
@@ -705,7 +706,7 @@ class ActiveGames(val db: Database, val scheduler: Scheduler) (implicit ec: Exec
         //to report the change in the game back to users and clean up the game
         val onTimeout = { () =>
           scheduler.scheduleOnce(0 seconds) {
-            applyLoginTimeouts
+            applyLoginTimeouts()
           }
           ()
         }
@@ -724,14 +725,14 @@ class ActiveGames(val db: Database, val scheduler: Scheduler) (implicit ec: Exec
 
   /* Applies the effect of heartbeat timeouts to all active games.
    * Also cleans up games that have ended. */
-  def applyLoginTimeouts: Unit = this.synchronized {
+  def applyLoginTimeouts(): Unit = this.synchronized {
     val now = Timestamp.get
     activeGames = activeGames.filter { case (id,game) =>
       game.doTimeouts(now)
       //Clean up games that have ended
       //TODO maybe add checking and logging for games that never get cleaned up because their db commits hang forever?
       if(game.game.canCleanup) {
-        game.advanceSequence
+        game.advanceSequence()
         false //filter out
       }
       else
@@ -751,7 +752,7 @@ class ActiveGames(val db: Database, val scheduler: Scheduler) (implicit ec: Exec
         Failure(new Exception("Not one of the players of this game."))
       else {
         val gameAuth = game.logins.login(user,now,Some(siteAuth))
-        game.advanceSequence
+        game.advanceSequence()
         Success(gameAuth)
       }
     }
@@ -797,7 +798,7 @@ class ActiveGames(val db: Database, val scheduler: Scheduler) (implicit ec: Exec
     ifLoggedInOpt(id,gameAuth) { case (user,game) =>
       val now = Timestamp.get
       game.logins.logout(user,gameAuth,now)
-      game.advanceSequence
+      game.advanceSequence()
       Success(())
     }
   }
@@ -812,13 +813,13 @@ class ActiveGames(val db: Database, val scheduler: Scheduler) (implicit ec: Exec
       this.synchronized {
         ifLoggedIn(id,gameAuth) { case (user,game) =>
           val player = lookupPlayer(game,user)
-          Success(game,player)
+          Success((game,player))
         }
       }
     result.flatMap { case (game,player) =>
       f(game.game,player).map { x =>
         this.synchronized {
-          game.advanceSequence
+          game.advanceSequence()
         }
         x
       }
@@ -917,7 +918,7 @@ class ActiveGame(
 
   def getNextPlayer: Player = GameUtils.nextPlayer(meta.numPly)
 
-  def saveMetaToDB: Unit = this.synchronized {
+  def saveMetaToDB(): Unit = this.synchronized {
     val metaToSave = meta
     metaSaveFinished = metaSaveFinished.resultMap { _ =>
       val query: DBIO[Int] = Games.gameTable.filter(_.id === metaToSave.id).update(metaToSave)
@@ -933,7 +934,7 @@ class ActiveGame(
     }
   }
 
-  def saveMovesToDB: Unit = this.synchronized {
+  def saveMovesToDB(): Unit = this.synchronized {
     if(movesWritten < moves.length) {
       val newMoves = moves.slice(movesWritten,moves.length)
       movesWritten = moves.length
@@ -965,7 +966,7 @@ class ActiveGame(
   private def declareWinner(player: Player, reason: EndingReason, now: Timestamp): Unit = this.synchronized {
     meta = meta.copy(result = GameResult(winner = Some(player), reason = reason, endTime = now))
     timeoutEvent.foreach(_.cancel)
-    saveMetaToDB
+    saveMetaToDB()
   }
 
   private def scheduleNextTimeout(now: Timestamp): Unit = this.synchronized {
@@ -1040,7 +1041,7 @@ class ActiveGame(
           Failure(new Exception("Game is over"))
         else {
           meta = meta.copy(
-            numPly = plyNum+1,
+            numPly = plyNum + 1,
             result = meta.result.copy(endTime = now)
           )
           moves = moves :+ MoveInfo(
@@ -1054,8 +1055,8 @@ class ActiveGame(
           clockBeforeTurn = clockBeforeTurn + (player -> clock)
           game = newGame
 
-          saveMetaToDB
-          saveMovesToDB
+          saveMetaToDB()
+          saveMovesToDB()
 
           game.winner match {
             case None => ()
@@ -1155,46 +1156,46 @@ case class MoveInfo(
 )
 
 class MovesTable(tag: Tag) extends Table[MoveInfo](tag, "movesTable") {
-  def gameID = column[GameID]("gameID")
-  def ply = column[Int]("ply")
-  def move = column[String]("move")
-  def time = column[Timestamp]("time")
-  def start = column[Timestamp]("start")
+  def gameID : Rep[GameID] = column[GameID]("gameID")
+  def ply : Rep[Int] = column[Int]("ply")
+  def move : Rep[String] = column[String]("move")
+  def time : Rep[Timestamp] = column[Timestamp]("time")
+  def start : Rep[Timestamp] = column[Timestamp]("start")
 
-  def * = (gameID, ply, move, time, start) <> (MoveInfo.tupled, MoveInfo.unapply)
+  def * : ProvenShape[MoveInfo] = (gameID, ply, move, time, start) <> (MoveInfo.tupled, MoveInfo.unapply)
 
-  def pk = primaryKey("pk_gameID_ply", (gameID, ply))
+  def pk : PrimaryKey = primaryKey("pk_gameID_ply", (gameID, ply))
 }
 
 class GameTable(tag: Tag) extends Table[GameMetadata](tag, "gameTable") {
-  def id = column[GameID]("id", O.PrimaryKey)
-  def numPly = column[Int]("numPly")
-  def startTime = column[Option[Timestamp]]("startTime")
-  def gUser = column[Username]("gUser")
-  def sUser = column[Username]("sUser")
+  def id : Rep[GameID] = column[GameID]("id", O.PrimaryKey)
+  def numPly : Rep[Int] = column[Int]("numPly")
+  def startTime : Rep[Option[Timestamp]] = column[Option[Timestamp]]("startTime")
+  def gUser : Rep[Username] = column[Username]("gUser")
+  def sUser : Rep[Username] = column[Username]("sUser")
 
   //TODO should these be doubles?
-  def gInitialTime = column[Int]("gInitialTime")
-  def gIncrement = column[Int]("gIncrement")
-  def gDelay = column[Int]("gDelay")
-  def gMaxReserve = column[Option[Int]]("gMaxReserve")
-  def gMaxMoveTime = column[Option[Int]]("gMaxMoveTime")
-  def gOvertimeAfter = column[Option[Int]]("gOvertimeAfter")
+  def gInitialTime : Rep[Int] = column[Int]("gInitialTime")
+  def gIncrement : Rep[Int] = column[Int]("gIncrement")
+  def gDelay : Rep[Int] = column[Int]("gDelay")
+  def gMaxReserve : Rep[Option[Int]] = column[Option[Int]]("gMaxReserve")
+  def gMaxMoveTime : Rep[Option[Int]] = column[Option[Int]]("gMaxMoveTime")
+  def gOvertimeAfter : Rep[Option[Int]] = column[Option[Int]]("gOvertimeAfter")
 
-  def sInitialTime = column[Int]("sInitialTime")
-  def sIncrement = column[Int]("sIncrement")
-  def sDelay = column[Int]("sDelay")
-  def sMaxReserve = column[Option[Int]]("sMaxReserve")
-  def sMaxMoveTime = column[Option[Int]]("sMaxMoveTime")
-  def sOvertimeAfter = column[Option[Int]]("sOvertimeAfter")
+  def sInitialTime : Rep[Int] = column[Int]("sInitialTime")
+  def sIncrement : Rep[Int] = column[Int]("sIncrement")
+  def sDelay : Rep[Int] = column[Int]("sDelay")
+  def sMaxReserve : Rep[Option[Int]] = column[Option[Int]]("sMaxReserve")
+  def sMaxMoveTime : Rep[Option[Int]] = column[Option[Int]]("sMaxMoveTime")
+  def sOvertimeAfter : Rep[Option[Int]] = column[Option[Int]]("sOvertimeAfter")
 
-  def rated = column[Boolean]("rated")
-  def gameType = column[GameType]("gameType")
-  def tags = column[List[String]]("tags")
+  def rated : Rep[Boolean] = column[Boolean]("rated")
+  def gameType : Rep[GameType] = column[GameType]("gameType")
+  def tags : Rep[List[String]] = column[List[String]]("tags")
 
-  def winner = column[Option[Player]]("winner")
-  def reason = column[EndingReason]("reason")
-  def endTime = column[Timestamp]("endTime")
+  def winner : Rep[Option[Player]] = column[Option[Player]]("winner")
+  def reason : Rep[EndingReason] = column[EndingReason]("reason")
+  def endTime : Rep[Timestamp] = column[Timestamp]("endTime")
 
   implicit val listStringMapper = MappedColumnType.base[List[String], String] (
     { list => list.mkString(",") },
@@ -1213,7 +1214,7 @@ class GameTable(tag: Tag) extends Table[GameMetadata](tag, "gameTable") {
     { str => GameType.ofString(str).get }
   )
 
-  def * = (
+  def * : ProvenShape[GameMetadata] = (
     //Define database projection shape
     id,numPly,startTime,gUser,sUser,
     (gInitialTime,gIncrement,gDelay,gMaxReserve,gMaxMoveTime,gOvertimeAfter),

@@ -174,7 +174,7 @@ object StandardNotation extends Notation {
         //End of move
         case Nil =>
           if(pushLocAndPower.nonEmpty) Failure(new Exception("Incomplete push at end of move"))
-          else                         Success(Steps(steps.reverse),board.endTurn)
+          else                         Success((Steps(steps.reverse),board.endTurn))
         //Normal case
         case token :: tokens =>
           Step.ofString(token).flatMap { step =>
@@ -186,7 +186,7 @@ object StandardNotation extends Notation {
               //Require the next step to be a push if we moved an opponent piece, unless it can be counted as a pull
               val newPushLocAndPower = {
                 if(step.piece.owner == opponent && !pullLocAndPower.exists { case (pt,loc) => step.dest == loc && step.piece.pieceType < pt })
-                  Some(step.piece.pieceType, step.src)
+                  Some((step.piece.pieceType, step.src))
                 else
                   None
               }
@@ -194,7 +194,7 @@ object StandardNotation extends Notation {
               //Allow the next step to be a pull of an opponent's piece into the square we moved out of, unless we just pushed
               val newPullLocAndPower = {
                 if(step.piece.owner == player && pushLocAndPower == None)
-                  Some(step.piece.pieceType, step.src)
+                  Some((step.piece.pieceType, step.src))
                 else
                   None
               }

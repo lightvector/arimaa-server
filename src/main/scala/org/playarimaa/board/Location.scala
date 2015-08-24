@@ -35,12 +35,13 @@ object Location {
       || s(1) < '1'
       || s(1) >= ('1' + Board.SIZE)
     ) {
-      return Failure(new IllegalArgumentException("Error parsing location: " + s))
+      Failure(new IllegalArgumentException("Error parsing location: " + s))
     }
-
-    val x = s(0) - 'a'
-    val y = s(1) - '1'
-    Success(Location(x,y))
+    else {
+      val x = s(0) - 'a'
+      val y = s(1) - '1'
+      Success(Location(x,y))
+    }
   }
 
   /** Returns values in AEI order (a8-h8, a7-h7...a1-h1) */

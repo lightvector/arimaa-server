@@ -233,7 +233,7 @@ class Board(
     returnVal.toString
   }
 
-  override def toString = {
+  override def toString : String = {
     toStringAei
   }
 }
@@ -241,12 +241,12 @@ class Board(
 object Board {
   val SIZE = 8
   val STEPS_PER_TURN = 4
-  val TRAPS = List(
+  val TRAPS = List( //scalastyle:off magic.number
     Location(2,2),
     Location(5,2),
     Location(2,5),
     Location(5,5)
-  )
+  )  //scalastyle:on magic.number
 
   val PIECE_DISTRIBUTION: List[(PieceType,Int)] = List(
     (RAB,8),

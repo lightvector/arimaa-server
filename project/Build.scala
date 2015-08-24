@@ -12,6 +12,7 @@ object ArimaaServerBuild extends Build {
 
       scalacOptions += "-deprecation",
       scalacOptions += "-feature",
+      scalacOptions += "-Xlint",
 
       libraryDependencies ++= Seq(
         "org.scalatra"  %% "scalatra"          % "2.4.0.RC1",

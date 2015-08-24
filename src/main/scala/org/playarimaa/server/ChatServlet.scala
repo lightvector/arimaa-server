@@ -4,7 +4,7 @@ import org.scalatra.{Accepted, FutureSupport, ScalatraServlet}
 import org.scalatra.scalate.ScalateSupport
 
 import scala.concurrent.{ExecutionContext, Future, Promise, future}
-import scala.concurrent.duration._
+import scala.concurrent.duration.{DurationInt}
 import scala.util.{Try, Success, Failure}
 import org.json4s.{DefaultFormats, Formats}
 import org.json4s.jackson.Serialization
@@ -81,7 +81,7 @@ class ChatServlet(system: ActorSystem, db: Database, ec: ExecutionContext)
     Action.all.find(_.name == action)
   }
 
-  def handleAction(channel: String, params: Map[String,String]) = {
+  def handleAction(channel: String, params: Map[String,String]) : AnyRef = {
     getAction(params("action")) match {
       case None =>
         pass()
@@ -103,7 +103,7 @@ class ChatServlet(system: ActorSystem, db: Database, ec: ExecutionContext)
     }
   }
 
-  def handleGet(channel: String, params: Map[String,String]) = {
+  def handleGet(channel: String, params: Map[String,String]) : AnyRef = {
     val query = Get.parseQuery(params)
     chat.get(channel, query.minId, None, query.minTime, None, query.doWait).map { chatLines =>
       Get.Reply(chatLines.map { line =>
