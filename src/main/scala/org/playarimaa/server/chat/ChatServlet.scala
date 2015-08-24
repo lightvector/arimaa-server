@@ -1,4 +1,4 @@
-package org.playarimaa.server
+package org.playarimaa.server.chat
 import org.scalatra.json.JacksonJsonSupport
 import org.scalatra.{Accepted, FutureSupport, ScalatraServlet}
 import org.scalatra.scalate.ScalateSupport
@@ -14,6 +14,7 @@ import akka.util.Timeout
 import slick.driver.H2Driver.api.Database
 
 import org.playarimaa.server.CommonTypes._
+import org.playarimaa.server.{Accounts,Json,LoginTracker,SiteLogin,Timestamp,WebAppStack}
 import org.playarimaa.server.Timestamp.Timestamp
 
 object ChatServlet {
@@ -34,17 +35,17 @@ object ChatServlet {
 
   case object Join extends Action {
     val name = "join"
-    case class Query(username: String)
-    case class Reply(username: String, auth: String)
+    case class Query(siteAuth: String)
+    case class Reply(chatAuth: String)
   }
   case object Leave extends Action {
     val name = "leave"
-    case class Query(username: String, auth: String)
+    case class Query(chatAuth: String)
     case class Reply(message: String)
   }
   case object Post extends Action {
     val name = "post"
-    case class Query(username: String, auth: String, text: String)
+    case class Query(chatAuth: String, text: String)
     case class Reply(message: String)
   }
 
@@ -62,15 +63,13 @@ object ChatServlet {
 
 }
 
-import org.playarimaa.server.ChatServlet._
+import org.playarimaa.server.chat.ChatServlet._
 
-class ChatServlet(system: ActorSystem, db: Database, ec: ExecutionContext)
+class ChatServlet(val accounts: Accounts, val siteLogin: SiteLogin, val chat: ChatSystem, val ec: ExecutionContext)
     extends WebAppStack with JacksonJsonSupport with FutureSupport {
   //Sets up automatic case class to JSON output serialization
   protected implicit lazy val jsonFormats: Formats = Json.formats
   protected implicit def executor: ExecutionContext = ec
-
-  val chat = new ChatSystem(db,system)
 
   //Before every action runs, set the content type to be in JSON format.
   before() {
@@ -87,17 +86,19 @@ class ChatServlet(system: ActorSystem, db: Database, ec: ExecutionContext)
         pass()
       case Some(Join) =>
         val query = Json.read[Join.Query](request.body)
-        chat.join(channel, query.username).map { auth =>
-          Join.Reply(query.username,auth)
-        }
+        siteLogin.requiringLogin(query.siteAuth) { username =>
+          chat.join(channel, username, query.siteAuth).map { chatAuth =>
+            Join.Reply(chatAuth)
+          }
+        }.get
       case Some(Leave) =>
         val query = Json.read[Leave.Query](request.body)
-        chat.leave(channel, query.auth).map { case () =>
+        chat.leave(channel, query.chatAuth).map { case () =>
           Leave.Reply("Ok")
         }
       case Some(Post) =>
         val query = Json.read[Post.Query](request.body)
-        chat.post(channel, query.auth, query.text).map { case () =>
+        chat.post(channel, query.chatAuth, query.text).map { case () =>
           Post.Reply("Ok")
         }
     }

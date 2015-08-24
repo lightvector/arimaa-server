@@ -11,6 +11,7 @@ import slick.driver.H2Driver.api._
 import org.slf4j.{Logger, LoggerFactory}
 
 import org.playarimaa.server._
+import org.playarimaa.server.chat._
 import org.playarimaa.server.game._
 
 
@@ -21,19 +22,22 @@ object ArimaaServerInit {
       if(!initialized) {
         //Initalize CSPRNG on startup
         RandGen.initialize()
-
-        //Initialize in-memory database and create tables for testing
-        val db = Database.forConfig("h2mem1")
-        Await.result(db.run(DBIO.seq(
-          ( ChatSystem.table.schema ++
-            Games.gameTable.schema ++
-            Games.movesTable.schema ++
-            Accounts.table.schema
-          ).create
-        )), Duration.Inf)
         initialized = true
       }
     }
+  }
+
+  def createDB(configName: String) : Database = {
+    //Initialize in-memory database and create tables for testing
+    val db = Database.forConfig(configName)
+    Await.result(db.run(DBIO.seq(
+      ( ChatSystem.table.schema ++
+        Games.gameTable.schema ++
+        Games.movesTable.schema ++
+        Accounts.table.schema
+      ).create
+    )), Duration.Inf)
+    db
   }
 }
 
@@ -43,7 +47,7 @@ class ScalatraBootstrap extends LifeCycle {
 
   override def init(context: ServletContext): Unit = {
     ArimaaServerInit.initialize()
-    context.mount(new ArimaaServlet, "/*")
+    context.mount(new ArimaaServlet(), "/*")
 
     val actorEC: ExecutionContext = actorSystem.dispatcher
     val mainEC: ExecutionContext = new ExecutionContext {
@@ -56,13 +60,14 @@ class ScalatraBootstrap extends LifeCycle {
       }
     }
 
-    val db = Database.forConfig("h2mem1")
+    val db = ArimaaServerInit.createDB("h2mem1")
     val accounts = new Accounts(db)(mainEC)
     val siteLogin = new SiteLogin(accounts)(mainEC)
     val scheduler = actorSystem.scheduler
     val games = new Games(db,siteLogin.logins,scheduler)(mainEC)
+    val chat = new ChatSystem(db,siteLogin.logins,actorSystem)(actorEC)
 
-    context.mount(new ChatServlet(actorSystem,db,actorEC), "/api/chat/*")
+    context.mount(new ChatServlet(accounts,siteLogin,chat,actorEC), "/api/chat/*")
     context.mount(new AccountServlet(siteLogin,mainEC), "/api/accounts/*")
     context.mount(new GameServlet(accounts,siteLogin,games,mainEC), "/api/games/*")
   }

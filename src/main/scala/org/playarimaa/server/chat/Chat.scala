@@ -1,4 +1,4 @@
-package org.playarimaa.server
+package org.playarimaa.server.chat
 import scala.collection.immutable.Queue
 import scala.language.postfixOps
 import scala.concurrent.{ExecutionContext, Future, Promise, future}
@@ -10,6 +10,7 @@ import akka.util.Timeout
 import slick.driver.H2Driver.api._
 import slick.lifted.{PrimaryKey,ProvenShape}
 import org.playarimaa.server.CommonTypes._
+import org.playarimaa.server.{LoginTracker,SiteLogin,Timestamp}
 import org.playarimaa.server.Timestamp.Timestamp
 
 object ChatSystem {
@@ -39,7 +40,7 @@ case class ChatLine(id: Long, channel: Channel, username: Username, text: String
 //---CHAT SYSTEM----------------------------------------------------------------------------------
 
 /** Class representing a whole chat system composed of various channels, backed by a database. */
-class ChatSystem(val db: Database, val actorSystem: ActorSystem)(implicit ec: ExecutionContext) {
+class ChatSystem(val db: Database, val parentLogins: LoginTracker, val actorSystem: ActorSystem)(implicit ec: ExecutionContext) {
 
   private var channelData: Map[Channel,ActorRef] = Map()
   implicit val timeout = ChatSystem.AKKA_TIMEOUT
@@ -48,7 +49,7 @@ class ChatSystem(val db: Database, val actorSystem: ActorSystem)(implicit ec: Ex
     channelData.get(channel) match {
       case Some(cc) => cc
       case None =>
-        val cc = actorSystem.actorOf(Props(new ChatChannel(channel,db,actorSystem)))
+        val cc = actorSystem.actorOf(Props(new ChatChannel(channel,db,parentLogins,actorSystem)))
         channelData = channelData + (channel -> cc)
         cc
     }
@@ -63,9 +64,9 @@ class ChatSystem(val db: Database, val actorSystem: ActorSystem)(implicit ec: Ex
   }
 
   /** Join the specified chat channel */
-  def join(channel: Channel, username: Username): Future[ChatAuth] = {
+  def join(channel: Channel, username: Username, siteAuth: SiteAuth): Future[ChatAuth] = {
     val cc = openChannel(channel)
-    (cc ? ChatChannel.Join(username)).map(_.asInstanceOf[ChatAuth])
+    (cc ? ChatChannel.Join(username,siteAuth)).map(_.asInstanceOf[ChatAuth])
   }
 
   /** Leave the specified chat channel. Failed if not logged in. */
@@ -117,7 +118,7 @@ object ChatChannel {
   //ACTOR MESSAGES---------------------------------------------------------
 
   //Replies with ChatAuth
-  case class Join(username: Username)
+  case class Join(username: Username, siteAuth: SiteAuth)
   //Replies with Unit
   case class Leave(chatAuth: ChatAuth)
   //Replies with Unit
@@ -142,7 +143,7 @@ object ChatChannel {
 }
 
 /** An actor that handles an individual channel that people can chat in */
-class ChatChannel(val channel: Channel, val db: Database, val actorSystem: ActorSystem) extends Actor with Stash {
+class ChatChannel(val channel: Channel, val db: Database, val parentLogins: LoginTracker, val actorSystem: ActorSystem) extends Actor with Stash {
 
   //Fulfilled and replaced on each message - this is the mechanism by which
   //queries can block and wait for chat activity
@@ -154,7 +155,7 @@ class ChatChannel(val channel: Channel, val db: Database, val actorSystem: Actor
   var messagesNotYetInDB: Queue[ChatLine] = Queue()
 
   //Tracks who is logged in to this chat channel
-  val logins: LoginTracker = new LoginTracker(None,ChatSystem.INACTIVITY_TIMEOUT)
+  val logins: LoginTracker = new LoginTracker(Some(parentLogins),ChatSystem.INACTIVITY_TIMEOUT)
   //Most recent time anything happened in this channel
   var lastActive = Timestamp.get
 
@@ -194,10 +195,10 @@ class ChatChannel(val channel: Channel, val db: Database, val actorSystem: Actor
   }
 
   def normalReceive: Receive = {
-    case ChatChannel.Join(username: Username) =>
+    case ChatChannel.Join(username: Username, siteAuth: SiteAuth) =>
       val now = Timestamp.get
       logins.doTimeouts(now)
-      val chatAuth = logins.login(username, now)
+      val chatAuth = logins.login(username, now, Some(siteAuth))
       lastActive = now
       sender ! (chatAuth : ChatAuth)
 

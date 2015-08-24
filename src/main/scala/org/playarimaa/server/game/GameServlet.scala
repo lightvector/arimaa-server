@@ -1,4 +1,4 @@
-package org.playarimaa.server
+package org.playarimaa.server.game
 import org.scalatra.json.JacksonJsonSupport
 import org.scalatra.{Accepted, FutureSupport, ScalatraServlet}
 import org.scalatra.scalate.ScalateSupport
@@ -11,12 +11,10 @@ import org.json4s.jackson.Serialization
 import org.slf4j.{Logger, LoggerFactory}
 
 import org.playarimaa.server.CommonTypes._
+import org.playarimaa.server.{Accounts,Json,LoginTracker,SiteLogin,Timestamp,WebAppStack}
 import org.playarimaa.server.Timestamp.Timestamp
 import org.playarimaa.server.Utils._
 
-import org.playarimaa.server.game.Games
-import org.playarimaa.server.game.GameUtils
-import org.playarimaa.server.game.{EndingReason, GameResult, TimeControl}
 import org.playarimaa.board.{Player,GOLD,SILV}
 import org.playarimaa.board.GameType
 
@@ -195,7 +193,7 @@ object GameServlet {
 
 }
 
-import org.playarimaa.server.GameServlet._
+import org.playarimaa.server.game.GameServlet._
 
 class GameServlet(val accounts: Accounts, val siteLogin: SiteLogin, val games: Games, val ec: ExecutionContext)
     extends WebAppStack with JacksonJsonSupport with FutureSupport {
