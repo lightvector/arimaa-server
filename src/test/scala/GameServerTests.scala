@@ -5,6 +5,7 @@ import akka.actor.{ActorSystem}
 import akka.testkit.{TestKit, ImplicitSender}
 import slick.driver.H2Driver.api._
 import scala.util.{Try, Success, Failure}
+import scala.concurrent.ExecutionContext
 
 import org.playarimaa.server.CommonTypes._
 import org.playarimaa.server._
@@ -12,10 +13,7 @@ import org.playarimaa.server.game._
 import org.playarimaa.board.{Player,GOLD,SILV}
 import org.playarimaa.board.Utils._
 
-import org.playarimaa.server.GameServlet.IOTypes
-
-//TODO - note that there is a memory leak when running this test in SBT
-//See github issue #49
+import org.playarimaa.server.game.GameServlet.IOTypes
 
 class GameServletTests(_system: ActorSystem) extends TestKit(_system) with ScalatraFlatSpec with BeforeAndAfterAll {
 
@@ -25,12 +23,18 @@ class GameServletTests(_system: ActorSystem) extends TestKit(_system) with Scala
     TestKit.shutdownActorSystem(system)
   }
 
+  def readJson[T](body: String)(implicit m: Manifest[T]): T = {
+    Try(Json.read[T](body)).tagFailure("Error parsing server reply:\n" + body + "\n").get
+  }
+
   ArimaaServerInit.initialize
-  val mainEC = scala.concurrent.ExecutionContext.Implicits.global
-  val db = Database.forConfig("h2mem1")
+  val actorSystem = system
+  val mainEC: ExecutionContext = ExecutionContext.Implicits.global
+  val cryptEC: ExecutionContext = mainEC
+  val db = ArimaaServerInit.createDB("h2memgame")
   val accounts = new Accounts(db)(mainEC)
-  val siteLogin = new SiteLogin(accounts)(mainEC)
-  val scheduler = system.scheduler
+  val siteLogin = new SiteLogin(accounts,cryptEC)(mainEC)
+  val scheduler = actorSystem.scheduler
   val games = new Games(db,siteLogin.logins,scheduler)(mainEC)
   addServlet(new AccountServlet(siteLogin,mainEC), "/accounts/*")
   addServlet(new GameServlet(accounts,siteLogin,games,mainEC), "/games/*")
@@ -52,11 +56,6 @@ class GameServletTests(_system: ActorSystem) extends TestKit(_system) with Scala
   var bobGameAuth = ""
   var bobPlayer: Player = GOLD
   var sequence: Long = -1
-
-  def readJson[T](body: String)(implicit m: Manifest[T]): T = {
-    Try(Json.read[T](body)).tagFailure("Error parsing server reply:\n" + body + "\n").get
-  }
-
 
   "GameServer" should "allow users to create games" in {
 

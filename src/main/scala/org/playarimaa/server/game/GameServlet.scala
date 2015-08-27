@@ -1,4 +1,4 @@
-package org.playarimaa.server
+package org.playarimaa.server.game
 import org.scalatra.json.JacksonJsonSupport
 import org.scalatra.{Accepted, FutureSupport, ScalatraServlet}
 import org.scalatra.scalate.ScalateSupport
@@ -11,12 +11,10 @@ import org.json4s.jackson.Serialization
 import org.slf4j.{Logger, LoggerFactory}
 
 import org.playarimaa.server.CommonTypes._
+import org.playarimaa.server.{Accounts,Json,LoginTracker,SiteLogin,Timestamp,WebAppStack}
 import org.playarimaa.server.Timestamp.Timestamp
 import org.playarimaa.server.Utils._
 
-import org.playarimaa.server.game.Games
-import org.playarimaa.server.game.GameUtils
-import org.playarimaa.server.game.{EndingReason, GameResult, TimeControl}
 import org.playarimaa.board.{Player,GOLD,SILV}
 import org.playarimaa.board.GameType
 
@@ -195,7 +193,7 @@ object GameServlet {
 
 }
 
-import org.playarimaa.server.GameServlet._
+import org.playarimaa.server.game.GameServlet._
 
 class GameServlet(val accounts: Accounts, val siteLogin: SiteLogin, val games: Games, val ec: ExecutionContext)
     extends WebAppStack with JacksonJsonSupport with FutureSupport {
@@ -228,14 +226,14 @@ class GameServlet(val accounts: Accounts, val siteLogin: SiteLogin, val games: G
     }
   }
 
-  def handleGameroomAction(params: Map[String,String]) : AnyRef = {
+  def handleGameroomAction(params: Map[String,String], requestBody: String) : AnyRef = {
     getGameroomAction(params("action")) match {
       case None =>
         pass()
       case Some(Create) =>
         val query =
-          Try(Json.read[Create.StandardQuery](request.body)).recoverWith { case _ =>
-            Try(Json.read[Create.HandicapQuery](request.body)).recoverWith { case _ =>
+          Try(Json.read[Create.StandardQuery](requestBody)).recoverWith { case _ =>
+            Try(Json.read[Create.HandicapQuery](requestBody)).recoverWith { case _ =>
               Failure(new Exception("Unknown game type or invalid fields"))
             }
           }
@@ -272,44 +270,44 @@ class GameServlet(val accounts: Accounts, val siteLogin: SiteLogin, val games: G
     }
   }
 
-  def handleGameAction(id: GameID, params: Map[String,String]) : AnyRef = {
+  def handleGameAction(id: GameID, params: Map[String,String], requestBody: String) : AnyRef = {
     getGameAction(params("action")) match {
       case None =>
         pass()
       case Some(Join) =>
-        val query = Json.read[Join.Query](request.body)
+        val query = Json.read[Join.Query](requestBody)
         siteLogin.requiringLogin(query.siteAuth) { username =>
           games.join(username,query.siteAuth,id).map { gameAuth =>
             Join.Reply(gameAuth)
           }
         }.get.get
       case Some(Leave) =>
-        val query = Json.read[Leave.Query](request.body)
+        val query = Json.read[Leave.Query](requestBody)
         games.leave(id,query.gameAuth).map { case () =>
           Leave.Reply("Ok")
         }.get
       case Some(Accept) =>
-        val query = Json.read[Accept.Query](request.body)
+        val query = Json.read[Accept.Query](requestBody)
         games.accept(id,query.gameAuth,query.opponent).map { case () =>
           Accept.Reply("Ok")
         }.get
       case Some(Decline) =>
-        val query = Json.read[Decline.Query](request.body)
+        val query = Json.read[Decline.Query](requestBody)
         games.decline(id,query.gameAuth,query.opponent).map { case () =>
           Decline.Reply("Ok")
         }.get
       case Some(Heartbeat) =>
-        val query = Json.read[Heartbeat.Query](request.body)
+        val query = Json.read[Heartbeat.Query](requestBody)
         games.heartbeat(id,query.gameAuth).map { case () =>
           Heartbeat.Reply("Ok")
         }.get
       case Some(Resign) =>
-        val query = Json.read[Resign.Query](request.body)
+        val query = Json.read[Resign.Query](requestBody)
         games.resign(id,query.gameAuth).map { case () =>
           Resign.Reply("Ok")
         }.get
       case Some(Move) =>
-        val query = Json.read[Move.Query](request.body)
+        val query = Json.read[Move.Query](requestBody)
         games.move(id,query.gameAuth,query.move,query.plyNum).map { case () =>
           Move.Reply("Ok")
         }.get
@@ -402,12 +400,12 @@ class GameServlet(val accounts: Accounts, val siteLogin: SiteLogin, val games: G
 
 
   post("/actions/:action") {
-    handleGameroomAction(params)
+    handleGameroomAction(params,request.body)
   }
 
   post("/:gameID/actions/:action") {
     val id = params("gameID")
-    handleGameAction(id,params)
+    handleGameAction(id,params,request.body)
   }
 
   get("/:gameID/state") {

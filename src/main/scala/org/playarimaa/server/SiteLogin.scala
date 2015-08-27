@@ -32,7 +32,7 @@ object SiteLogin {
 
 import SiteLogin.Constants._
 
-class SiteLogin(val accounts: Accounts)(implicit ec: ExecutionContext) {
+class SiteLogin(val accounts: Accounts, val cryptEC: ExecutionContext)(implicit ec: ExecutionContext) {
 
   val logins: LoginTracker = new LoginTracker(None,INACTIVITY_TIMEOUT)
 
@@ -50,7 +50,7 @@ class SiteLogin(val accounts: Accounts)(implicit ec: ExecutionContext) {
 
   //TODO throttle registrations somehow?
   def register(username: Username, email: Email, password: String, isBot: Boolean): Future[(Username,SiteAuth)] = {
-    Future(()).flatMap { case () =>
+    Future.successful(()).flatMap { case () =>
       if(username.length < USERNAME_MIN_LENGTH || username.length > USERNAME_MAX_LENGTH)
         throw new IllegalArgumentException(USERNAME_LENGTH_ERROR)
       if(!username.forall(USERNAME_CHARS.contains(_)))
@@ -59,34 +59,37 @@ class SiteLogin(val accounts: Accounts)(implicit ec: ExecutionContext) {
       validatePassword(password)
 
       val lowercaseName = username.toLowerCase
-      val passwordHash = BCrypt.hashpw(password, BCrypt.gensalt)
-      val now = Timestamp.get
-      val createdTime = now
-      val account = Account(lowercaseName,username,email,passwordHash,isBot,createdTime)
-      accounts.add(account).recover { case _ => throw new Exception("Username already in use") }.map { case () =>
-        logins.doTimeouts(now)
-        val siteAuth = logins.login(account.username, now)
-        (account.username,siteAuth)
+
+      Future(BCrypt.hashpw(password, BCrypt.gensalt))(cryptEC).flatMap { passwordHash =>
+        val now = Timestamp.get
+        val createdTime = now
+        val account = Account(lowercaseName,username,email,passwordHash,isBot,createdTime)
+        accounts.add(account).recover { case _ => throw new Exception("Username already in use") }.map { case () =>
+          logins.doTimeouts(now)
+          val siteAuth = logins.login(account.username, now)
+          (account.username,siteAuth)
+        }
       }
     }
   }
 
   //TODO throttle login attempt rate
   def login(usernameOrEmail: String, password: String): Future[(Username,SiteAuth)] = {
-    accounts.getByNameOrEmail(usernameOrEmail).map { account =>
+    accounts.getByNameOrEmail(usernameOrEmail).flatMap { account =>
       def fail = throw new IllegalArgumentException("Invalid username/email and password combination.")
       account match {
         //Note: the quick failure here means that we're vulnerable to a time-measuring attack if we wanted
         //to keep the existence of accounts anonymous.
         case None => fail
         case Some(account) =>
-          //TODO do this in another thread to limit cost?
-          if(!BCrypt.checkpw(password, account.passwordHash))
-            fail
-          val now = Timestamp.get
-          logins.doTimeouts(now)
-          val siteAuth = logins.login(account.username, now)
-          (account.username,siteAuth)
+          Future(BCrypt.checkpw(password, account.passwordHash))(cryptEC).map { success =>
+            if(!success)
+              fail
+            val now = Timestamp.get
+            logins.doTimeouts(now)
+            val siteAuth = logins.login(account.username, now)
+            (account.username,siteAuth)
+          }
       }
     }
   }
