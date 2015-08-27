@@ -9,6 +9,7 @@ import akka.pattern.{ask, pipe, after}
 import akka.util.Timeout
 import slick.driver.H2Driver.api._
 import slick.lifted.{PrimaryKey,ProvenShape}
+import org.slf4j.{Logger, LoggerFactory}
 import org.playarimaa.server.CommonTypes._
 import org.playarimaa.server.{LoginTracker,SiteLogin,Timestamp}
 import org.playarimaa.server.Timestamp.Timestamp
@@ -45,11 +46,13 @@ class ChatSystem(val db: Database, val parentLogins: LoginTracker, val actorSyst
   private var channelData: Map[Channel,ActorRef] = Map()
   implicit val timeout = ChatSystem.AKKA_TIMEOUT
 
+  val logger =  LoggerFactory.getLogger(getClass)
+
   private def openChannel(channel: Channel): ActorRef = this.synchronized {
     channelData.get(channel) match {
       case Some(cc) => cc
       case None =>
-        val cc = actorSystem.actorOf(Props(new ChatChannel(channel,db,parentLogins,actorSystem)))
+        val cc = actorSystem.actorOf(Props(new ChatChannel(channel,db,parentLogins,actorSystem,logger)))
         channelData = channelData + (channel -> cc)
         cc
     }
@@ -143,7 +146,7 @@ object ChatChannel {
 }
 
 /** An actor that handles an individual channel that people can chat in */
-class ChatChannel(val channel: Channel, val db: Database, val parentLogins: LoginTracker, val actorSystem: ActorSystem) extends Actor with Stash {
+class ChatChannel(val channel: Channel, val db: Database, val parentLogins: LoginTracker, val actorSystem: ActorSystem, val logger: Logger) extends Actor with Stash {
 
   //Fulfilled and replaced on each message - this is the mechanism by which
   //queries can block and wait for chat activity
@@ -217,10 +220,10 @@ class ChatChannel(val channel: Channel, val db: Database, val parentLogins: Logi
         messagesNotYetInDB = messagesNotYetInDB.enqueue(line)
 
         //Write to DB and on success clear own memory
-        //TODO log on error
         val query = ChatSystem.table += line
-        db.run(DBIO.seq(query)).foreach { _ =>
-          self ! DBWritten(line.id)
+        db.run(DBIO.seq(query)).onComplete {
+          case Failure(err) => logger.error("Error saving chat post: " + err.getMessage)
+          case Success(()) => self ! DBWritten(line.id)
         }
 
         nextMessage.success(line)

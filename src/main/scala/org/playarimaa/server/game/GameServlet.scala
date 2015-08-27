@@ -18,8 +18,6 @@ import org.playarimaa.server.Utils._
 import org.playarimaa.board.{Player,GOLD,SILV}
 import org.playarimaa.board.GameType
 
-//TODO: Guard against nans or other weird values when reading floats?
-
 object GameServlet {
 
   object IOTypes {
@@ -30,6 +28,7 @@ object GameServlet {
     )
 
     case class TimeControl(
+      //TODO: should we allow non-integer values for these?
       initialTime: Int,
       increment: Option[Int],
       delay: Option[Int],
