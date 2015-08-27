@@ -216,26 +216,42 @@ class Board(
     newBoard.resolveCaps._1
   }
 
-
   def toStringAei : String = {
     val returnVal : StringBuilder = new StringBuilder
     returnVal.append("[")
-    Location.valuesAei foreach {
-      ((loc : Location) => {
-        this(loc) match {
-          case OffBoard => throw new AssertionError("Bad location: " + loc)
-          case HasPiece(p) => returnVal.append(p.toChar)
-          case Empty => returnVal.append(' ')
-        }
-      })
+    Location.valuesAei.foreach { loc : Location =>
+      this(loc) match {
+        case OffBoard => throw new AssertionError("Bad location: " + loc)
+        case HasPiece(p) => returnVal.append(p.toChar)
+        case Empty => returnVal.append(' ')
+      }
     }
     returnVal.append("]")
     returnVal.toString
   }
 
-  override def toString : String = {
-    toStringAei
+  /* Standard format for returning in server queries and/or caching in database */
+  def toStandardString : String = {
+    val returnVal : StringBuilder = new StringBuilder
+    var first = true
+    Location.rowsFen.foreach { row =>
+      if(first)
+        first = false
+      else
+        returnVal.append('/')
+
+      row.foreach { loc : Location =>
+        this(loc) match {
+          case OffBoard => throw new AssertionError("Bad location: " + loc)
+          case HasPiece(p) => returnVal.append(p.toChar)
+          case Empty => returnVal.append('.')
+        }
+      }
+    }
+    returnVal.toString
   }
+
+  override def toString : String = toStandardString
 }
 
 object Board {

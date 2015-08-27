@@ -72,6 +72,7 @@ object GameServlet {
       openGameData: Option[OpenGameData],
       activeGameData: Option[ActiveGameData],
       result: Option[GameResult],
+      position: String,
       now: Double
     )
 
@@ -425,6 +426,7 @@ class GameServlet(val accounts: Accounts, val siteLogin: SiteLogin, val games: G
           endTime = data.meta.result.endTime
         ))
       },
+      position = data.meta.position,
       now = Timestamp.get
     )
   }

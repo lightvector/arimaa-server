@@ -13,7 +13,7 @@ import org.playarimaa.server.RandGen
 import org.playarimaa.server.LoginTracker
 import org.playarimaa.server.Utils._
 import org.playarimaa.board.{Player,GOLD,SILV}
-import org.playarimaa.board.{Game,Notation,StandardNotation,GameType}
+import org.playarimaa.board.{Board,Game,Notation,StandardNotation,GameType}
 import akka.actor.{Scheduler,Cancellable}
 import akka.pattern.{after}
 
@@ -439,6 +439,7 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker, val serverInst
       gameType = gameType,
       tags = List(),
       result = GameUtils.unfinishedResult(now),
+      position = (new Board()).toStandardString,
       serverInstanceID = serverInstanceID
     )
     val game = OpenGameData(
@@ -505,7 +506,7 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker, val serverInst
             )
             val game = OpenGameData (
               meta = newMeta,
-              moves = Vector(),
+              moves = moves,
               users = meta.users.map(Some(_)),
               creator = None,
               creationTime = now,
@@ -1221,7 +1222,8 @@ class ActiveGame(
         else {
           meta = meta.copy(
             numPly = plyNum + 1,
-            result = meta.result.copy(endTime = now)
+            result = meta.result.copy(endTime = now),
+            position = newGame.currentBoardString
           )
           moves = moves :+ MoveInfo(
             gameID = meta.id,
@@ -1352,6 +1354,7 @@ case class GameMetadata(
   gameType: GameType,
   tags: List[String],
   result: GameResult,
+  position: String,
   serverInstanceID: Long
 )
 
@@ -1405,6 +1408,8 @@ class GameTable(tag: Tag) extends Table[GameMetadata](tag, "gameTable") {
   def winner : Rep[Option[Player]] = column[Option[Player]]("winner")
   def reason : Rep[String] = column[String]("reason")
   def endTime : Rep[Timestamp] = column[Timestamp]("endTime")
+
+  def position : Rep[String] = column[String]("position")
   def serverInstanceID: Rep[Long] = column[Long]("serverInstanceID")
 
   implicit val listStringMapper = MappedColumnType.base[List[String], String] (
@@ -1431,10 +1436,11 @@ class GameTable(tag: Tag) extends Table[GameMetadata](tag, "gameTable") {
     (sInitialTime,sIncrement,sDelay,sMaxReserve,sMaxMoveTime,sOvertimeAfter),
     rated,postal,gameType,tags,
     (winner,reason,endTime),
+    position,
     serverInstanceID
   ).shaped <> (
     //Database shape -> Scala object
-    { case (id,numPly,startTime,gUser,sUser,gTC,sTC,rated,postal,gameType,tags,(winner,reason,endTime),serverInstanceID) =>
+    { case (id,numPly,startTime,gUser,sUser,gTC,sTC,rated,postal,gameType,tags,(winner,reason,endTime),position,serverInstanceID) =>
       GameMetadata(id,numPly,startTime,
         PlayerArray(gold = gUser, silv = sUser),
         PlayerArray(
@@ -1443,6 +1449,7 @@ class GameTable(tag: Tag) extends Table[GameMetadata](tag, "gameTable") {
         ),
         rated,postal,GameType.ofString(gameType).get,tags,
         GameResult.tupled.apply((winner,EndingReason.ofString(reason).get,endTime)),
+        position,
         serverInstanceID
       )
     },
@@ -1454,6 +1461,7 @@ class GameTable(tag: Tag) extends Table[GameMetadata](tag, "gameTable") {
         TimeControl.unapply(g.tcs(SILV)).get,
         g.rated,g.postal,g.gameType.toString,g.tags,
         (g.result.winner,g.result.reason.toString,g.result.endTime),
+        g.position,
         g.serverInstanceID
       ))
     }

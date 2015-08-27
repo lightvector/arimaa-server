@@ -50,6 +50,15 @@ object Location {
     yield Location(x,y)
     )(collection.breakOut)
 
+  /** Returns rows in FEN order */
+  val rowsFen: List[List[Location]] = (
+    for(y <- 7 to 0 by -1)
+    yield (
+      for(x <- 0 to 7)
+      yield Location(x,y)
+    )(collection.breakOut) : List[Location]
+  )(collection.breakOut)
+
   /** Returns values: (a1-h1, a2-h2, ... a8-h8) */
   val values: List[Location] = (
     for(y <- 0 to 7; x <- 0 to 7)
