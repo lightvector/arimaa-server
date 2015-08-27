@@ -17,8 +17,10 @@ object EndingReason {
       case 'm' => Success(IMMOBILIZATION)
       case 't' => Success(TIME)
       case 'r' => Success(RESIGNATION)
+      case 'f' => Success(FORFEIT)
       case 'i' => Success(ILLEGAL_MOVE)
       case 'a' => Success(ADJOURNED)
+      case 'x' => Success(INTERRUPTED)
       case _   =>
         if(c >= 'a' && c <= 'z')
           Success(OTHER(c))
@@ -40,5 +42,7 @@ object EndingReason {
   case object RESIGNATION    extends EndingReason {val char = 'r'}
   case object ILLEGAL_MOVE   extends EndingReason {val char = 'i'}
   case object ADJOURNED      extends EndingReason {val char = 'a'}
+  case object FORFEIT        extends EndingReason {val char = 'f'}
+  case object INTERRUPTED    extends EndingReason {val char = 'x'}
   case class OTHER(char: Char) extends EndingReason
 }

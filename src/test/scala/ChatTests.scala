@@ -30,11 +30,12 @@ class ChatServletTests(_system: ActorSystem) extends TestKit(_system) with Scala
   val mainEC: ExecutionContext = ExecutionContext.Implicits.global
   val cryptEC: ExecutionContext = mainEC
   val actorEC: ExecutionContext = actorSystem.dispatcher
+  val serverInstanceID: Long = System.currentTimeMillis
   val db = ArimaaServerInit.createDB("h2memchat")
   val accounts = new Accounts(db)(mainEC)
   val siteLogin = new SiteLogin(accounts,cryptEC)(mainEC)
   val scheduler = actorSystem.scheduler
-  val games = new Games(db,siteLogin.logins,scheduler)(mainEC)
+  val games = new Games(db,siteLogin.logins,scheduler,serverInstanceID)(mainEC)
   val chat = new ChatSystem(db,siteLogin.logins,actorSystem)(actorEC)
   addServlet(new AccountServlet(siteLogin,mainEC), "/accounts/*")
   addServlet(new ChatServlet(accounts,siteLogin,chat,games,actorEC), "/*")

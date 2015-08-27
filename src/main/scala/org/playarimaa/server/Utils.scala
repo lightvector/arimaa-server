@@ -11,4 +11,14 @@ object Utils {
       future.flatMap(x => f(Success(x))).recoverWith{ case x : Throwable => f(Failure(x)) }
     }
   }
+
+  implicit class StringExtended(val s: String) extends AnyVal {
+    def toFiniteDouble: Double = {
+      val x = s.toDouble
+      if(x.isNaN || x.isInfinite)
+        throw new NumberFormatException("Double value is infinite or nan: " + x)
+      else
+        x
+    }
+  }
 }

@@ -71,11 +71,14 @@ class ScalatraBootstrap extends LifeCycle {
     val mainEC: ExecutionContext = createPool(math.ceil(numProcessors * mainThreadPoolSizeFactor).toInt)
     val cryptEC: ExecutionContext = createPool(cryptThreadPoolSize)
 
+    //A value that should be unique in practice between each time the server is started
+    val serverInstanceID: Long = System.currentTimeMillis
+
     val db = ArimaaServerInit.createDB("h2mem1")
     val accounts = new Accounts(db)(mainEC)
     val siteLogin = new SiteLogin(accounts,cryptEC)(mainEC)
     val scheduler = actorSystem.scheduler
-    val games = new Games(db,siteLogin.logins,scheduler)(mainEC)
+    val games = new Games(db,siteLogin.logins,scheduler,serverInstanceID)(mainEC)
     val chat = new ChatSystem(db,siteLogin.logins,actorSystem)(actorEC)
 
     context.mount(new ChatServlet(accounts,siteLogin,chat,games,actorEC), "/api/chat/*")
