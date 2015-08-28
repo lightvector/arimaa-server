@@ -67,52 +67,42 @@ var APIUtils = {
   },
 
   login: function(username, password, success, error) {
-    POST('api/accounts/login', {username:username, password:password}, success, error);
+    POST('/api/accounts/login', {username:username, password:password}, success, error);
   },
 
   register: function(username, email, password, success, error) {
-    POST('api/accounts/register', {username:username, email:email, password:password,isBot:false}, success, error);
+    POST('/api/accounts/register', {username:username, email:email, password:password,isBot:false}, success, error);
   },
 
   logout: function() {
-    POST('api/accounts/logout', {siteAuth:UserStore.siteAuthToken()}, function(){}, function(){});
+    POST('/api/accounts/logout', {siteAuth:UserStore.siteAuthToken()}, function(){}, function(){});
   },
 
   createGame: function(options, success, error) {
     console.log('creating game ',options);
-    POST('api/games/actions/create', options, success, error);
+    POST('/api/games/actions/create', options, success, error);
   },
 
-  joinGame: function(gameId, success, error) {
-    console.log('joining game ', gameId);
-    POST('api/games/'+gameId+'/actions/join', {siteAuth:UserStore.siteAuthToken()}, success, error);
+  joinGame: function(gameID, success, error) {
+    console.log('joining game ', gameID);
+    POST('/api/games/'+gameID+'/actions/join', {siteAuth:UserStore.siteAuthToken()}, success, error);
   },
 
-  gameStatus: function(gameId, success, error) {
-    GET('api/games/'+gameId+'/state', success, error);
+  gameStatus: function(gameID, seq, success, error) {
+    GET('/api/games/'+gameID+'/state', {minSequence:seq}, success, error);
   },
 
-  gameHeartbeat: function(gameId, success, error) {
-    POST('api/games/'+gameId+'/heartbeat', {gameAuth:""}, success, error);
+  gameHeartbeat: function(gameID, success, error) {
+    POST('/api/games/'+gameID+'/heartbeat', {gameAuth:""}, success, error);
   },
 
-  complete_move: function() {
+  acceptUserForGame: function(gameID, username, success, error) {
+    POST('/api/games/'+gameID+'/actions/accept', {gameAuth:UserStore.gameAuthToken(), opponent: username}, success, error);
+  },
 
-    /*
-    $.ajax({
-      type : 'POST',
-      url : 'api/game/12345/complete', //CHANGE THIS!!!!!!!!!!!!!!
-      contentType: "application/json; charset=utf-8",
-      dataType : 'json',
-      data : JSON.stringify({username:this.state.username,auth:this.state.auth,text:comment}),
-      success : function(data) {
-        //console.log("post chat success",data);
-        if(data.error) {
-          alert(data.error);
-        } else {
-          console.log("no error");
-        }
-      });*/
+  send_move: function(gameID, moveStr, plyNum, success, error) {
+    console.log(gameID, moveStr, plyNum);
+    POST('/api/games/'+gameID+'/actions/move', {gameAuth:UserStore.gameAuthToken(), move:moveStr, plyNum:plyNum}, success, error);
   },
   do_something_else: 0
 }

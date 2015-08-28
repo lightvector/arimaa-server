@@ -1,7 +1,26 @@
 var ArimaaDispatcher = require('../dispatcher/ArimaaDispatcher.js');
-var ArimaaConstants = require('../constants/ArimaaConstants.js')
+var ArimaaConstants = require('../constants/ArimaaConstants.js');
+var APIUtils = require('../utils/WebAPIUtils.js');
+var ArimaaStore = require('../stores/ArimaaStore.js');
+
+const FUNC_NOP = function(){}
 
 var ArimaaActions = {
+  //we shouldn't
+  gameStatus: function(gameID, sequence) {
+    APIUtils.gameStatus(gameID, sequence, ArimaaActions.gameStatusSuccess, FUNC_NOP);
+  },
+
+  gameStatusSuccess: function(data) {
+    var history = data.history;
+    //maybe do a while loop here?
+    var n = ArimaaStore.getMoveList().length;
+    while(history.length > ArimaaStore.getMoveList().length) {
+        ArimaaActions.addMove(history[n]);
+        n++;
+    }
+  },
+
   clickSquare: function(sqNum, sqName) {
     ArimaaDispatcher.dispatch({
       actionType: ArimaaConstants.ACTIONS.GAME_CLICK_SQUARE,
@@ -22,6 +41,22 @@ var ArimaaActions = {
     });
   },
 
+  setupGold: function(gameID, setupString) {
+    ArimaaDispatcher.dispatch({
+      actionType: ArimaaConstants.ACTIONS.GAME_SETUP_GOLD,
+      text: setupString,
+      gameID: gameID
+    });
+  },
+
+  setupSilver: function(gameID, setupString) {
+    ArimaaDispatcher.dispatch({
+      actionType: ArimaaConstants.ACTIONS.GAME_SETUP_SILVER,
+      text: setupString,
+      gameID: gameID
+    });
+  },
+
   addStep: function(stepString) {
     ArimaaDispatcher.dispatch({
       actionType: ArimaaConstants.ACTIONS.GAME_ADD_STEP,
@@ -29,6 +64,7 @@ var ArimaaActions = {
     });
   },
 
+  //from opponents
   addMove: function(moveStr) {
     ArimaaDispatcher.dispatch({
       actionType: ArimaaConstants.ACTIONS.GAME_ADD_MOVE,
@@ -36,9 +72,12 @@ var ArimaaActions = {
     });
   },
 
-  completeMove: function() {
+  completeMove: function(gameID) {
+    //delete following line
+    //APIUtils.send_move(gameID, moveStr, plyNum, FUNC_NOP, FUNC_NOP);
     ArimaaDispatcher.dispatch({
-      actionType: ArimaaConstants.ACTIONS.GAME_COMPLETE_MOVE
+      actionType: ArimaaConstants.ACTIONS.GAME_COMPLETE_MOVE,
+      gameID: gameID
     });
   },
 

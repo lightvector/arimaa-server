@@ -24,7 +24,7 @@ if(url == "/login") {
   React.render(<Register/>, document.getElementById('board_container'));
 } else if(gameMatch) {
   console.log("game id: " + gameMatch[1]);
-  React.render(<Game gameId={gameMatch[1]}/>, document.getElementById('board_container'));
+  React.render(<Game gameID={gameMatch[1]}/>, document.getElementById('board_container'));
 } else {
   React.render(<DebugComp/>, document.getElementById('board_container'));
 }

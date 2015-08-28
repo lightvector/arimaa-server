@@ -3,8 +3,10 @@
 var ArimaaDispatcher = require('../dispatcher/ArimaaDispatcher.js');
 var EventEmitter = require('events').EventEmitter;
 var ArimaaConstants = require('../constants/ArimaaConstants.js');
+var SiteConstants = require('../constants/SiteConstants.js');
 var assign = require('object-assign');
 var Arimaa = require('../lib/arimaa.js');
+var APIUtils = require('../utils/WebAPIUtils.js');
 
 const CHANGE_EVENT = 'change';
 const MOVE_EVENT = 'new-move';
@@ -13,13 +15,16 @@ const NULL_SQUARE_NUM = -1;
 
 var debugMsg = "";
 
+var _gameID;
+var _gameAuth;
+
 var _arimaa = new Arimaa();
 var _selSquareNum = NULL_SQUARE_NUM;
 var _selSquareName = "";
 var _validSteps = [];
 var _selSquareStack = []; //previous selected squares for undo/redo
 var _redoSquareStack = []; //used for undo/redo
-
+var _myColor;
 setInitialState();
 
 const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
@@ -32,6 +37,7 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
   },
 
   getBoard: function() {
+    console.log('board: ', _arimaa.get_board());
     return _arimaa.get_board();
   },
 
@@ -80,7 +86,23 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
       _validSteps = [];
     }
 
+
     switch(action.actionType) {
+      //maybe we should put this in user store? or both???
+      case SiteConstants.GAME_CREATED:
+        _gameID = action.gameId;
+        _gameAuth = action.gameAuth;
+        break;
+      case ArimaaConstants.ACTIONS.GAME_SETUP_GOLD:
+        _arimaa.setup_gold(action.text);
+        APIUtils.send_move(action.gameID, action.text, 0, function(){}, function(){});
+        ArimaaStore.emitChange();
+        break;
+      case ArimaaConstants.ACTIONS.GAME_SETUP_SILVER:
+        _arimaa.setup_silver(action.text);
+        APIUtils.send_move(action.gameID, action.text, 1, function(){}, function(){});
+        ArimaaStore.emitChange();
+        break;
       case ArimaaConstants.ACTIONS.GAME_CLICK_SQUARE:
         //DEFINITELY NEED TO SIMPLIFY THESE CONDITIONALS
 
@@ -141,12 +163,10 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
       case ArimaaConstants.ACTIONS.GAME_ADD_MOVE:
         _arimaa.undo_ongoing_move();
         var moveStr = action.move;
-        var stepsList = moveStr.split(' ');
-        console.log(stepsList);
         _redoSquareStack = [];
         _selSquareStack = [];
         _setSelectedSquareToNull();
-        _arimaa.add_move(stepsList);
+        _arimaa.add_move_string(moveStr);
         var completed = _arimaa.complete_move();
         if(!completed.success) {
           debugMsg = completed.reason;
@@ -157,10 +177,13 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
 
         var completed = _arimaa.complete_move();
         if(completed.success) {
+          //definitely need a better way of doing this...
+          var moves = _arimaa.get_move_list();
+          var lastMove = moves[moves.length-1];
+          var lastMoveStr = lastMove.map(function(s) {return s.string;}).join(' ');
 
           //send move to server
-          //wait for response
-          //blah blah blah
+          APIUtils.send_move(action.gameID, lastMoveStr, _arimaa.get_halfmove_number()+1, function(){}, function(){});
           _redoSquareStack = [];
           _selSquareStack = [];
           _setSelectedSquareToNull();
@@ -180,11 +203,13 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
 
 });
 
+//debug only???
 function setInitialState() {
-  _arimaa = new Arimaa({fen:"8/8/3CR3/3r4/8/8/8/8"});
+  var options = {fen:"8/8/3CR3/3r4/8/8/8/8"};
+  _arimaa = new Arimaa();
   //
-  _arimaa.add_step("Cd6n");
-  _arimaa.complete_move();
+  //_arimaa.add_step("Cd6n");
+  //_arimaa.complete_move();
 }
 
 module.exports = ArimaaStore;

@@ -3,6 +3,8 @@ var keyMirror = require('keymirror');
 
 var ACTION_CONSTANTS = keyMirror({
   GAME_CLICK_SQUARE: null,
+  GAME_SETUP_GOLD: null,
+  GAME_SETUP_SILVER: null,
   GAME_ADD_STEP: null, //NO LONGER NEEDED, HANDLED IN CLICK_SQUARE
   GAME_UNDO_STEP: null,
   GAME_UNDO_MOVE: null,

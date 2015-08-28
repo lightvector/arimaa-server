@@ -4,7 +4,14 @@ var SiteConstants = require('../constants/SiteConstants.js');
 var UserStore = require('../stores/UserStore.js');
 var cookie = require('react-cookie');
 
-FUNC_NOP = function(){}
+const FUNC_NOP = function(){}
+
+var seqNum = 0; //maybe move this to the store?
+
+
+/*********
+MOVE ALL API CALLS TO STORES????
+********/
 
 var SiteActions = {
   login: function(username, password) {
@@ -65,15 +72,50 @@ var SiteActions = {
   },
   createGameSuccess: function(data) {
     console.log("create game data ", data);
-    cookie.save('gameAuth',data.gameAuth, {path:'/'});
-    APIUtils.gameStatus(data.gameID, FUNC_NOP, FUNC_NOP);
+    cookie.save('gameAuth',data.gameAuth, {path:'/'}); //need a way to save multiple gameauths
+
+    ArimaaDispatcher.dispatch({
+      actionType: SiteConstants.GAME_CREATED,
+      gameID: data.gameID,
+      gameAuth: data.gameAuth
+    })
+    APIUtils.gameStatus(data.gameID, 0, SiteActions.gameStatusSuccess, FUNC_NOP);
   },
   createGameError: function(data) {
 
   },
-  joinGame: function(gameId) {
-    APIUtils.joinGame(gameId, FUNC_NOP, FUNC_NOP);
+  gameStatusSuccess: function(data) {
+    seqNum = data.sequence;
+
+    if(data.meta.openGameData && data.meta.openGameData.joined.length > 1) {
+      ArimaaDispatcher.dispatch({
+        actionType: SiteConstants.PLAYER_JOINED,
+        players: data.meta.openGameData.joined, //note this includes the creator
+        gameID: data.meta.id
+      });
+      ArimaaDispatcher.dispatch({
+        actionType: SiteConstants.GAME_STATUS_UPDATE,
+        data: data //pass all the data. maybe we can be more selective later on
+      });
+    }
+
+    APIUtils.gameStatus(data.meta.id, seqNum+1, SiteActions.gameStatusSuccess, FUNC_NOP); //hopefully the compiler tail recurses this
   },
+  gameStatus: function(gameID, sequence) {
+    APIUtils.gameStatus(gameID, sequence, SiteActions.gameStatusSuccess, FUNC_NOP);
+  },
+
+
+  //starts a game
+  acceptUserForGame: function(gameID, username) {
+    APIUtils.acceptUserForGame(gameID, username, FUNC_NOP, FUNC_NOP);
+  },
+  joinGame: function(gameID) {
+    APIUtils.joinGame(gameID, SiteActions.joinGameSuccess, FUNC_NOP);
+  },
+  joinGameSuccess: function(data) {
+    cookie.save('gameAuth',data.gameAuth, {path:'/'});//once again, we'll need a way to save multiple gameauths
+  }
 
 };
 

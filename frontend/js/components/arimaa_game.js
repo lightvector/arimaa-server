@@ -6,7 +6,7 @@ var DebugComp = require('./boardDebugComponent');
 var Game = React.createClass({
 
   heartbeat: function() {
-    
+
   },
 
   componentDidMount: function() {
@@ -21,9 +21,9 @@ var Game = React.createClass({
   render: function() {
     return (
       <div>
-        <Board/>
-        <Movelist/>
-        <DebugComp/>
+        <Board gameID={this.props.gameID}/>
+        <Movelist gameID={this.props.gameID}/>
+        <DebugComp gameID={this.props.gameID}/>
       </div>
     );
   }

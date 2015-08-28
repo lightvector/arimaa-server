@@ -8,11 +8,12 @@ var ArimaaConstants = require('../constants/ArimaaConstants.js');
 const NULL_SQUARE = -1;
 
 function getGameState() {
-  return {
+  var boardState= {
     fen: ArimaaStore.getArimaa().get_fen(),
     stepFrom: ArimaaStore.getSeletedSquare().num, //need to change this name
     steps: ArimaaStore.getValidSteps()
   };
+  return boardState;
 }
 
 var Board = React.createClass({

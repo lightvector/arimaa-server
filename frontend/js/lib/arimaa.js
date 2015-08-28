@@ -1,9 +1,9 @@
 var Arimaa = function(options) {
 	//Constants
-	var GOLD = 0;
-	var SILVER = 1;
+	const GOLD = 0;
+	const SILVER = 1;
 
- 	var SQUARES = {
+ 	const SQUARES = {
       a8:   0, b8:   1, c8:   2, d8:   3, e8:   4, f8:   5, g8:   6, h8:   7,
       a7:  16, b7:  17, c7:  18, d7:  19, e7:  20, f7:  21, g7:  22, h7:  23,
       a6:  32, b6:  33, c6:  34, d6:  35, e6:  36, f6:  37, g6:  38, h6:  39,
@@ -14,29 +14,29 @@ var Arimaa = function(options) {
       a1: 112, b1: 113, c1: 114, d1: 115, e1: 116, f1: 117, g1: 118, h1: 119
  	};
 
-	var TRAPS = {
+	const TRAPS = {
 		c3: 82,
 		c6: 34,
 		f3: 85,
 		f6: 37
 	}
 
-	var EMPTY = 0;
-	var GRABBIT = 1;
-	var GCAT = 2;
-	var GDOG = 3;
-	var GHORSE = 4;
-	var GCAMEL = 5;
-	var GELEPHANT = 6;
-	var COLOR = 8;
-	var SRABBIT = 9;
-	var SCAT = 10;
-	var SDOG = 11;
-	var SHORSE = 12;
-	var SCAMEL = 13;
-	var SELEPHANT = 14;
-	var COUNT = 15;
-	var PIECES = " RCDHME  rcdhme"
+	const EMPTY = 0;
+	const GRABBIT = 1;
+	const GCAT = 2;
+	const GDOG = 3;
+	const GHORSE = 4;
+	const GCAMEL = 5;
+	const GELEPHANT = 6;
+	const COLOR = 8;
+	const SRABBIT = 9;
+ 	const SCAT = 10;
+	const SDOG = 11;
+	const SHORSE = 12;
+	const SCAMEL = 13;
+	const SELEPHANT = 14;
+	const COUNT = 15;
+	const PIECES = " RCDHME  rcdhme"
 
 	const DIRECTIONS = {
 		NORTH:-16,
@@ -77,7 +77,7 @@ var Arimaa = function(options) {
 
 	var options = options || {
 		fen: "8/8/8/8/8/8/8/8",
-		halfmoveNumber:1,
+		halfmoveNumber:0,
 		colorToMove:GOLD,
 		stepsLeft:4,
 		ongoingMove:[],
@@ -95,7 +95,7 @@ var Arimaa = function(options) {
 	var boardHistory = options['boardHistory'] || [fen]; //nb empty array is truthy
 	var moveHistory = options['moveHistory'] || [];
 	var ongoingMove = options['ongoingMove'] || [];
-	var halfmoveNumber = options['halfmoveNumber'] || 1;
+	var halfmoveNumber = options['halfmoveNumber'] || 0;
 	var colorToMove = options['colorToMove'] || 0; //GOLD == 0 is falsey
 
 	//need to do this since 0 is falsey
@@ -368,6 +368,21 @@ var Arimaa = function(options) {
 		return steps;
 	}
 
+	//NO ERROR CHECKING!!!
+	function setup(setupString) {
+		var stepStrsList = setupString.split(' ');
+
+		var stepList = [];
+		stepStrsList.forEach(function(stepString) {
+			var piece = PIECES.indexOf(stepString.charAt(0));
+			var location = stepString.substring(1,3);
+
+			stepList.push({string:stepString}); //need to make adding pieces correspond to the step object
+
+			board[SQUARES[location]] = piece;
+		});
+		moveHistory.push(stepList);
+	}
 
 	//eventually, since we will need to call generate_moves at the beginning
 	//of every move, we can skip some of the checking and just add steps if its
@@ -485,7 +500,6 @@ var Arimaa = function(options) {
 		}
 
 		//later iterate over the directions
-
 		//same color
 		if((piece & COLOR) >> 3 == colorToMove && !is_frozen(squareNum)) {
 			if ((((squareNum + DIRECTIONS.NORTH) & 0x88) === 0) && (board[squareNum+DIRECTIONS.NORTH] === EMPTY) && piece !== SRABBIT)
@@ -754,6 +768,24 @@ var Arimaa = function(options) {
 			return this.get_piece_on_square(square) === EMPTY;
 		},
 
+		//Ra1 Rb1 ...
+		setup_gold: function(setupString) {
+			setup(setupString);
+		},
+
+		setup_silver: function(setupString) {
+			setup(setupString);
+		},
+
+		//this is ugly!!
+		add_move_string: function(moveString) {
+			var stepsList = moveString.split(' ');
+
+			if(moveHistory.length === 0) setup(moveString);
+			else if(moveHistory.length === 1) setup(moveString);
+			else add_move(stepsList);
+		},
+
 		//move is a list of step strings
 		add_move: function(move) {
 			return add_move(move);
@@ -816,9 +848,13 @@ var Arimaa = function(options) {
 		},
 
 		//TEST THIS!!!!
-		get_turn_num: function() {
+		get_turn_name: function() {
 			var c = halfmoveNumber % 2 ? 's' : 'g';
-			return Math.floor(halfmoveNumber/2) + c;
+			return (1+Math.floor(halfmoveNumber/2)) + c; //casting
+		},
+
+		get_halfmove_number: function() {
+			return halfmoveNumber;
 		},
 
 		generate_moves: function() {
