@@ -116,7 +116,6 @@ class Game private (
   }
 
 
-
   /** Returns the winner of the game based on the current move history, or None if nobody has won */
   def winner: Option[(Player,Game.EndingReason)] = {
     //TODO a bit inefficient?
@@ -140,4 +139,11 @@ class Game private (
     else
       None
   }
+
+
+  /* Standard format for returning in server queries and/or caching in database */
+  def currentBoardString: String = {
+    boards.last.toStandardString
+  }
+
 }

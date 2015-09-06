@@ -31,11 +31,12 @@ class GameServletTests(_system: ActorSystem) extends TestKit(_system) with Scala
   val actorSystem = system
   val mainEC: ExecutionContext = ExecutionContext.Implicits.global
   val cryptEC: ExecutionContext = mainEC
+  val serverInstanceID: Long = System.currentTimeMillis
   val db = ArimaaServerInit.createDB("h2memgame")
   val accounts = new Accounts(db)(mainEC)
   val siteLogin = new SiteLogin(accounts,cryptEC)(mainEC)
   val scheduler = actorSystem.scheduler
-  val games = new Games(db,siteLogin.logins,scheduler)(mainEC)
+  val games = new Games(db,siteLogin.logins,scheduler,serverInstanceID)(mainEC)
   addServlet(new AccountServlet(siteLogin,mainEC), "/accounts/*")
   addServlet(new GameServlet(accounts,siteLogin,games,mainEC), "/games/*")
 
@@ -235,7 +236,7 @@ class GameServletTests(_system: ActorSystem) extends TestKit(_system) with Scala
   }
 
   it should "allow users to play a game" in {
-    //Fritzlein v Chessandgo 2015 Arimaa WC
+    //Fritzlein v Chessandgo 2015 Arimaa WC R12
     beginAliceBobGame()
     sendMove(aliceGameAuth,"Ra1 Rb1 Rc1 Dd1 De1 Rf1 Rg1 Rh1 Ra2 Hb2 Cc2 Ed2 Me2 Cf2 Hg2 Rh2",0)
     sendMove(bobGameAuth,  "ha7 mb7 cc7 dd7 ee7 df7 hg7 rh7 ra8 rb8 rc8 rd8 ce8 rf8 rg8 rh8",1)
@@ -347,6 +348,7 @@ class GameServletTests(_system: ActorSystem) extends TestKit(_system) with Scala
       state.meta.result.nonEmpty should equal (true)
       state.meta.result.get.winner should equal ("s")
       state.meta.result.get.reason should equal ("g")
+      state.meta.position should equal ("......../..c..c../.Hr...../r.D.rrrr/R.dE..dR/R..e..R./..h.CR../rC......")
       state.sequence should equal (None)
     }
   }

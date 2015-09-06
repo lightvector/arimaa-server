@@ -18,8 +18,6 @@ import org.playarimaa.server.Utils._
 import org.playarimaa.board.{Player,GOLD,SILV}
 import org.playarimaa.board.GameType
 
-//TODO: Guard against nans or other weird values when reading floats?
-
 object GameServlet {
 
   object IOTypes {
@@ -30,6 +28,7 @@ object GameServlet {
     )
 
     case class TimeControl(
+      //TODO: should we allow non-integer values for these?
       initialTime: Int,
       increment: Option[Int],
       delay: Option[Int],
@@ -46,7 +45,8 @@ object GameServlet {
 
     case class OpenGameData(
       creator: Option[ShortUserInfo],
-      joined: List[ShortUserInfo]
+      joined: List[ShortUserInfo],
+      creationTime: Double
     )
 
     case class ActiveGameData(
@@ -72,6 +72,7 @@ object GameServlet {
       openGameData: Option[OpenGameData],
       activeGameData: Option[ActiveGameData],
       result: Option[GameResult],
+      position: String,
       now: Double
     )
 
@@ -189,6 +190,53 @@ object GameServlet {
         params.get("timeout").map(_.toInt)
       )
     }
+  }
+
+  case object GetMetadata {
+    type Reply = IOTypes.GameMetadata
+  }
+
+  case object GetSearch {
+    case class Query(
+      open: Boolean,
+      active: Boolean,
+
+      rated: Option[Boolean],
+      postal: Option[Boolean],
+      gameType: Option[String],
+
+      usersInclude: Option[Set[Username]],
+      gUser: Option[Username],
+      sUser: Option[Username],
+
+      minTime: Option[Timestamp],
+      maxTime: Option[Timestamp],
+
+      limit: Option[Int]
+    )
+    type Reply = List[IOTypes.GameMetadata]
+
+    def parseQuery(params: Map[String,String]): Query = {
+      new Query(
+        open = params.get("open").map(_.toBoolean).getOrElse(false),
+        active = params.get("active").map(_.toBoolean).getOrElse(false),
+        rated = params.get("rated").map(_.toBoolean),
+        postal = params.get("postal").map(_.toBoolean),
+        gameType = params.get("gameType"),
+        usersInclude = (
+          if(params.contains("user1") || params.contains("user2"))
+            Some(params.get("user1").toSet ++ params.get("user2").toSet)
+          else
+            None
+        ),
+        gUser = params.get("gUser"),
+        sUser = params.get("sUser"),
+        minTime = params.get("minTime").map(_.toFiniteDouble),
+        maxTime = params.get("maxTime").map(_.toFiniteDouble),
+        limit = params.get("limit").map(_.toInt)
+      )
+    }
+
   }
 
 }
@@ -340,7 +388,7 @@ class GameServlet(val accounts: Accounts, val siteLogin: SiteLogin, val games: G
     IOTypes.ShortUserInfo(username)
   }
 
-  def convMeta(data: Games.GetData): IOTypes.GameMetadata = {
+  def convMeta(data: Games.GetMetadata): IOTypes.GameMetadata = {
     IOTypes.GameMetadata(
       id = data.meta.id,
       numPly = data.meta.numPly,
@@ -355,7 +403,8 @@ class GameServlet(val accounts: Accounts, val siteLogin: SiteLogin, val games: G
       openGameData = data.openGameData.map { ogdata =>
         IOTypes.OpenGameData(
           creator = ogdata.creator.map(convUser(_)),
-          joined = ogdata.joined.toList.sorted.map(convUser(_))
+          joined = ogdata.joined.toList.sorted.map(convUser(_)),
+          creationTime = ogdata.creationTime
         )
       },
       activeGameData = data.activeGameData.map { agdata =>
@@ -377,6 +426,7 @@ class GameServlet(val accounts: Accounts, val siteLogin: SiteLogin, val games: G
           endTime = data.meta.result.endTime
         ))
       },
+      position = data.meta.position,
       now = Timestamp.get
     )
   }
@@ -386,7 +436,7 @@ class GameServlet(val accounts: Accounts, val siteLogin: SiteLogin, val games: G
       history = data.moves.map(_.move),
       moveTimes = data.moves.map { info => IOTypes.MoveTime(start = info.start, time = info.time) },
       toMove = GameUtils.nextPlayer(data.moves.length).toString,
-      meta = convMeta(data),
+      meta = convMeta(data.meta),
       sequence = data.sequence
     )
   }
@@ -395,6 +445,32 @@ class GameServlet(val accounts: Accounts, val siteLogin: SiteLogin, val games: G
     val query = GetState.parseQuery(params)
     games.get(id, query.minSequence, query.timeout.map(_.toDouble)).map { data =>
       convState(data)
+    }
+  }
+
+  def handleGetMetadata(id: GameID, params: Map[String,String]) : AnyRef = {
+    games.getMetadata(id).map { data =>
+      convMeta(data)
+    }
+  }
+
+  def handleGetSearch(params: Map[String,String]) : AnyRef = {
+    val query = GetSearch.parseQuery(params)
+    val searchParams = Games.SearchParams(
+      open = query.open,
+      active = query.active,
+      rated = query.rated,
+      postal = query.postal,
+      gameType = query.gameType,
+      usersInclude = query.usersInclude,
+      gUser = query.gUser,
+      sUser = query.sUser,
+      minTime = query.minTime,
+      maxTime = query.maxTime,
+      limit = query.limit
+    )
+    games.searchMetadata(searchParams).map { data =>
+      data.map(convMeta(_))
     }
   }
 
@@ -411,6 +487,13 @@ class GameServlet(val accounts: Accounts, val siteLogin: SiteLogin, val games: G
   get("/:gameID/state") {
     val id = params("gameID")
     handleGetState(id,params)
+  }
+  get("/:gameID/metadata") {
+    val id = params("gameID")
+    handleGetMetadata(id,params)
+  }
+  get("/:gameID/search") {
+    handleGetSearch(params)
   }
 
   error {
