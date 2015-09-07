@@ -502,30 +502,41 @@ class GameServlet(val accounts: Accounts, val siteLogin: SiteLogin, val games: G
   //TODO doesn't work yet due to scalatra atmosphere bug
   atmosphere("/:gameID/stateStream") {
     val id = params("gameID")
+    var connected = false
     new AtmosphereClient {
       def receive = {
         case Atmosphere.Connected =>
           var lastSequence = Games.INITIAL_SEQUENCE - 1
           def loop(): Unit = {
-            games.get(id, Some(lastSequence+1), Games.GET_MAX_TIMEOUT).onComplete {
-              case Failure(e) =>
-                send(Json.write(IOTypes.SimpleError(e.getMessage())))
-              case Success(data) =>
-                //Send back the gamestate if it's new
-                if(!data.sequence.exists(_ <= lastSequence))
-                  send(Json.write(convState(data)))
-                //If the game is active or open (gamestate has a sequence number), then repeat
-                data.sequence.foreach { sequence =>
-                  lastSequence = sequence
-                  assert(data.meta.openGameData.nonEmpty || data.meta.activeGameData.nonEmpty)
-                  loop
+            if(connected) {
+              games.get(id, Some(lastSequence+1), Games.GET_MAX_TIMEOUT).onComplete { result =>
+                //If the connection is still active after getting the game...
+                if(connected) {
+                  result match {
+                    case Failure(e) =>
+                      send(Json.write(IOTypes.SimpleError(e.getMessage())))
+                    case Success(data) =>
+                      //Send back the gamestate if it's new
+                      if(!data.sequence.exists(_ <= lastSequence))
+                        send(Json.write(convState(data)))
+                      //If the game is active or open (gamestate has a sequence number), then repeat
+                      data.sequence.foreach { sequence =>
+                        lastSequence = sequence
+                        assert(data.meta.openGameData.nonEmpty || data.meta.activeGameData.nonEmpty)
+                        loop
+                      }
+                  }
                 }
+              }
             }
           }
+          connected = true
           loop()
         case Atmosphere.Disconnected(disconnector, None) =>
+          connected = false
           ()
         case Atmosphere.Disconnected(disconnector, Some(error)) =>
+          connected = false
           logger.error("gameID " + id + ": " + disconnector + " disconnected due to error " + error)
         case Atmosphere.Error(None) =>
           logger.error("gameID " + id + ": unknown error event")
