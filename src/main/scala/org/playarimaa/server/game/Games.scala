@@ -36,6 +36,9 @@ object Games {
   val DEFAULT_SEARCH_LIMIT = 50
   val MAX_SEARCH_LIMIT = 1000
 
+  //Sequence number that game starts on
+  val INITIAL_SEQUENCE = 0L
+
   val gameTable = TableQuery[GameTable]
   val movesTable = TableQuery[MovesTable]
 
@@ -222,10 +225,9 @@ class Games(val db: Database, val parentLogins: LoginTracker, val scheduler: Sch
   }
 
   /* Get the full state of a game */
-  def get(id: GameID, minSequence: Option[Long], timeout: Option[Double]): Future[Games.GetData] = {
+  def get(id: GameID, minSequence: Option[Long], timeout: Double): Future[Games.GetData] = {
     val timeoutFut = minSequence.map { _ =>
-      val dur = math.min(Games.GET_MAX_TIMEOUT, timeout.getOrElse(Games.GET_DEFAULT_TIMEOUT))
-      after(dur seconds,scheduler)(Future.failed(new Exception("Future timed out!")))
+      after(timeout seconds,scheduler)(Future.failed(new Exception("Future timed out!")))
     }
     def loop: Future[Games.GetData] = {
       if(timeoutFut.exists(_.isCompleted))
@@ -452,7 +454,7 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker, val serverInst
       accepted = Map(),
       starting = false,
       sequencePromise = Promise(),
-      sequence = 0L
+      sequence = Games.INITIAL_SEQUENCE
     )
     val gameAuth = game.logins.login(creator,now,Some(siteAuth))
     openGames = openGames + (reservedID -> game)
@@ -514,7 +516,7 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker, val serverInst
               accepted = Map(),
               starting = false,
               sequencePromise = Promise(),
-              sequence = 0L
+              sequence = Games.INITIAL_SEQUENCE
             )
             openGames = openGames + (reservedID -> game)
           }
