@@ -295,7 +295,7 @@ class ChatServlet(val accounts: Accounts, val siteLogin: SiteLogin, val chat: Ch
     def isValidChannel: Future[Boolean] = Future.successful(isValidBaseChannel(channel))
     handleAction(channel,params,request.body,isValidChannel)
   }
-  atmosphere("/:channel/atmosphere") {
+  atmosphere("/:channel/socket") {
     val channel = params("channel")
     def isValidChannel: Future[Boolean] = Future.successful(isValidBaseChannel(channel))
     handleAtmosphere(channel,params,isValidChannel)
@@ -321,7 +321,7 @@ class ChatServlet(val accounts: Accounts, val siteLogin: SiteLogin, val chat: Ch
     val channel = "game/" + gameID
     handleAction(channel,params,request.body,isValidChannel)
   }
-  atmosphere("/game/:gameID/atmosphere") {
+  atmosphere("/game/:gameID/socket") {
     val gameID = params("gameID")
     def isValidChannel: Future[Boolean] =
       isValidGameID(gameID).map {
