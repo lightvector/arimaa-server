@@ -11,23 +11,33 @@ var APIUtils = require('../utils/WebAPIUtils.js');
 const CHANGE_EVENT = 'change';
 const MOVE_EVENT = 'new-move';
 
-const NULL_SQUARE_NUM = -1;
-
 var debugMsg = "";
 
 var _gameID;
 var _gameAuth;
 
 var _arimaa = new Arimaa();
-var _selSquareNum = NULL_SQUARE_NUM;
+var _selSquareNum = ArimaaConstants.GAME.NULL_SQUARE_NUM;
 var _selSquareName = "";
 var _validSteps = [];
 var _selSquareStack = []; //previous selected squares for undo/redo
 var _redoSquareStack = []; //used for undo/redo
-var _myColor;
+var _myColor = ArimaaConstants.GAME.NULL_COLOR; //spectators, or before we know what color we are
+var _viewSide = ArimaaConstants.GAME.GOLD; //can only be gold or silver (unless we want east/west views?)
+var _colorToMove = ArimaaConstants.GAME.NULL_COLOR; //in this context, null color === can't move
+var _gameOver = null;
+var _sequenceNum = 0;
 setInitialState();
 
 const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
+  getMyColor: function() {
+    return _myColor;
+  },
+
+  getViewSide: function() {
+    return _viewSide;
+  },
+
   getDebugMsg: function() {
     return debugMsg;
   },
@@ -69,10 +79,7 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
     this.removeListener(CHANGE_EVENT, callback);
   },
 
-
   dispatcherIndex: ArimaaDispatcher.register(function(action) {
-
-
 
     function _setSelectedSquare(square) {
       _selSquareNum = square.squareNum;
@@ -81,7 +88,7 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
     }
 
     function _setSelectedSquareToNull() {
-      _selSquareNum = NULL_SQUARE_NUM; //also move these to a function
+      _selSquareNum = ArimaaConstants.GAME.NULL_SQUARE_NUM; //also move these to a function
       _selSquareName = "";
       _validSteps = [];
     }
@@ -92,6 +99,16 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
       case SiteConstants.GAME_CREATED:
         _gameID = action.gameId;
         _gameAuth = action.gameAuth;
+        ArimaaStore.emitChange();
+        break;
+      case ArimaaConstants.ACTIONS.GAME_SET_COLOR:
+        _myColor = action.color;
+        if(_myColor === ArimaaConstants.GAME.SILVER) {
+          _viewSide = ArimaaConstants.GAME.SILVER;
+        } else {
+          _viewSide = ArimaaConstants.GAME.GOLD;
+        }
+        ArimaaStore.emitChange();
         break;
       case ArimaaConstants.ACTIONS.GAME_SETUP_GOLD:
         _arimaa.setup_gold(action.text);
@@ -107,7 +124,7 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
         //DEFINITELY NEED TO SIMPLIFY THESE CONDITIONALS
 
         //USE IF_EMPTY FUNCTION AFTER UPDATING ARIMAAJS
-        if(_selSquareNum === NULL_SQUARE_NUM && !_arimaa.is_empty(action.squareName)) {
+        if(_selSquareNum === ArimaaConstants.GAME.NULL_SQUARE_NUM && !_arimaa.is_empty(action.squareName)) {
           _setSelectedSquare(action);
         } else if (_selSquareNum === action.squareNum) {
           _setSelectedSquareToNull();
@@ -174,7 +191,6 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
         }
 
       case ArimaaConstants.ACTIONS.GAME_COMPLETE_MOVE:
-
         var completed = _arimaa.complete_move();
         if(completed.success) {
           //definitely need a better way of doing this...
@@ -192,9 +208,11 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
           //undo step
           debugMsg = completed.reason;
         }
-
         ArimaaStore.emitChange();
         break;
+      case ArimaaConstants.ACTIONS.GAME_FLIP_BOARD:
+        _viewSide = ArimaaConstants.GAME.reverseColor(_viewSide);
+        ArimaaStore.emitChange();
       default:
         break;
     }

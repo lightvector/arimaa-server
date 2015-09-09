@@ -18,7 +18,6 @@ var SiteActions = {
     APIUtils.login(username, password, this.loginSuccess, this.loginError);
   },
   loginError: function(data) {
-    //console.log('error');
     ArimaaDispatcher.dispatch({
       actionType: SiteConstants.LOGIN_FAILED,
       reason: data.error
@@ -28,9 +27,9 @@ var SiteActions = {
     console.log('login success');
 
     cookie.save('siteAuth',data.siteAuth, {path:'/'});
-    window.location.pathname = "/"; //we should track where the user was before and then redirect there instead
+    cookie.save('username',data.username, {path:'/'});
 
-    //redirect here?
+    window.location.pathname = "/"; //we should track where the user was before and then redirect there instead
     ArimaaDispatcher.dispatch({
       actionType: SiteConstants.LOGIN_SUCCESS
     });
@@ -40,8 +39,8 @@ var SiteActions = {
     APIUtils.register(username, email, password, this.registerSuccess, this.registerError);
   },
   registerSuccess: function(data) {
-    //dispatch registration success
     cookie.save('siteAuth',data.siteAuth, {path:'/'});
+    cookie.save('username',data.username, {path:'/'});
     ArimaaDispatcher.dispatch({
       actionType: SiteConstants.REGISTRATION_SUCCESS
     });
@@ -56,6 +55,7 @@ var SiteActions = {
   logout: function() {
     APIUtils.logout();
     cookie.remove('siteAuth','/');//TODO: create logout_success/error and remove cookie there
+    cookie.remove('username','/');
     window.location.pathname = "/login"; //make the login page nicer
   },
   createGame: function(gameType) {
@@ -115,6 +115,15 @@ var SiteActions = {
   },
   joinGameSuccess: function(data) {
     cookie.save('gameAuth',data.gameAuth, {path:'/'});//once again, we'll need a way to save multiple gameauths
+  },
+  getOpenGames: function() {
+    APIUtils.getOpenGames(SiteActions.getOpenGamesSuccess, FUNC_NOP);
+  },
+  getOpenGamesSuccess: function(data) {
+    ArimaaDispatcher.dispatch({
+      actionType: SiteConstants.OPEN_GAMES_LIST,
+      metadatas: data
+    });
   }
 
 };

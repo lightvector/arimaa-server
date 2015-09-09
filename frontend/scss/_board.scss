@@ -28,6 +28,11 @@
   background: no-repeat center url("../images/green-circle.png");
 }
 
+.trap.step {
+  background-color: rgba(50, 20, 20, 0.5);
+  background-image: no-repeat center url("../images/green-circle.png");
+}
+
 .board {
   width:$board-size;
   height:$board-size;

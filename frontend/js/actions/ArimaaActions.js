@@ -2,6 +2,7 @@ var ArimaaDispatcher = require('../dispatcher/ArimaaDispatcher.js');
 var ArimaaConstants = require('../constants/ArimaaConstants.js');
 var APIUtils = require('../utils/WebAPIUtils.js');
 var ArimaaStore = require('../stores/ArimaaStore.js');
+var UserStore = require('../stores/UserStore.js');
 
 const FUNC_NOP = function(){}
 
@@ -19,6 +20,26 @@ var ArimaaActions = {
         ArimaaActions.addMove(history[n]);
         n++;
     }
+    if(data.openGameData) {
+      //game is still unstarted
+    }
+    if(data.meta) {
+      if(data.meta.gUser.name === UserStore.getUsername() && ArimaaStore.getMyColor() != ArimaaConstants.GAME.GOLD) {
+        ArimaaDispatcher.dispatch({
+          actionType: ArimaaConstants.ACTIONS.GAME_SET_COLOR,
+          color: ArimaaConstants.GAME.GOLD
+        });
+      } else if(data.meta.sUser.name === UserStore.getUsername() && ArimaaStore.getMyColor() != ArimaaConstants.GAME.SILVER) {
+        //dispatch color silver
+        ArimaaDispatcher.dispatch({
+          actionType: ArimaaConstants.ACTIONS.GAME_SET_COLOR,
+          color: ArimaaConstants.GAME.SILVER
+        });
+      }
+    }
+    //if(data.)
+
+
   },
 
   clickSquare: function(sqNum, sqName) {
@@ -80,6 +101,13 @@ var ArimaaActions = {
       gameID: gameID
     });
   },
+
+  flipBoard: function() {
+    ArimaaDispatcher.dispatch({
+      actionType: ArimaaConstants.ACTIONS.GAME_FLIP_BOARD
+    })
+  },
+
 
   viewPrevBoardState: function(plyNum) {
 

@@ -104,6 +104,11 @@ var APIUtils = {
     console.log(gameID, moveStr, plyNum);
     POST('/api/games/'+gameID+'/actions/move', {gameAuth:UserStore.gameAuthToken(), move:moveStr, plyNum:plyNum}, success, error);
   },
+
+  getOpenGames: function(success, error) {
+    GET('api/search',{open:true}, success, error);
+  },
+
   do_something_else: 0
 }
 

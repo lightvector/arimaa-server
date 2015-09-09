@@ -2,10 +2,11 @@ var React = require('react');
 var ArimaaActions = require('../actions/ArimaaActions.js');
 var SiteActions = require('../actions/SiteActions.js');
 var ArimaaStore = require('../stores/ArimaaStore.js');
+var ArimaaConstants = require('../constants/ArimaaConstants.js');
 
 var component = React.createClass({
   getInitialState: function() {
-    return {debugMsg:""};
+    return {debugMsg:"", myColor:ArimaaStore.getMyColor()};
   },
 
   componentDidMount: function() {
@@ -16,7 +17,7 @@ var component = React.createClass({
   },
   _onChange: function() {
     //alert(ArimaaStore.getDebugMsg());
-    this.setState({debugMsg:ArimaaStore.getDebugMsg()});
+    this.setState({debugMsg:ArimaaStore.getDebugMsg(), myColor:ArimaaStore.getMyColor()});
   },
 
   moveFromText: function() {
@@ -52,6 +53,10 @@ var component = React.createClass({
     ArimaaActions.gameStatus(this.props.gameID, this.refs.statusMinSeq.getDOMNode().value);
   },
 
+  flipBoard: function() {
+    ArimaaActions.flipBoard();
+  },
+
   forfeit: function() {
     alert("NOT YET IMPLEMENTED");
   },
@@ -61,6 +66,13 @@ var component = React.createClass({
   },
 
   render: function() {
+    var color = "NONE";
+    if(this.state.myColor === ArimaaConstants.GAME.GOLD) {
+      color = "GOLD";
+    } else if(this.state.myColor === ArimaaConstants.GAME.SILVER) {
+      color = "SILVER";
+    }
+
     return (
       <div>
         <input type="text" placeholder="enter move.. Ra1n Cb1n ..." ref="move"></input>
@@ -77,8 +89,10 @@ var component = React.createClass({
         <button onClick={this.completeMove}>Complete Move</button>
         <button onClick={this.undoStep}>Undo Step</button>
         <button onClick={this.redoStep}>Redo Step</button>
+        <button onClick={this.flipBoard}>Flip Board</button>
         <button onClick={this.forfeit}>Forfeit</button>
         <button onClick={this.leave}>Leave</button><br/>
+        <p/>{color}
         <p/>{"gameID: " + this.props.gameID}
         <p/>{"debug msg: " + this.state.debugMsg}<br/>
 

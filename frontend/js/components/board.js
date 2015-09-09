@@ -5,20 +5,19 @@ var ArimaaStore = require('../stores/ArimaaStore.js');
 var ArimaaActions = require('../actions/ArimaaActions.js');
 var ArimaaConstants = require('../constants/ArimaaConstants.js');
 
-const NULL_SQUARE = -1;
-
 function getGameState() {
   var boardState= {
     fen: ArimaaStore.getArimaa().get_fen(),
     stepFrom: ArimaaStore.getSeletedSquare().num, //need to change this name
-    steps: ArimaaStore.getValidSteps()
+    steps: ArimaaStore.getValidSteps(),
+    viewSide: ArimaaStore.getViewSide()
   };
   return boardState;
 }
 
 var Board = React.createClass({
   getInitialState: function() {
-    return {fen: ArimaaStore.getArimaa().get_fen(), stepFrom: NULL_SQUARE, steps: []};
+    return {fen: ArimaaStore.getArimaa().get_fen(), stepFrom: ArimaaConstants.GAME.NULL_SQUARE_NUM, steps: [], viewSide: ArimaaConstants.GAME.SILVER}; //move constants into store?
   },
 
   componentDidMount: function() {
@@ -34,6 +33,10 @@ var Board = React.createClass({
   },
 
   renderSquare: function(p, i) {
+    if(this.state.viewSide === ArimaaConstants.GAME.SILVER) {
+      i = 63-i;
+    }
+
     var x = i%8;
     var y = Math.floor(i/8);
 
@@ -69,6 +72,10 @@ var Board = React.createClass({
       else if("12345678".indexOf(c) !== -1) {
         for(var j=0;j<parseInt(c);j++) {position.push(' ');}
       } else {position.push(c);}
+    }
+
+    if(this.state.viewSide === ArimaaConstants.GAME.SILVER) {
+      position.reverse();
     }
 
     var squares = position.map(this.renderSquare, this);

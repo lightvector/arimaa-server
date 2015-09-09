@@ -12,10 +12,22 @@ var ACTION_CONSTANTS = keyMirror({
   GAME_REDO_MOVE: null,
   GAME_COMPLETE_MOVE: null,
   GAME_ADD_MOVE: null,
+  GAME_FLIP_BOARD: null,
+  GAME_SET_COLOR: null,
   GAME_FORFEIT: null
 });
 
-var GAME_CONSTANTS = {
+const GAME_CONSTANTS = {
+  NULL_COLOR: -1,
+  GOLD: 0,
+  SILVER: 1,
+  BOTH_COLOR: 2, //for moving both sides
+  NULL_SQUARE_NUM: -1,
+  reverseColor: function(color) {
+    return 1-color;
+  },
+
+  //are the following even needed???
   pieceSymbol: function(num) {
     return " RCDHMExxrcdhme".charAt(num);
   },

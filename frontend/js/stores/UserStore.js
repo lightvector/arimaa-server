@@ -32,12 +32,20 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
     return {error: errorText};
   },
 
+  getUsername: function() {
+    return cookie.load('username');
+  },
+
   siteAuthToken: function() {
     return cookie.load('siteAuth');
   },
 
   gameAuthToken: function() {
     return cookie.load('gameAuth');
+  },
+
+  getOpenGames: function() {
+    return openGames;
   },
 
   dispatcherIndex: ArimaaDispatcher.register(function(action) {
@@ -57,7 +65,9 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
         UserStore.emitGameMetaChange();
       case SiteConstants.GAME_STATUS_UPDATE:
         break;
-
+      case SiteConstants.OPEN_GAMES_LIST:
+        openGames = action.metadatas;
+        break;
       default:
         break;
     }

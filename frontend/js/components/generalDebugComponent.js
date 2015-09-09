@@ -13,18 +13,25 @@ var component = React.createClass({
   },
 
   _onGameMetaChange: function() {
-      console.log('bc');
+
   },
 
   _onChange: function() {
 
   },
 
+  fastRegister: function() {
+    var a = this.refs.fastRegister.getDOMNode().value;
+    var user = a+a+a;
+    var pass = user+user;
+    var email = a+'@'+a;
+    SiteActions.register(user, email, pass);
+  },
+
   register: function() {
     var user = this.refs.registerUser.getDOMNode().value;
     var pass = this.refs.registerPass.getDOMNode().value;
     var email = this.refs.registerEmail.getDOMNode().value;
-
     SiteActions.register(user, email, pass);
   },
 
@@ -52,14 +59,29 @@ var component = React.createClass({
     SiteActions.gameStatus(gID, minSeq);
   },
 
+  getOpenGames: function() {
+    SiteActions.getOpenGames();
+  },
+
   logout: function() {
     SiteActions.logout();
   },
 
   render: function() {
+
+    var openGamesList = UserStore.getOpenGames().map(function(metadata) {
+      return (
+        <li>{metadata.gameID}</li>
+      )
+    });
+
     return (
       <div>
         <h1>DEBUG</h1>
+        <input type="text" ref="fastRegister" placeholder="Fast Register"/>
+        <button type="button" onClick={this.fastRegister}>Register</button>
+        <p />
+
         <input type="text" ref="registerUser" placeholder="username"/>
         <input type="text" ref="registerEmail" placeholder="email"/>
         <input type="text" ref="registerPass" placeholder="password"/>
@@ -84,6 +106,13 @@ var component = React.createClass({
         <input type="text" ref="acceptGameID" placeholder="gameID"/>
         <input type="text" ref="acceptUsername" placeholder="username to accept"/>
         <button type="button" onClick={this.accept}>Accept</button>
+
+        <p />
+        <button type="button" onClick={this.getOpenGames}>Open Games</button>
+
+        <ul>
+          {openGamesList}
+        </ul>
 
         <p />
         <button type="button" onClick={this.logout}>Logout</button>

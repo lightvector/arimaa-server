@@ -21,7 +21,8 @@ var Square = React.createClass({
       className += " " + "trap";
     } else if(selected) {
       className += " " + "sel";
-    } else if(stepTo) {
+    }
+    if(stepTo) {
       className += " " + "step";
     }
 

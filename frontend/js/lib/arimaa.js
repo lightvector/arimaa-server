@@ -397,6 +397,16 @@ var Arimaa = function(options) {
 		var piece = PIECES.indexOf(stepString.charAt(0));
 		var location = stepString.charAt(1)+stepString.charAt(2);
 		var direction = stepString.charAt(3);
+
+		//we already implicitly add the trap step, so trying to add it in later would be an error
+		//since we would try to remove the piece twice
+		//however this would create bad things where we try to remove invalid traps
+		//eventually, we should have a separate function addstepwithouttraps or something
+		//to better fit this
+		//or maybe require an explicit step to remove from traps where the only step possible
+		//is to x the trapped piece
+		if(direction === 'x') return {success:true};
+
 		var squareNum = SQUARES[location];
 		//var stepObj = {piece:piece,squareNum:squareNum,direction:direction,string:stepString};
 		stepObj = ArimaaStep(piece, squareNum, direction);
