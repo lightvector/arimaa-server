@@ -5,6 +5,7 @@ import akka.actor.{ActorSystem}
 import akka.testkit.{TestKit, ImplicitSender}
 import slick.driver.H2Driver.api._
 import scala.util.{Try, Success, Failure}
+import scala.concurrent.ExecutionContext
 
 import org.playarimaa.server.CommonTypes._
 import org.playarimaa.server._
@@ -12,10 +13,7 @@ import org.playarimaa.server.game._
 import org.playarimaa.board.{Player,GOLD,SILV}
 import org.playarimaa.board.Utils._
 
-import org.playarimaa.server.GameServlet.IOTypes
-
-//TODO - note that there is a memory leak when running this test in SBT
-//See github issue #49
+import org.playarimaa.server.game.GameServlet.IOTypes
 
 class GameServletTests(_system: ActorSystem) extends TestKit(_system) with ScalatraFlatSpec with BeforeAndAfterAll {
 
@@ -25,13 +23,20 @@ class GameServletTests(_system: ActorSystem) extends TestKit(_system) with Scala
     TestKit.shutdownActorSystem(system)
   }
 
+  def readJson[T](body: String)(implicit m: Manifest[T]): T = {
+    Try(Json.read[T](body)).tagFailure("Error parsing server reply:\n" + body + "\n").get
+  }
+
   ArimaaServerInit.initialize
-  val mainEC = scala.concurrent.ExecutionContext.Implicits.global
-  val db = Database.forConfig("h2mem1")
+  val actorSystem = system
+  val mainEC: ExecutionContext = ExecutionContext.Implicits.global
+  val cryptEC: ExecutionContext = mainEC
+  val serverInstanceID: Long = System.currentTimeMillis
+  val db = ArimaaServerInit.createDB("h2memgame")
   val accounts = new Accounts(db)(mainEC)
-  val siteLogin = new SiteLogin(accounts)(mainEC)
-  val scheduler = system.scheduler
-  val games = new Games(db,siteLogin.logins,scheduler)(mainEC)
+  val siteLogin = new SiteLogin(accounts,cryptEC)(mainEC)
+  val scheduler = actorSystem.scheduler
+  val games = new Games(db,siteLogin.logins,scheduler,serverInstanceID)(mainEC)
   addServlet(new AccountServlet(siteLogin,mainEC), "/accounts/*")
   addServlet(new GameServlet(accounts,siteLogin,games,mainEC), "/games/*")
 
@@ -52,11 +57,6 @@ class GameServletTests(_system: ActorSystem) extends TestKit(_system) with Scala
   var bobGameAuth = ""
   var bobPlayer: Player = GOLD
   var sequence: Long = -1
-
-  def readJson[T](body: String)(implicit m: Manifest[T]): T = {
-    Try(Json.read[T](body)).tagFailure("Error parsing server reply:\n" + body + "\n").get
-  }
-
 
   "GameServer" should "allow users to create games" in {
 
@@ -209,7 +209,7 @@ class GameServletTests(_system: ActorSystem) extends TestKit(_system) with Scala
     }
   }
 
-  def beginAliceBobGame: Unit = {
+  def beginAliceBobGame(): Unit = {
     post("/games/actions/create", Json.write(GameServlet.Create.StandardQuery(bobSiteAuth,tc,true,Some("alice"),Some("bob"),"standard"))) {
       status should equal (200)
       val reply = readJson[GameServlet.Create.Reply](body)
@@ -236,8 +236,8 @@ class GameServletTests(_system: ActorSystem) extends TestKit(_system) with Scala
   }
 
   it should "allow users to play a game" in {
-    //Fritzlein v Chessandgo 2015 Arimaa WC
-    beginAliceBobGame
+    //Fritzlein v Chessandgo 2015 Arimaa WC R12
+    beginAliceBobGame()
     sendMove(aliceGameAuth,"Ra1 Rb1 Rc1 Dd1 De1 Rf1 Rg1 Rh1 Ra2 Hb2 Cc2 Ed2 Me2 Cf2 Hg2 Rh2",0)
     sendMove(bobGameAuth,  "ha7 mb7 cc7 dd7 ee7 df7 hg7 rh7 ra8 rb8 rc8 rd8 ce8 rf8 rg8 rh8",1)
     sendMove(aliceGameAuth,"Ed2n Ed3n Ed4n Hg2n",2)
@@ -348,6 +348,7 @@ class GameServletTests(_system: ActorSystem) extends TestKit(_system) with Scala
       state.meta.result.nonEmpty should equal (true)
       state.meta.result.get.winner should equal ("s")
       state.meta.result.get.reason should equal ("g")
+      state.meta.position should equal ("......../..c..c../.Hr...../r.D.rrrr/R.dE..dR/R..e..R./..h.CR../rC......")
       state.sequence should equal (None)
     }
   }

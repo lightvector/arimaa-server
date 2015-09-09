@@ -1,14 +1,17 @@
-package org.playarimaa.server
+package org.playarimaa.server.chat
 import scala.collection.immutable.Queue
 import scala.language.postfixOps
 import scala.concurrent.{ExecutionContext, Future, Promise, future}
-import scala.concurrent.duration._
+import scala.concurrent.duration.{DurationInt, DurationDouble}
 import scala.util.{Try, Success, Failure}
 import akka.actor.{Actor, ActorRef, ActorSystem, Props, Stash}
 import akka.pattern.{ask, pipe, after}
 import akka.util.Timeout
 import slick.driver.H2Driver.api._
+import slick.lifted.{PrimaryKey,ProvenShape}
+import org.slf4j.{Logger, LoggerFactory}
 import org.playarimaa.server.CommonTypes._
+import org.playarimaa.server.{LoginTracker,SiteLogin,Timestamp}
 import org.playarimaa.server.Timestamp.Timestamp
 
 object ChatSystem {
@@ -38,16 +41,18 @@ case class ChatLine(id: Long, channel: Channel, username: Username, text: String
 //---CHAT SYSTEM----------------------------------------------------------------------------------
 
 /** Class representing a whole chat system composed of various channels, backed by a database. */
-class ChatSystem(val db: Database, val actorSystem: ActorSystem)(implicit ec: ExecutionContext) {
+class ChatSystem(val db: Database, val parentLogins: LoginTracker, val actorSystem: ActorSystem)(implicit ec: ExecutionContext) {
 
   private var channelData: Map[Channel,ActorRef] = Map()
   implicit val timeout = ChatSystem.AKKA_TIMEOUT
+
+  val logger =  LoggerFactory.getLogger(getClass)
 
   private def openChannel(channel: Channel): ActorRef = this.synchronized {
     channelData.get(channel) match {
       case Some(cc) => cc
       case None =>
-        val cc = actorSystem.actorOf(Props(new ChatChannel(channel,db,actorSystem)))
+        val cc = actorSystem.actorOf(Props(new ChatChannel(channel,db,parentLogins,actorSystem,logger)))
         channelData = channelData + (channel -> cc)
         cc
     }
@@ -62,9 +67,9 @@ class ChatSystem(val db: Database, val actorSystem: ActorSystem)(implicit ec: Ex
   }
 
   /** Join the specified chat channel */
-  def join(channel: Channel, username: Username): Future[ChatAuth] = {
+  def join(channel: Channel, username: Username, siteAuth: SiteAuth): Future[ChatAuth] = {
     val cc = openChannel(channel)
-    (cc ? ChatChannel.Join(username)).map(_.asInstanceOf[ChatAuth])
+    (cc ? ChatChannel.Join(username,siteAuth)).map(_.asInstanceOf[ChatAuth])
   }
 
   /** Leave the specified chat channel. Failed if not logged in. */
@@ -116,7 +121,7 @@ object ChatChannel {
   //ACTOR MESSAGES---------------------------------------------------------
 
   //Replies with ChatAuth
-  case class Join(username: Username)
+  case class Join(username: Username, siteAuth: SiteAuth)
   //Replies with Unit
   case class Leave(chatAuth: ChatAuth)
   //Replies with Unit
@@ -141,7 +146,7 @@ object ChatChannel {
 }
 
 /** An actor that handles an individual channel that people can chat in */
-class ChatChannel(val channel: Channel, val db: Database, val actorSystem: ActorSystem) extends Actor with Stash {
+class ChatChannel(val channel: Channel, val db: Database, val parentLogins: LoginTracker, val actorSystem: ActorSystem, val logger: Logger) extends Actor with Stash {
 
   //Fulfilled and replaced on each message - this is the mechanism by which
   //queries can block and wait for chat activity
@@ -153,7 +158,7 @@ class ChatChannel(val channel: Channel, val db: Database, val actorSystem: Actor
   var messagesNotYetInDB: Queue[ChatLine] = Queue()
 
   //Tracks who is logged in to this chat channel
-  val logins: LoginTracker = new LoginTracker(None,ChatSystem.INACTIVITY_TIMEOUT)
+  val logins: LoginTracker = new LoginTracker(Some(parentLogins),ChatSystem.INACTIVITY_TIMEOUT)
   //Most recent time anything happened in this channel
   var lastActive = Timestamp.get
 
@@ -167,7 +172,7 @@ class ChatChannel(val channel: Channel, val db: Database, val actorSystem: Actor
   implicit val timeout = ChatSystem.AKKA_TIMEOUT
   import context.dispatcher
 
-  override def preStart = {
+  override def preStart : Unit = {
     //Find the maximum chat id in this channel from the database
     val query: Rep[Option[Long]] = ChatSystem.table.filter(_.channel === channel).map(_.id).max
     db.run(query.result).map(_.getOrElse(-1L)).onComplete {
@@ -179,7 +184,7 @@ class ChatChannel(val channel: Channel, val db: Database, val actorSystem: Actor
     }
   }
 
-  def receive = initialReceive
+  def receive : Receive = initialReceive
   def initialReceive: Receive = {
     //Wait for us to have found the maximum chat id
     case Initialized(maxId: Try[Long]) =>
@@ -193,10 +198,10 @@ class ChatChannel(val channel: Channel, val db: Database, val actorSystem: Actor
   }
 
   def normalReceive: Receive = {
-    case ChatChannel.Join(username: Username) =>
+    case ChatChannel.Join(username: Username, siteAuth: SiteAuth) =>
       val now = Timestamp.get
       logins.doTimeouts(now)
-      val chatAuth = logins.login(username, now)
+      val chatAuth = logins.login(username, now, Some(siteAuth))
       lastActive = now
       sender ! (chatAuth : ChatAuth)
 
@@ -215,10 +220,10 @@ class ChatChannel(val channel: Channel, val db: Database, val actorSystem: Actor
         messagesNotYetInDB = messagesNotYetInDB.enqueue(line)
 
         //Write to DB and on success clear own memory
-        //TODO log on error
         val query = ChatSystem.table += line
-        db.run(DBIO.seq(query)).foreach { _ =>
-          self ! DBWritten(line.id)
+        db.run(DBIO.seq(query)).onComplete {
+          case Failure(err) => logger.error("Error saving chat post: " + err.getMessage)
+          case Success(()) => self ! DBWritten(line.id)
         }
 
         nextMessage.success(line)
@@ -274,11 +279,11 @@ class ChatChannel(val channel: Channel, val db: Database, val actorSystem: Actor
 
         if(doWait_ && lines.isEmpty) {
           val result = nextMessage.future.map { x => List(x).filter(isOk) }
-          val timeout = akka.pattern.after(ChatSystem.GET_TIMEOUT seconds, actorSystem.scheduler)(Future(List()))
+          val timeout = akka.pattern.after(ChatSystem.GET_TIMEOUT seconds, actorSystem.scheduler)(Future.successful(List()))
           Future.firstCompletedOf(List(result,timeout))
         }
         else {
-          Future(lines)
+          Future.successful(lines)
         }
       }
       result pipeTo sender
@@ -295,7 +300,7 @@ class ChatChannel(val channel: Channel, val db: Database, val actorSystem: Actor
       actorSystem.scheduler.scheduleOnce(ChatSystem.CHAT_CHECK_TIMEOUT_PERIOD seconds, self, DoTimeouts())
   }
 
-  def replyWith[T](sender: ActorRef, result: Try[T]) = {
+  def replyWith[T](sender: ActorRef, result: Try[T]) : Unit = {
     result match {
       case Failure(e) => sender ! akka.actor.Status.Failure(e)
       case Success(x) => sender ! x
@@ -316,12 +321,12 @@ class ChatChannel(val channel: Channel, val db: Database, val actorSystem: Actor
 }
 
 class ChatTable(tag: Tag) extends Table[ChatLine](tag, "chatTable") {
-  def id = column[Long]("id")
-  def channel = column[String]("channel")
-  def username = column[String]("username")
-  def text = column[String]("text")
-  def timestamp = column[Double]("time")
+  def id : Rep[Long] = column[Long]("id")
+  def channel : Rep[String] = column[String]("channel")
+  def username : Rep[String] = column[String]("username")
+  def text : Rep[String] = column[String]("text")
+  def timestamp : Rep[Double] = column[Double]("time")
 
   //The * projection (e.g. select * ...) auto-transforms the tuple to the case class
-  def * = (id, channel, username, text, timestamp) <> (ChatLine.tupled, ChatLine.unapply)
+  def * : ProvenShape[ChatLine] = (id, channel, username, text, timestamp) <> (ChatLine.tupled, ChatLine.unapply)
 }

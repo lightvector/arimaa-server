@@ -127,28 +127,36 @@ class BoardTests extends FlatSpec with Matchers {
   }
 
   it should "print toStringAei correctly" in {
-    new Board().toStringAei should be ("[                                                                ]")
+    new Board().toString should be (
+      "......../......../......../......../......../......../......../........")
     new Board().add(GOLD_RAB, Location("a8")).get
-        .toStringAei should be ("[R                                                               ]")
+      .toString should be (
+      "R......./......../......../......../......../......../......../........")
     new Board().add(SILV_RAB, Location("a8")).get
-        .add(GOLD_HOR, Location("b1")).get
-        .toStringAei should be ("[r                                                        H      ]")
+      .add(GOLD_HOR, Location("b1")).get
+      .toString should be (
+      "r......./......../......../......../......../......../......../.H......")
   }
 
   it should "step pieces to empty squares correctly. (no captures, no errors)" in {
     var board = new Board().add(SILV_RAB, Location.ofString("a8").get).get
-    board.toStringAei should be("[r                                                               ]")
+    board.toString should be (
+      "r......./......../......../......../......../......../......../........")
+
     val step = new Step(SILV_RAB, Location.ofString("a8").get, EAST)
     board = board.step(step).get
-    board.toStringAei should be("[ r                                                              ]")
+    board.toString should be (
+      ".r....../......../......../......../......../......../......../........")
     val step2 = new Step(SILV_RAB, Location.ofString("b8").get, SOUTH)
     board = board.step(step2).get
-    board.toStringAei should be("[         r                                                      ]")
+    board.toString should be (
+      "......../.r....../......../......../......../......../......../........")
   }
 
   it should "give an error if you try to step a piece off the board" in {
     var board = new Board().add(GOLD_RAB, Location.ofString("a8").get).get
-    board.toStringAei should be("[R                                                               ]")
+    board.toString should be (
+      "R......./......../......../......../......../......../......../........")
     val step = new Step(GOLD_RAB, Location.ofString("a8").get, WEST)
     board.step(step).isFailure should be (true)
   }
@@ -156,7 +164,8 @@ class BoardTests extends FlatSpec with Matchers {
   it should "give an error if you try to step a piece onto another piece" in {
     var board = new Board().add(GOLD_RAB, Location.ofString("a8").get).get
     board = board.add(GOLD_RAB, Location.ofString("b8").get).get
-    board.toStringAei should be("[RR                                                              ]")
+    board.toString should be (
+      "RR....../......../......../......../......../......../......../........")
     val step = new Step(GOLD_RAB, Location.ofString("a8").get, EAST)
     board.step(step).isFailure should be (true)
   }

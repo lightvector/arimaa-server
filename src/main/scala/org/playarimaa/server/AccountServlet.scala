@@ -4,7 +4,7 @@ import org.scalatra.{Accepted, FutureSupport, ScalatraServlet}
 import org.scalatra.scalate.ScalateSupport
 
 import scala.concurrent.{ExecutionContext, Future, Promise, future}
-import scala.concurrent.duration._
+import scala.concurrent.duration.{DurationInt}
 import scala.util.{Try, Success, Failure}
 import org.json4s.{DefaultFormats, Formats}
 import org.json4s.jackson.Serialization
@@ -66,7 +66,7 @@ class AccountServlet(val siteLogin: SiteLogin, val ec: ExecutionContext)
     Action.all.find(_.name == action)
   }
 
-  def handleAction(params: Map[String,String]) = {
+  def handleAction(params: Map[String,String]) : AnyRef = {
     getAction(params("action")) match {
       case None =>
         pass()

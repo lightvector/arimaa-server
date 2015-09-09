@@ -72,7 +72,7 @@ class Game private (
       //Check if there exists a piece that can a make a legal move
       board.pieces.exists { case (src,piece) =>
         //Piece must be owned by us and unfrozen and have a direction it can move
-        piece.owner == p && !board.isFrozen(src) && Direction.values.exists { case dir =>
+        piece.owner == p && !board.isFrozen(src) && Direction.values.exists { case dir: Direction =>
           //Direction must be okay if it's a rabbit
           (piece.pieceType != RAB || Board.canRabbitGoInDir(p,dir)) && {
             val dest = src(dir)
@@ -84,7 +84,7 @@ class Game private (
                 //Regular step
                 hasLegalMove(board.stepAndResolveNoCheck(src,dir), p) ||
                 //Pull
-                Direction.values.exists { case pullFromDir =>
+                Direction.values.exists { case pullFromDir: Direction =>
                   val pullSrc = src(pullFromDir)
                   //Pull is possible if there is a pullee...
                   board(pullSrc) match {
@@ -116,7 +116,6 @@ class Game private (
   }
 
 
-
   /** Returns the winner of the game based on the current move history, or None if nobody has won */
   def winner: Option[(Player,Game.EndingReason)] = {
     //TODO a bit inefficient?
@@ -128,16 +127,23 @@ class Game private (
     if(boards.length <= 2)
       None
     else if(isGoalFor(board,opponent))
-      Some(opponent,Game.GOAL)
+      Some((opponent,Game.GOAL))
     else if(isGoalFor(board,player))
-      Some(player,Game.GOAL)
+      Some((player,Game.GOAL))
     else if(isEliminated(board,player))
-      Some(opponent,Game.ELIMINATION)
+      Some((opponent,Game.ELIMINATION))
     else if(isEliminated(board,opponent))
-      Some(player,Game.ELIMINATION)
+      Some((player,Game.ELIMINATION))
     else if(!hasLegalMove(board,player))
-      Some(opponent,Game.IMMOBILIZATION)
+      Some((opponent,Game.IMMOBILIZATION))
     else
       None
   }
+
+
+  /* Standard format for returning in server queries and/or caching in database */
+  def currentBoardString: String = {
+    boards.last.toStandardString
+  }
+
 }

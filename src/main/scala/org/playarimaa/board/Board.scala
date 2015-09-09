@@ -216,37 +216,53 @@ class Board(
     newBoard.resolveCaps._1
   }
 
-
   def toStringAei : String = {
     val returnVal : StringBuilder = new StringBuilder
     returnVal.append("[")
-    Location.valuesAei foreach {
-      ((loc : Location) => {
-        this(loc) match {
-          case OffBoard => throw new AssertionError("Bad location: " + loc)
-          case HasPiece(p) => returnVal.append(p.toChar)
-          case Empty => returnVal.append(' ')
-        }
-      })
+    Location.valuesAei.foreach { loc : Location =>
+      this(loc) match {
+        case OffBoard => throw new AssertionError("Bad location: " + loc)
+        case HasPiece(p) => returnVal.append(p.toChar)
+        case Empty => returnVal.append(' ')
+      }
     }
     returnVal.append("]")
     returnVal.toString
   }
 
-  override def toString = {
-    toStringAei
+  /* Standard format for returning in server queries and/or caching in database */
+  def toStandardString : String = {
+    val returnVal : StringBuilder = new StringBuilder
+    var first = true
+    Location.rowsFen.foreach { row =>
+      if(first)
+        first = false
+      else
+        returnVal.append('/')
+
+      row.foreach { loc : Location =>
+        this(loc) match {
+          case OffBoard => throw new AssertionError("Bad location: " + loc)
+          case HasPiece(p) => returnVal.append(p.toChar)
+          case Empty => returnVal.append('.')
+        }
+      }
+    }
+    returnVal.toString
   }
+
+  override def toString : String = toStandardString
 }
 
 object Board {
   val SIZE = 8
   val STEPS_PER_TURN = 4
-  val TRAPS = List(
+  val TRAPS = List( //scalastyle:off magic.number
     Location(2,2),
     Location(5,2),
     Location(2,5),
     Location(5,5)
-  )
+  )  //scalastyle:on magic.number
 
   val PIECE_DISTRIBUTION: List[(PieceType,Int)] = List(
     (RAB,8),

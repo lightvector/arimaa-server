@@ -35,12 +35,13 @@ object Location {
       || s(1) < '1'
       || s(1) >= ('1' + Board.SIZE)
     ) {
-      return Failure(new IllegalArgumentException("Error parsing location: " + s))
+      Failure(new IllegalArgumentException("Error parsing location: " + s))
     }
-
-    val x = s(0) - 'a'
-    val y = s(1) - '1'
-    Success(Location(x,y))
+    else {
+      val x = s(0) - 'a'
+      val y = s(1) - '1'
+      Success(Location(x,y))
+    }
   }
 
   /** Returns values in AEI order (a8-h8, a7-h7...a1-h1) */
@@ -48,6 +49,15 @@ object Location {
     for(y <- 7 to 0 by -1; x <- 0 to 7)
     yield Location(x,y)
     )(collection.breakOut)
+
+  /** Returns rows in FEN order */
+  val rowsFen: List[List[Location]] = (
+    for(y <- 7 to 0 by -1)
+    yield (
+      for(x <- 0 to 7)
+      yield Location(x,y)
+    )(collection.breakOut) : List[Location]
+  )(collection.breakOut)
 
   /** Returns values: (a1-h1, a2-h2, ... a8-h8) */
   val values: List[Location] = (

@@ -28,6 +28,10 @@ node_modules/*
 # IntelliJ specific
 .idea
 
+# Emacs autosave
+\#*
+.\#*
+
 # OSX specific
 # https://github.com/github/gitignore/blob/master/Global/OSX.gitignore
 .DS_Store

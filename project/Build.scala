@@ -12,6 +12,7 @@ object ArimaaServerBuild extends Build {
 
       scalacOptions += "-deprecation",
       scalacOptions += "-feature",
+      scalacOptions += "-Xlint",
 
       libraryDependencies ++= Seq(
         "org.scalatra"  %% "scalatra"          % "2.4.0.RC1",
@@ -28,7 +29,8 @@ object ArimaaServerBuild extends Build {
         "org.slf4j" % "slf4j-api" % "1.7.5",
         "org.slf4j" % "slf4j-simple" % "1.7.5",
         "com.h2database" % "h2" % "1.3.170",
-        "org.mindrot" % "jbcrypt" % "0.3m"
+        "org.mindrot" % "jbcrypt" % "0.3m",
+        "com.typesafe" % "config" % "1.2.1"
       ),
 
       //Full backtraces

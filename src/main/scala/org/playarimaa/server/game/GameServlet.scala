@@ -1,26 +1,22 @@
-package org.playarimaa.server
+package org.playarimaa.server.game
 import org.scalatra.json.JacksonJsonSupport
 import org.scalatra.{Accepted, FutureSupport, ScalatraServlet}
 import org.scalatra.scalate.ScalateSupport
 
 import scala.concurrent.{ExecutionContext, Future, Promise, future}
-import scala.concurrent.duration._
+import scala.concurrent.duration.{DurationInt}
 import scala.util.{Try, Success, Failure}
 import org.json4s.{DefaultFormats, Formats}
 import org.json4s.jackson.Serialization
 import org.slf4j.{Logger, LoggerFactory}
 
 import org.playarimaa.server.CommonTypes._
+import org.playarimaa.server.{Accounts,Json,LoginTracker,SiteLogin,Timestamp,WebAppStack}
 import org.playarimaa.server.Timestamp.Timestamp
 import org.playarimaa.server.Utils._
 
-import org.playarimaa.server.game.Games
-import org.playarimaa.server.game.GameUtils
-import org.playarimaa.server.game.{EndingReason, GameResult, TimeControl}
 import org.playarimaa.board.{Player,GOLD,SILV}
 import org.playarimaa.board.GameType
-
-//TODO: Guard against nans or other weird values when reading floats?
 
 object GameServlet {
 
@@ -32,6 +28,7 @@ object GameServlet {
     )
 
     case class TimeControl(
+      //TODO: should we allow non-integer values for these?
       initialTime: Int,
       increment: Option[Int],
       delay: Option[Int],
@@ -48,7 +45,8 @@ object GameServlet {
 
     case class OpenGameData(
       creator: Option[ShortUserInfo],
-      joined: List[ShortUserInfo]
+      joined: List[ShortUserInfo],
+      creationTime: Double
     )
 
     case class ActiveGameData(
@@ -74,6 +72,7 @@ object GameServlet {
       openGameData: Option[OpenGameData],
       activeGameData: Option[ActiveGameData],
       result: Option[GameResult],
+      position: String,
       now: Double
     )
 
@@ -193,9 +192,56 @@ object GameServlet {
     }
   }
 
+  case object GetMetadata {
+    type Reply = IOTypes.GameMetadata
+  }
+
+  case object GetSearch {
+    case class Query(
+      open: Boolean,
+      active: Boolean,
+
+      rated: Option[Boolean],
+      postal: Option[Boolean],
+      gameType: Option[String],
+
+      usersInclude: Option[Set[Username]],
+      gUser: Option[Username],
+      sUser: Option[Username],
+
+      minTime: Option[Timestamp],
+      maxTime: Option[Timestamp],
+
+      limit: Option[Int]
+    )
+    type Reply = List[IOTypes.GameMetadata]
+
+    def parseQuery(params: Map[String,String]): Query = {
+      new Query(
+        open = params.get("open").map(_.toBoolean).getOrElse(false),
+        active = params.get("active").map(_.toBoolean).getOrElse(false),
+        rated = params.get("rated").map(_.toBoolean),
+        postal = params.get("postal").map(_.toBoolean),
+        gameType = params.get("gameType"),
+        usersInclude = (
+          if(params.contains("user1") || params.contains("user2"))
+            Some(params.get("user1").toSet ++ params.get("user2").toSet)
+          else
+            None
+        ),
+        gUser = params.get("gUser"),
+        sUser = params.get("sUser"),
+        minTime = params.get("minTime").map(_.toFiniteDouble),
+        maxTime = params.get("maxTime").map(_.toFiniteDouble),
+        limit = params.get("limit").map(_.toInt)
+      )
+    }
+
+  }
+
 }
 
-import org.playarimaa.server.GameServlet._
+import org.playarimaa.server.game.GameServlet._
 
 class GameServlet(val accounts: Accounts, val siteLogin: SiteLogin, val games: Games, val ec: ExecutionContext)
     extends WebAppStack with JacksonJsonSupport with FutureSupport {
@@ -228,14 +274,14 @@ class GameServlet(val accounts: Accounts, val siteLogin: SiteLogin, val games: G
     }
   }
 
-  def handleGameroomAction(params: Map[String,String]) = {
+  def handleGameroomAction(params: Map[String,String], requestBody: String) : AnyRef = {
     getGameroomAction(params("action")) match {
       case None =>
         pass()
       case Some(Create) =>
         val query =
-          Try(Json.read[Create.StandardQuery](request.body)).recoverWith { case _ =>
-            Try(Json.read[Create.HandicapQuery](request.body)).recoverWith { case _ =>
+          Try(Json.read[Create.StandardQuery](requestBody)).recoverWith { case _ =>
+            Try(Json.read[Create.HandicapQuery](requestBody)).recoverWith { case _ =>
               Failure(new Exception("Unknown game type or invalid fields"))
             }
           }
@@ -272,44 +318,44 @@ class GameServlet(val accounts: Accounts, val siteLogin: SiteLogin, val games: G
     }
   }
 
-  def handleGameAction(id: GameID, params: Map[String,String]) = {
+  def handleGameAction(id: GameID, params: Map[String,String], requestBody: String) : AnyRef = {
     getGameAction(params("action")) match {
       case None =>
         pass()
       case Some(Join) =>
-        val query = Json.read[Join.Query](request.body)
+        val query = Json.read[Join.Query](requestBody)
         siteLogin.requiringLogin(query.siteAuth) { username =>
           games.join(username,query.siteAuth,id).map { gameAuth =>
             Join.Reply(gameAuth)
           }
         }.get.get
       case Some(Leave) =>
-        val query = Json.read[Leave.Query](request.body)
+        val query = Json.read[Leave.Query](requestBody)
         games.leave(id,query.gameAuth).map { case () =>
           Leave.Reply("Ok")
         }.get
       case Some(Accept) =>
-        val query = Json.read[Accept.Query](request.body)
+        val query = Json.read[Accept.Query](requestBody)
         games.accept(id,query.gameAuth,query.opponent).map { case () =>
           Accept.Reply("Ok")
         }.get
       case Some(Decline) =>
-        val query = Json.read[Decline.Query](request.body)
+        val query = Json.read[Decline.Query](requestBody)
         games.decline(id,query.gameAuth,query.opponent).map { case () =>
           Decline.Reply("Ok")
         }.get
       case Some(Heartbeat) =>
-        val query = Json.read[Heartbeat.Query](request.body)
+        val query = Json.read[Heartbeat.Query](requestBody)
         games.heartbeat(id,query.gameAuth).map { case () =>
           Heartbeat.Reply("Ok")
         }.get
       case Some(Resign) =>
-        val query = Json.read[Resign.Query](request.body)
+        val query = Json.read[Resign.Query](requestBody)
         games.resign(id,query.gameAuth).map { case () =>
           Resign.Reply("Ok")
         }.get
       case Some(Move) =>
-        val query = Json.read[Move.Query](request.body)
+        val query = Json.read[Move.Query](requestBody)
         games.move(id,query.gameAuth,query.move,query.plyNum).map { case () =>
           Move.Reply("Ok")
         }.get
@@ -342,7 +388,7 @@ class GameServlet(val accounts: Accounts, val siteLogin: SiteLogin, val games: G
     IOTypes.ShortUserInfo(username)
   }
 
-  def convMeta(data: Games.GetData): IOTypes.GameMetadata = {
+  def convMeta(data: Games.GetMetadata): IOTypes.GameMetadata = {
     IOTypes.GameMetadata(
       id = data.meta.id,
       numPly = data.meta.numPly,
@@ -357,7 +403,8 @@ class GameServlet(val accounts: Accounts, val siteLogin: SiteLogin, val games: G
       openGameData = data.openGameData.map { ogdata =>
         IOTypes.OpenGameData(
           creator = ogdata.creator.map(convUser(_)),
-          joined = ogdata.joined.toList.sorted.map(convUser(_))
+          joined = ogdata.joined.toList.sorted.map(convUser(_)),
+          creationTime = ogdata.creationTime
         )
       },
       activeGameData = data.activeGameData.map { agdata =>
@@ -379,6 +426,7 @@ class GameServlet(val accounts: Accounts, val siteLogin: SiteLogin, val games: G
           endTime = data.meta.result.endTime
         ))
       },
+      position = data.meta.position,
       now = Timestamp.get
     )
   }
@@ -388,31 +436,64 @@ class GameServlet(val accounts: Accounts, val siteLogin: SiteLogin, val games: G
       history = data.moves.map(_.move),
       moveTimes = data.moves.map { info => IOTypes.MoveTime(start = info.start, time = info.time) },
       toMove = GameUtils.nextPlayer(data.moves.length).toString,
-      meta = convMeta(data),
+      meta = convMeta(data.meta),
       sequence = data.sequence
     )
   }
 
-  def handleGetState(id: GameID, params: Map[String,String]) = {
+  def handleGetState(id: GameID, params: Map[String,String]) : AnyRef = {
     val query = GetState.parseQuery(params)
     games.get(id, query.minSequence, query.timeout.map(_.toDouble)).map { data =>
       convState(data)
     }
   }
 
+  def handleGetMetadata(id: GameID, params: Map[String,String]) : AnyRef = {
+    games.getMetadata(id).map { data =>
+      convMeta(data)
+    }
+  }
+
+  def handleGetSearch(params: Map[String,String]) : AnyRef = {
+    val query = GetSearch.parseQuery(params)
+    val searchParams = Games.SearchParams(
+      open = query.open,
+      active = query.active,
+      rated = query.rated,
+      postal = query.postal,
+      gameType = query.gameType,
+      usersInclude = query.usersInclude,
+      gUser = query.gUser,
+      sUser = query.sUser,
+      minTime = query.minTime,
+      maxTime = query.maxTime,
+      limit = query.limit
+    )
+    games.searchMetadata(searchParams).map { data =>
+      data.map(convMeta(_))
+    }
+  }
+
 
   post("/actions/:action") {
-    handleGameroomAction(params)
+    handleGameroomAction(params,request.body)
   }
 
   post("/:gameID/actions/:action") {
     val id = params("gameID")
-    handleGameAction(id,params)
+    handleGameAction(id,params,request.body)
   }
 
   get("/:gameID/state") {
     val id = params("gameID")
     handleGetState(id,params)
+  }
+  get("/:gameID/metadata") {
+    val id = params("gameID")
+    handleGetMetadata(id,params)
+  }
+  get("/:gameID/search") {
+    handleGetSearch(params)
   }
 
   error {

@@ -13,7 +13,6 @@ sealed trait Piece {
     }
 
   def canFreeze(other : Piece) : Boolean = {
-    if (other == null) { return false; }
     this.owner != other.owner && this.pieceType.compare(other.pieceType) > 0
   }
 
@@ -30,7 +29,7 @@ object Piece {
       )
     )
 
-  def apply(p : Player, pt : PieceType) = {
+  def apply(p : Player, pt : PieceType) : Piece = {
     (p, pt) match {
       case (GOLD, RAB) => GOLD_RAB
       case (GOLD, CAT) => GOLD_CAT

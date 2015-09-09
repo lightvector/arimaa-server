@@ -1,9 +1,10 @@
 package org.playarimaa.server.game
 import scala.concurrent.{ExecutionContext, Future, Promise, future}
-import scala.concurrent.duration._
+import scala.concurrent.duration.{DurationInt, DurationDouble}
 import scala.language.postfixOps
 import scala.util.{Try, Success, Failure}
 import slick.driver.H2Driver.api._
+import slick.lifted.{Query,PrimaryKey,ProvenShape}
 import org.slf4j.{Logger, LoggerFactory}
 import org.playarimaa.server.CommonTypes._
 import org.playarimaa.server.Timestamp
@@ -12,7 +13,7 @@ import org.playarimaa.server.RandGen
 import org.playarimaa.server.LoginTracker
 import org.playarimaa.server.Utils._
 import org.playarimaa.board.{Player,GOLD,SILV}
-import org.playarimaa.board.{Game,Notation,StandardNotation,GameType}
+import org.playarimaa.board.{Board,Game,Notation,StandardNotation,GameType}
 import akka.actor.{Scheduler,Cancellable}
 import akka.pattern.{after}
 
@@ -31,35 +32,61 @@ object Games {
   //Clean up a game with no creator after this many seconds if there is nobody in it
   val NO_CREATOR_GAME_CLEANUP_AGE = 600.0
 
+  //Default value and cap on games returned in one search query
+  val DEFAULT_SEARCH_LIMIT = 50
+  val MAX_SEARCH_LIMIT = 1000
+
   val gameTable = TableQuery[GameTable]
   val movesTable = TableQuery[MovesTable]
 
 
-  case class GetData(
+  case class GetMetadata(
     meta: GameMetadata,
-    moves: Vector[MoveInfo],
     openGameData: Option[OpenGames.GetData],
-    activeGameData: Option[ActiveGames.GetData],
+    activeGameData: Option[ActiveGames.GetData]
+  )
+  case class GetData(
+    meta: GetMetadata,
+    moves: Vector[MoveInfo],
     sequence: Option[Long]
   )
+
+  case class SearchParams(
+    open: Boolean,
+    active: Boolean,
+    rated: Option[Boolean],
+    postal: Option[Boolean],
+    gameType: Option[String],
+
+    usersInclude: Option[Set[Username]],
+    gUser: Option[Username],
+    sUser: Option[Username],
+
+    minTime: Option[Timestamp],
+    maxTime: Option[Timestamp],
+
+    limit: Option[Int]
+  ) {
+    def getLimit = math.min(Games.MAX_SEARCH_LIMIT, math.max(0,limit.getOrElse(Games.DEFAULT_SEARCH_LIMIT)))
+  }
 }
 
-class Games(val db: Database, val parentLogins: LoginTracker, val scheduler: Scheduler)(implicit ec: ExecutionContext) {
+class Games(val db: Database, val parentLogins: LoginTracker, val scheduler: Scheduler, val serverInstanceID: Long)(implicit ec: ExecutionContext) {
 
   //Properties/invariants maintained by the implementation of this and of OpenGames and ActiveGames:
   //1. Every game is either open or is recorded in the database (or both)
   //2. If a game is neither active nor open, it cannot become active directly, it must be opened first
   //   (and there is no point during the transition open -> active where a game will appear to be not active yet but also no longer open)
 
-  private val openGames = new OpenGames(db,parentLogins)
-  private val activeGames = new ActiveGames(db,scheduler)
+  private val openGames = new OpenGames(db,parentLogins,serverInstanceID)
+  private val activeGames = new ActiveGames(db,scheduler,serverInstanceID)
   val logger =  LoggerFactory.getLogger(getClass)
 
-  //TODO upon creation, should we load adjourned games from the DB and start them?
+  //TODO upon creation, should we load interrupted games from the DB and start them?
   //Maybe only if they're postal games (some heuristic based on tc?). Do we want to credit any time for them?
 
   //Begin timeout loop on initialization
-  checkTimeoutLoop
+  checkTimeoutLoop()
 
   def createStandardGame(
     creator: Username,
@@ -89,7 +116,8 @@ class Games(val db: Database, val parentLogins: LoginTracker, val scheduler: Sch
     }
   }
 
-  def reopenAdjournedGame(id: GameID): Future[Unit] = {
+  /* Reopen a game that has no winner if the game has any of the specified ending reasons */
+  def reopenUnfinishedGame(id: GameID, allowedReasons: Set[EndingReason]): Future[Unit] = {
     //Checking open and then active in this order is important, taking advantage of property #2 above
     //to make sure that no game with this slips through our check due to a race
     if(!openGames.reserveGameID(id))
@@ -99,20 +127,29 @@ class Games(val db: Database, val parentLogins: LoginTracker, val scheduler: Sch
       Future.failed(new Exception("Game already active with this id"))
     }
     else
-      openGames.reopenAdjournedGame(id)
+      openGames.reopenUnfinishedGame(id,allowedReasons)
+  }
+
+  /* Returns true if there is any open, active, or finished game with this id */
+  def gameExists(id: GameID): Future[Boolean] = {
+    if(openGames.gameExists(id) || activeGames.gameExists(id))
+      Future.successful(true)
+    else
+      //TODO cache this to avoid banging on the database all the time?
+      GameUtils.gameExists(db,id)
   }
 
   /* Applies the effect of heartbeat/login timeouts to all open and active games */
-  private def applyLoginTimeouts: Unit = {
-    openGames.applyLoginTimeouts
-    activeGames.applyLoginTimeouts
+  private def applyLoginTimeouts(): Unit = {
+    openGames.applyLoginTimeouts()
+    activeGames.applyLoginTimeouts()
   }
 
-  private def checkTimeoutLoop: Unit = {
+  private def checkTimeoutLoop(): Unit = {
     //This shouldn't normally throw an exception, but in case it does, we don't want to kill the loop,
     //so we instead catch the exception and log it.
     val nextDelay =
-      Try(applyLoginTimeouts) match {
+      Try(applyLoginTimeouts()) match {
         case Failure(exn) =>
           logger.error("Error in checkTimeoutLoop from applyLoginTimeouts: " + exn)
           Games.TIMEOUT_CHECK_PERIOD_IF_ERROR
@@ -120,7 +157,7 @@ class Games(val db: Database, val parentLogins: LoginTracker, val scheduler: Sch
           Games.TIMEOUT_CHECK_PERIOD
       }
     try {
-      scheduler.scheduleOnce(nextDelay seconds) { checkTimeoutLoop }
+      scheduler.scheduleOnce(nextDelay seconds) { checkTimeoutLoop() }
     }
     catch {
       //Thrown when the actorsystem shuts down, ignore
@@ -184,7 +221,7 @@ class Games(val db: Database, val parentLogins: LoginTracker, val scheduler: Sch
     activeGames.move(id,gameAuth, moveStr, plyNum: Int)
   }
 
-  /* Get the state of a game */
+  /* Get the full state of a game */
   def get(id: GameID, minSequence: Option[Long], timeout: Option[Double]): Future[Games.GetData] = {
     val timeoutFut = minSequence.map { _ =>
       val dur = math.min(Games.GET_MAX_TIMEOUT, timeout.getOrElse(Games.GET_DEFAULT_TIMEOUT))
@@ -194,20 +231,22 @@ class Games(val db: Database, val parentLogins: LoginTracker, val scheduler: Sch
       if(timeoutFut.exists(_.isCompleted))
         throw new Exception("Done")
       openGames.get(id,minSequence) match {
-        case Some(Right(data)) => Future(data)
+        case Some(Right(data)) => Future.successful(data)
         case Some(Left(fut)) => fut.flatMap { case () => loop }
         case None =>
           activeGames.get(id,minSequence) match {
-            case Some(Right(data)) => Future(data)
+            case Some(Right(data)) => Future.successful(data)
             case Some(Left(fut)) => fut.flatMap { case () => loop }
             case None =>
               GameUtils.loadMetaFromDB(db,id).flatMap { meta =>
                 GameUtils.loadMovesFromDB(db,id).map { moves =>
                   Games.GetData(
-                    meta = meta,
+                    meta = Games.GetMetadata(
+                      meta = meta,
+                      openGameData = None,
+                      activeGameData = None
+                    ),
                     moves = moves,
-                    openGameData = None,
-                    activeGameData = None,
                     sequence = None
                   )
                 }
@@ -222,6 +261,43 @@ class Games(val db: Database, val parentLogins: LoginTracker, val scheduler: Sch
     }
   }
 
+  /* Get only the metadata associated with a game */
+  def getMetadata(id: GameID): Future[Games.GetMetadata] = {
+    openGames.getMetadata(id) match {
+      case Some(data) => Future.successful(data)
+      case None =>
+        activeGames.getMetadata(id) match {
+          case Some(data) => Future.successful(data)
+          case None =>
+            GameUtils.loadMetaFromDB(db,id).map { meta =>
+              Games.GetMetadata(
+                meta = meta,
+                openGameData = None,
+                activeGameData = None
+              )
+            }
+        }
+    }
+  }
+
+
+  def searchMetadata(searchParams: Games.SearchParams): Future[List[Games.GetMetadata]] = {
+    (searchParams.open, searchParams.active) match {
+      case (true,true) => Future.failed(new Exception("Specified both \"open\" and \"active\" in search query"))
+      case (true,false) => Future.successful(openGames.searchMetadata(searchParams))
+      case (false,true) => Future.successful(activeGames.searchMetadata(searchParams))
+      case (false,false) =>
+        GameUtils.searchDB(db, searchParams, serverInstanceID).map { metas =>
+          metas.map { meta =>
+            Games.GetMetadata(
+              meta = meta,
+              openGameData = None,
+              activeGameData = None
+            )
+          }
+        }
+    }
+  }
 }
 
 object OpenGames {
@@ -229,11 +305,12 @@ object OpenGames {
     creator: Option[Username],
     joined: Set[Username],
     users: PlayerArray[Option[Username]],
-    accepted: Map[Username,Username] //TODO use this in output
+    accepted: Map[Username,Username], //TODO use this in output
+    creationTime: Timestamp
   )
 }
 
-class OpenGames(val db: Database, val parentLogins: LoginTracker)(implicit ec: ExecutionContext) {
+class OpenGames(val db: Database, val parentLogins: LoginTracker, val serverInstanceID: Long)(implicit ec: ExecutionContext) {
 
   case class OpenGameData(
     val meta: GameMetadata,
@@ -252,14 +329,14 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker)(implicit ec: E
     var sequence: Long
   ) {
     //Updates the sequence number and trigger anyone who was waiting on this game state to be updated
-    def advanceSequence: Unit = {
+    def advanceSequence(): Unit = {
       sequence = sequence + 1
       sequencePromise.success(())
       sequencePromise = Promise()
     }
 
     //Unaccepts anyone who is logged out at the time of this function call
-    def filterAcceptedByLogins: Unit = {
+    def filterAcceptedByLogins(): Unit = {
       accepted = accepted.filter { case (user1,user2) =>
         logins.isUserLoggedIn(user1) && !logins.isUserLoggedIn(user2)
       }
@@ -267,9 +344,9 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker)(implicit ec: E
 
     def doTimeouts(now: Timestamp): Unit = {
       val loggedOut = logins.doTimeouts(now)
-      filterAcceptedByLogins
+      filterAcceptedByLogins()
       if(loggedOut.nonEmpty)
-        advanceSequence
+        advanceSequence()
     }
   }
 
@@ -280,6 +357,11 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker)(implicit ec: E
   //For synchronization - to make sure we don't open two games with the same id
   //Reserving an id prevents new games from being opened OR started that have this id.
   private var reservedGameIDs: Set[GameID] = Set()
+
+  /* Returns true if there is an open game with this id */
+  def gameExists(id: GameID): Boolean = this.synchronized {
+    openGames.contains(id)
+  }
 
   /* Try to reserve a game id for a game that is about to be opened, so that nothing else attempts
    * to open a game with this id in the meantime.
@@ -316,7 +398,7 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker)(implicit ec: E
               reserveNewGameID
             }
             else
-              Future(id)
+              Future.successful(id)
         }
       }
     }
@@ -327,7 +409,7 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker)(implicit ec: E
     this.synchronized {
       assert(reservedGameIDs.contains(id))
       if(openGames.contains(id))
-        return Future(true)
+        return Future.successful(true)
     }
     //Otherwise, query the database to check if we've used it for an older game
     val query: Rep[Int] = Games.gameTable.filter(_.id === id).length
@@ -353,9 +435,12 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker)(implicit ec: E
       users = users.map(_.getOrElse("")),
       tcs = tcs,
       rated = rated,
+      postal = tcs.exists(_.isPostal),
       gameType = gameType,
       tags = List(),
-      result = GameUtils.adjournedResult(now)
+      result = GameUtils.unfinishedResult(now),
+      position = (new Board()).toStandardString,
+      serverInstanceID = serverInstanceID
     )
     val game = OpenGameData(
       meta = meta,
@@ -401,8 +486,8 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker)(implicit ec: E
     createGame(reservedID, creator, siteAuth, PlayerArray(gold = gTC, silv = sTC), users, rated = false, GameType.HANDICAP)
   }
 
-  /* Reopens an existing adjourned game, unreserving the id regardless of success or failure */
-  def reopenAdjournedGame(reservedID: GameID): Future[Unit] = {
+  /* Reopens an existing winnerless game if it has one of the specified reasons, unreserving the id regardless of success or failure */
+  def reopenUnfinishedGame(reservedID: GameID, allowedReasons: Set[EndingReason]): Future[Unit] = {
     //Load any existing metadata and moves for the game.
     val result =
       GameUtils.loadMetaFromDB(db,reservedID).flatMap { meta =>
@@ -410,13 +495,18 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker)(implicit ec: E
           this.synchronized {
             assert(reservedGameIDs.contains(reservedID))
             assert(!openGames.contains(reservedID))
-            if(meta.result.winner.nonEmpty || meta.result.reason != EndingReason.ADJOURNED)
-              throw new Exception("Game was not adjourned and/or has a winner already")
+            if(meta.result.winner.nonEmpty)
+              throw new Exception("Game has a winner already")
+            if(!allowedReasons.contains(meta.result.reason))
+              throw new Exception("Game cannot be restarted because it ended for reason " + meta.result.reason)
             val now = Timestamp.get
-            val newMeta = meta.copy(result = GameUtils.adjournedResult(now))
+            val newMeta = meta.copy(
+              result = GameUtils.unfinishedResult(now),
+              serverInstanceID = serverInstanceID
+            )
             val game = OpenGameData (
               meta = newMeta,
-              moves = Vector(),
+              moves = moves,
               users = meta.users.map(Some(_)),
               creator = None,
               creationTime = now,
@@ -440,7 +530,7 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker)(implicit ec: E
   }
 
   /* Applies the effect of heartbeat timeouts to all open games */
-  def applyLoginTimeouts: Unit = this.synchronized {
+  def applyLoginTimeouts(): Unit = this.synchronized {
     val now = Timestamp.get
     openGames = openGames.filter { case (id,game) =>
       //Log out any individual users who have been inactive
@@ -463,7 +553,7 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker)(implicit ec: E
         }
       //Trigger anyone waiting if we're about to clean up this game
       if(!shouldKeep)
-        game.advanceSequence
+        game.advanceSequence()
       shouldKeep
     }
   }
@@ -480,7 +570,7 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker)(implicit ec: E
         val now = Timestamp.get
         game.doTimeouts(now)
         val gameAuth = game.logins.login(user,now,Some(siteAuth))
-        game.advanceSequence
+        game.advanceSequence()
         Success(gameAuth)
       }
     }
@@ -522,8 +612,8 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker)(implicit ec: E
     ifLoggedInOpt(id,gameAuth) { case (user,game) =>
       val now = Timestamp.get
       game.logins.logout(user,gameAuth,now)
-      game.filterAcceptedByLogins
-      game.advanceSequence
+      game.filterAcceptedByLogins()
+      game.advanceSequence()
       Success(())
     }
   }
@@ -542,7 +632,7 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker)(implicit ec: E
         Failure(new Exception("Game already starting"))
       else {
         game.accepted = game.accepted + (user -> opponent)
-        game.advanceSequence
+        game.advanceSequence()
 
         val shouldBegin = game.creator match {
           case None => game.accepted.get(user) == Some(opponent) && game.accepted.get(opponent) == Some(user)
@@ -584,8 +674,8 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker)(implicit ec: E
         val now = Timestamp.get
         //TODO should this be distingushed somehow from a timeout for the declined?
         game.logins.logoutUser(opponent,now)
-        game.filterAcceptedByLogins
-        game.advanceSequence
+        game.filterAcceptedByLogins()
+        game.advanceSequence()
         Success(())
       }
     }
@@ -598,8 +688,22 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker)(implicit ec: E
   def clearStartedGame(id: GameID): Unit = this.synchronized {
     val game = openGames.get(id)
     assert(game.exists(_.starting))
-    game.get.advanceSequence
+    game.get.advanceSequence()
     openGames = openGames - id
+  }
+
+  private def metadataOfGame(game: OpenGameData): Games.GetMetadata = {
+    Games.GetMetadata(
+      meta = game.meta,
+      openGameData = Some(OpenGames.GetData(
+        creator = game.creator,
+        joined = game.logins.usersLoggedIn,
+        users = game.users,
+        accepted = game.accepted,
+        creationTime = game.creationTime
+      )),
+      activeGameData = None
+    )
   }
 
   /* Returns None if there is no such game with this id,
@@ -612,18 +716,36 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker)(implicit ec: E
         Left(game.sequencePromise.future)
       else
         Right(Games.GetData(
-          meta = game.meta,
+          meta = metadataOfGame(game),
           moves = game.moves,
-          openGameData = Some(OpenGames.GetData(
-            creator = game.creator,
-            joined = game.logins.usersLoggedIn,
-            users = game.users,
-            accepted = game.accepted
-          )),
-          activeGameData = None,
           sequence = Some(game.sequence)
         ))
     }
+  }
+
+  /* Get only the metadata associated with a game */
+  def getMetadata(id: GameID): Option[Games.GetMetadata] = this.synchronized {
+    openGames.get(id).map { game =>
+      metadataOfGame(game)
+    }
+  }
+
+
+  def searchMetadata(searchParams: Games.SearchParams): List[Games.GetMetadata] = this.synchronized {
+    def matches(game: OpenGameData) = {
+      searchParams.rated.forall(_ == game.meta.rated) &&
+      searchParams.postal.forall(_ == game.meta.postal) &&
+      searchParams.gameType.forall(_ == game.meta.gameType) &&
+      searchParams.usersInclude.forall { set => set.forall { user => game.users.contains(Some(user)) } } &&
+      searchParams.gUser.forall { gUser => game.users(GOLD) == Some(gUser) } &&
+      searchParams.sUser.forall { sUser => game.users(SILV) == Some(sUser) } &&
+      searchParams.minTime.forall { game.creationTime >= _ }
+      searchParams.maxTime.forall { game.creationTime <= _ }
+    }
+    openGames.values.filter(matches).map(metadataOfGame).
+      toList.
+      sortWith(_.openGameData.get.creationTime > _.openGameData.get.creationTime).
+      take(searchParams.getLimit)
   }
 
   def hasGame(id: GameID): Boolean = this.synchronized {
@@ -651,10 +773,11 @@ object ActiveGames {
 }
 
 
-class ActiveGames(val db: Database, val scheduler: Scheduler) (implicit ec: ExecutionContext) {
+class ActiveGames(val db: Database, val scheduler: Scheduler, val serverInstanceID: Long) (implicit ec: ExecutionContext) {
   case class ActiveGameData(
     val logins: LoginTracker,
     val users: PlayerArray[Username],
+    val initMeta: GameMetadata, //initial metadata as of game start
     val game: ActiveGame,
 
     //Fulfilled and replaced on each update - this is the mechanism by which queries can block and wait for chat activity
@@ -662,7 +785,7 @@ class ActiveGames(val db: Database, val scheduler: Scheduler) (implicit ec: Exec
     var sequence: Long
   ) {
     //Updates the sequence number and trigger anyone who was waiting on this game state to be updated
-    def advanceSequence: Unit = {
+    def advanceSequence(): Unit = {
       sequence = sequence + 1
       sequencePromise.success(())
       sequencePromise = Promise()
@@ -671,13 +794,18 @@ class ActiveGames(val db: Database, val scheduler: Scheduler) (implicit ec: Exec
     def doTimeouts(now: Timestamp): Unit = {
       val loggedOut = logins.doTimeouts(now)
       if(loggedOut.nonEmpty)
-        advanceSequence
+        advanceSequence()
     }
   }
 
   //All active games are in this map, and also any game in this map has an entry in the database
   private var activeGames: Map[GameID,ActiveGameData] = Map()
   val logger =  LoggerFactory.getLogger(getClass)
+
+  /* Returns true if there is an active game with this id */
+  def gameExists(id: GameID): Boolean = this.synchronized {
+    activeGames.contains(id)
+  }
 
   def addGame(data: ActiveGames.InitData): Future[Unit] = {
     val id = data.meta.id
@@ -687,7 +815,8 @@ class ActiveGames(val db: Database, val scheduler: Scheduler) (implicit ec: Exec
     var meta: GameMetadata = data.meta.copy(
       startTime = data.meta.startTime.orElse(Some(now)),
       users = data.users,
-      result = data.meta.result.copy(endTime = now)
+      result = data.meta.result.copy(endTime = now),
+      serverInstanceID = serverInstanceID
     )
 
     //Add game to database
@@ -705,13 +834,14 @@ class ActiveGames(val db: Database, val scheduler: Scheduler) (implicit ec: Exec
         //to report the change in the game back to users and clean up the game
         val onTimeout = { () =>
           scheduler.scheduleOnce(0 seconds) {
-            applyLoginTimeouts
+            applyLoginTimeouts()
           }
           ()
         }
         val game = ActiveGameData(
           logins = data.logins,
           users = data.users,
+          initMeta = meta,
           //Note that this could raise an exception if the moves aren't legal somehow
           game = new ActiveGame(meta,data.moves,now,db,scheduler,onTimeout,logger),
           sequencePromise = Promise(),
@@ -724,14 +854,14 @@ class ActiveGames(val db: Database, val scheduler: Scheduler) (implicit ec: Exec
 
   /* Applies the effect of heartbeat timeouts to all active games.
    * Also cleans up games that have ended. */
-  def applyLoginTimeouts: Unit = this.synchronized {
+  def applyLoginTimeouts(): Unit = this.synchronized {
     val now = Timestamp.get
     activeGames = activeGames.filter { case (id,game) =>
       game.doTimeouts(now)
       //Clean up games that have ended
       //TODO maybe add checking and logging for games that never get cleaned up because their db commits hang forever?
       if(game.game.canCleanup) {
-        game.advanceSequence
+        game.advanceSequence()
         false //filter out
       }
       else
@@ -751,7 +881,7 @@ class ActiveGames(val db: Database, val scheduler: Scheduler) (implicit ec: Exec
         Failure(new Exception("Not one of the players of this game."))
       else {
         val gameAuth = game.logins.login(user,now,Some(siteAuth))
-        game.advanceSequence
+        game.advanceSequence()
         Success(gameAuth)
       }
     }
@@ -797,7 +927,7 @@ class ActiveGames(val db: Database, val scheduler: Scheduler) (implicit ec: Exec
     ifLoggedInOpt(id,gameAuth) { case (user,game) =>
       val now = Timestamp.get
       game.logins.logout(user,gameAuth,now)
-      game.advanceSequence
+      game.advanceSequence()
       Success(())
     }
   }
@@ -812,13 +942,13 @@ class ActiveGames(val db: Database, val scheduler: Scheduler) (implicit ec: Exec
       this.synchronized {
         ifLoggedIn(id,gameAuth) { case (user,game) =>
           val player = lookupPlayer(game,user)
-          Success(game,player)
+          Success((game,player))
         }
       }
     result.flatMap { case (game,player) =>
       f(game.game,player).map { x =>
         this.synchronized {
-          game.advanceSequence
+          game.advanceSequence()
         }
         x
       }
@@ -839,6 +969,18 @@ class ActiveGames(val db: Database, val scheduler: Scheduler) (implicit ec: Exec
     }
   }
 
+  private def metadataAndMovesOfGame(game: ActiveGameData): (Games.GetMetadata, Vector[MoveInfo]) = {
+    val present = game.users.map { user => game.logins.isUserLoggedIn(user) }
+    val (meta,moves,activeGameData) = game.game.getActiveGetData(present)
+    val gm = Games.GetMetadata(
+      meta = meta,
+      openGameData = None,
+      //This will be None if the game is ended but is not yet cleaned up
+      activeGameData = activeGameData
+    )
+    (gm,moves)
+  }
+
   /* Returns None if there is no such game with this id,
    * Left(future) if the game exists but minSequence is not satisfied (with the future being determined
    *  at some future time, including but not necessarily only when minSequence is satisfied)
@@ -850,17 +992,56 @@ class ActiveGames(val db: Database, val scheduler: Scheduler) (implicit ec: Exec
       else {
         val present = game.users.map { user => game.logins.isUserLoggedIn(user) }
         val (meta,moves,activeGameData) = game.game.getActiveGetData(present)
-        Right(Games.GetData(
+        val gmeta = Games.GetMetadata(
           meta = meta,
-          moves = moves,
           openGameData = None,
           //This will be None if the game is ended but is not yet cleaned up
-          activeGameData = activeGameData,
+          activeGameData = activeGameData
+        )
+        Right(Games.GetData(
+          meta = gmeta,
+          moves = moves,
           //Only provide the sequence number if the game is still going
           sequence = activeGameData.map { case _ => game.sequence }
         ))
       }
     }
+  }
+
+  private def metadataOfGame(game: ActiveGameData): Games.GetMetadata = {
+    val present = game.users.map { user => game.logins.isUserLoggedIn(user) }
+    val (meta,_,activeGameData) = game.game.getActiveGetData(present)
+    Games.GetMetadata(
+      meta = meta,
+      openGameData = None,
+      //This will be None if the game is ended but is not yet cleaned up
+      activeGameData = activeGameData
+    )
+  }
+
+  /* Get only the metadata associated with a game */
+  def getMetadata(id: GameID): Option[Games.GetMetadata] = this.synchronized {
+    activeGames.get(id).map { game =>
+      metadataOfGame(game)
+    }
+  }
+
+
+  def searchMetadata(searchParams: Games.SearchParams): List[Games.GetMetadata] = this.synchronized {
+    def matches(game: ActiveGameData) = {
+      searchParams.rated.forall(_ == game.initMeta.rated) &&
+      searchParams.postal.forall(_ == game.initMeta.postal) &&
+      searchParams.gameType.forall(_ == game.initMeta.gameType) &&
+      searchParams.usersInclude.forall { set => set.forall { user => game.users.contains(user) } } &&
+      searchParams.gUser.forall { gUser => game.users(GOLD) == gUser } &&
+      searchParams.sUser.forall { sUser => game.users(SILV) == sUser }
+      searchParams.minTime.forall { game.initMeta.startTime.get >= _ }
+      searchParams.maxTime.forall { game.initMeta.startTime.get <= _ }
+    }
+    activeGames.values.filter(matches).map(metadataOfGame).
+      toList.
+      sortWith(_.meta.startTime.get > _.meta.startTime.get).
+      take(searchParams.getLimit)
   }
 
   def hasGame(id: GameID): Boolean = this.synchronized {
@@ -896,8 +1077,8 @@ class ActiveGame(
   //The last timeout event we've scheduled to happen
   private var timeoutEvent: Option[Cancellable] = None
   //Future that represent the finishing of writing metadata and moves to the DB
-  private var metaSaveFinished: Future[Unit] = Future(())
-  private var moveSaveFinished: Future[Unit] = Future(())
+  private var metaSaveFinished: Future[Unit] = Future.successful(())
+  private var moveSaveFinished: Future[Unit] = Future.successful(())
 
   scheduleNextTimeout(initNow)
 
@@ -917,7 +1098,7 @@ class ActiveGame(
 
   def getNextPlayer: Player = GameUtils.nextPlayer(meta.numPly)
 
-  def saveMetaToDB: Unit = this.synchronized {
+  def saveMetaToDB(): Unit = this.synchronized {
     val metaToSave = meta
     metaSaveFinished = metaSaveFinished.resultMap { _ =>
       val query: DBIO[Int] = Games.gameTable.filter(_.id === metaToSave.id).update(metaToSave)
@@ -933,7 +1114,7 @@ class ActiveGame(
     }
   }
 
-  def saveMovesToDB: Unit = this.synchronized {
+  def saveMovesToDB(): Unit = this.synchronized {
     if(movesWritten < moves.length) {
       val newMoves = moves.slice(movesWritten,moves.length)
       movesWritten = moves.length
@@ -965,7 +1146,7 @@ class ActiveGame(
   private def declareWinner(player: Player, reason: EndingReason, now: Timestamp): Unit = this.synchronized {
     meta = meta.copy(result = GameResult(winner = Some(player), reason = reason, endTime = now))
     timeoutEvent.foreach(_.cancel)
-    saveMetaToDB
+    saveMetaToDB()
   }
 
   private def scheduleNextTimeout(now: Timestamp): Unit = this.synchronized {
@@ -1040,8 +1221,9 @@ class ActiveGame(
           Failure(new Exception("Game is over"))
         else {
           meta = meta.copy(
-            numPly = plyNum+1,
-            result = meta.result.copy(endTime = now)
+            numPly = plyNum + 1,
+            result = meta.result.copy(endTime = now),
+            position = newGame.currentBoardString
           )
           moves = moves :+ MoveInfo(
             gameID = meta.id,
@@ -1054,8 +1236,8 @@ class ActiveGame(
           clockBeforeTurn = clockBeforeTurn + (player -> clock)
           game = newGame
 
-          saveMetaToDB
-          saveMovesToDB
+          saveMetaToDB()
+          saveMovesToDB()
 
           game.winner match {
             case None => ()
@@ -1099,8 +1281,15 @@ object GameUtils {
     game
   }
 
+  /* Returns true if this game exists in the database */
+  def gameExists(db: Database, id: GameID)(implicit ec: ExecutionContext): Future[Boolean] = {
+    val query: Rep[Boolean] = Games.gameTable.filter(_.id === id).exists
+    db.run(query.result).map { x => !x }
+  }
+
+  /* Load the metadata for a game from the database */
   def loadMetaFromDB(db: Database, id: GameID)(implicit ec: ExecutionContext): Future[GameMetadata] = {
-    val query = Games.gameTable.filter(_.id === id)
+    val query: Rep[Seq[GameMetadata]] = Games.gameTable.filter(_.id === id)
     db.run(query.result).map(_.toList).map { metas =>
       metas match {
         case Nil => throw new Exception("No game found with the given id")
@@ -1112,8 +1301,28 @@ object GameUtils {
 
   /* Load all existing moves for a game from the database */
   def loadMovesFromDB(db: Database, id: GameID)(implicit ec: ExecutionContext): Future[Vector[MoveInfo]] = {
-    val query = Games.movesTable.filter(_.gameID === id).sortBy(_.ply)
+    val query: Rep[Seq[MoveInfo]] = Games.movesTable.filter(_.gameID === id).sortBy(_.ply)
     db.run(query.result).map(_.toVector)
+  }
+
+  def searchDB(db: Database, searchParams: Games.SearchParams, serverInstanceID: Long)(implicit ec: ExecutionContext): Future[List[GameMetadata]] = {
+    var query = Games.gameTable.filter(_.numPly === 5)
+    searchParams.rated.foreach { rated => query = query.filter(_.rated === rated) }
+    searchParams.postal.foreach { postal => query = query.filter(_.postal === postal) }
+    searchParams.gameType.foreach { gameType => query = query.filter(_.gameType === gameType) }
+    searchParams.usersInclude.foreach { set => set.foreach { user => query = query.filter { row => (row.gUser === user) || (row.sUser === user) } } }
+    searchParams.gUser.foreach { gUser => query = query.filter(_.gUser === gUser) }
+    searchParams.sUser.foreach { sUser => query = query.filter(_.sUser === sUser) }
+    searchParams.minTime.foreach { minTime => query = query.filter(_.endTime >= minTime) }
+    searchParams.maxTime.foreach { maxTime => query = query.filter(_.endTime <= maxTime) }
+    //Filter out games that are active right now. Games active right now are present in the database with ending
+    //reason interrupted but were created with this server instance
+    query = query.filter { row => row.reason === EndingReason.INTERRUPTED.toString } .filter { row => row.serverInstanceID === serverInstanceID }
+    //Reverse chronological sort
+    query = query.sortBy(_.endTime.desc)
+    //Limit the size of the query results
+    val final_query = query.take(math.min(Games.MAX_SEARCH_LIMIT, searchParams.limit.getOrElse(Games.DEFAULT_SEARCH_LIMIT)))
+    db.run(query.result).map(_.toList)
   }
 
   /* The next player to play, based on the number of half-moves played */
@@ -1125,11 +1334,11 @@ object GameUtils {
   }
 
   /* The game result entered into the database for any unfinished game so that in case the
-   * server goes down, any game active at that time appears adjourned without a winner. */
-  def adjournedResult(now: Timestamp): GameResult =
+   * server goes down, any game active at that time appears this way without a winner. */
+  def unfinishedResult(now: Timestamp): GameResult =
     GameResult(
       winner = None,
-      reason = EndingReason.ADJOURNED,
+      reason = EndingReason.INTERRUPTED,
       endTime = now
     )
 }
@@ -1141,9 +1350,12 @@ case class GameMetadata(
   users: PlayerArray[Username],
   tcs: PlayerArray[TimeControl],
   rated: Boolean,
+  postal: Boolean,
   gameType: GameType,
   tags: List[String],
-  result: GameResult
+  result: GameResult,
+  position: String,
+  serverInstanceID: Long
 )
 
 case class MoveInfo(
@@ -1155,46 +1367,50 @@ case class MoveInfo(
 )
 
 class MovesTable(tag: Tag) extends Table[MoveInfo](tag, "movesTable") {
-  def gameID = column[GameID]("gameID")
-  def ply = column[Int]("ply")
-  def move = column[String]("move")
-  def time = column[Timestamp]("time")
-  def start = column[Timestamp]("start")
+  def gameID : Rep[GameID] = column[GameID]("gameID")
+  def ply : Rep[Int] = column[Int]("ply")
+  def move : Rep[String] = column[String]("move")
+  def time : Rep[Timestamp] = column[Timestamp]("time")
+  def start : Rep[Timestamp] = column[Timestamp]("start")
 
-  def * = (gameID, ply, move, time, start) <> (MoveInfo.tupled, MoveInfo.unapply)
+  def * : ProvenShape[MoveInfo] = (gameID, ply, move, time, start) <> (MoveInfo.tupled, MoveInfo.unapply)
 
-  def pk = primaryKey("pk_gameID_ply", (gameID, ply))
+  def pk : PrimaryKey = primaryKey("pk_gameID_ply", (gameID, ply))
 }
 
 class GameTable(tag: Tag) extends Table[GameMetadata](tag, "gameTable") {
-  def id = column[GameID]("id", O.PrimaryKey)
-  def numPly = column[Int]("numPly")
-  def startTime = column[Option[Timestamp]]("startTime")
-  def gUser = column[Username]("gUser")
-  def sUser = column[Username]("sUser")
+  def id : Rep[GameID] = column[GameID]("id", O.PrimaryKey)
+  def numPly : Rep[Int] = column[Int]("numPly")
+  def startTime : Rep[Option[Timestamp]] = column[Option[Timestamp]]("startTime")
+  def gUser : Rep[Username] = column[Username]("gUser")
+  def sUser : Rep[Username] = column[Username]("sUser")
 
   //TODO should these be doubles?
-  def gInitialTime = column[Int]("gInitialTime")
-  def gIncrement = column[Int]("gIncrement")
-  def gDelay = column[Int]("gDelay")
-  def gMaxReserve = column[Option[Int]]("gMaxReserve")
-  def gMaxMoveTime = column[Option[Int]]("gMaxMoveTime")
-  def gOvertimeAfter = column[Option[Int]]("gOvertimeAfter")
+  def gInitialTime : Rep[Int] = column[Int]("gInitialTime")
+  def gIncrement : Rep[Int] = column[Int]("gIncrement")
+  def gDelay : Rep[Int] = column[Int]("gDelay")
+  def gMaxReserve : Rep[Option[Int]] = column[Option[Int]]("gMaxReserve")
+  def gMaxMoveTime : Rep[Option[Int]] = column[Option[Int]]("gMaxMoveTime")
+  def gOvertimeAfter : Rep[Option[Int]] = column[Option[Int]]("gOvertimeAfter")
 
-  def sInitialTime = column[Int]("sInitialTime")
-  def sIncrement = column[Int]("sIncrement")
-  def sDelay = column[Int]("sDelay")
-  def sMaxReserve = column[Option[Int]]("sMaxReserve")
-  def sMaxMoveTime = column[Option[Int]]("sMaxMoveTime")
-  def sOvertimeAfter = column[Option[Int]]("sOvertimeAfter")
+  def sInitialTime : Rep[Int] = column[Int]("sInitialTime")
+  def sIncrement : Rep[Int] = column[Int]("sIncrement")
+  def sDelay : Rep[Int] = column[Int]("sDelay")
+  def sMaxReserve : Rep[Option[Int]] = column[Option[Int]]("sMaxReserve")
+  def sMaxMoveTime : Rep[Option[Int]] = column[Option[Int]]("sMaxMoveTime")
+  def sOvertimeAfter : Rep[Option[Int]] = column[Option[Int]]("sOvertimeAfter")
 
-  def rated = column[Boolean]("rated")
-  def gameType = column[GameType]("gameType")
-  def tags = column[List[String]]("tags")
+  def rated : Rep[Boolean] = column[Boolean]("rated")
+  def postal : Rep[Boolean] = column[Boolean]("postal")
+  def gameType : Rep[String] = column[String]("gameType")
+  def tags : Rep[List[String]] = column[List[String]]("tags")
 
-  def winner = column[Option[Player]]("winner")
-  def reason = column[EndingReason]("reason")
-  def endTime = column[Timestamp]("endTime")
+  def winner : Rep[Option[Player]] = column[Option[Player]]("winner")
+  def reason : Rep[String] = column[String]("reason")
+  def endTime : Rep[Timestamp] = column[Timestamp]("endTime")
+
+  def position : Rep[String] = column[String]("position")
+  def serverInstanceID: Rep[Long] = column[Long]("serverInstanceID")
 
   implicit val listStringMapper = MappedColumnType.base[List[String], String] (
     { list => list.mkString(",") },
@@ -1208,29 +1424,33 @@ class GameTable(tag: Tag) extends Table[GameMetadata](tag, "gameTable") {
     { reason => reason.toString },
     { str => EndingReason.ofString(str).get }
   )
-  implicit val gameTypeMapper = MappedColumnType.base[GameType, String] (
-    { gt => gt.toString },
-    { str => GameType.ofString(str).get }
-  )
+  // implicit val gameTypeMapper = MappedColumnType.base[GameType, String] (
+  //   { gt => gt.toString },
+  //   { str => GameType.ofString(str).get }
+  // )
 
-  def * = (
+  def * : ProvenShape[GameMetadata] = (
     //Define database projection shape
     id,numPly,startTime,gUser,sUser,
     (gInitialTime,gIncrement,gDelay,gMaxReserve,gMaxMoveTime,gOvertimeAfter),
     (sInitialTime,sIncrement,sDelay,sMaxReserve,sMaxMoveTime,sOvertimeAfter),
-    rated,gameType,tags,
-    (winner,reason,endTime)
+    rated,postal,gameType,tags,
+    (winner,reason,endTime),
+    position,
+    serverInstanceID
   ).shaped <> (
     //Database shape -> Scala object
-    { case (id,numPly,startTime,gUser,sUser,gTC,sTC,rated,gameType,tags,result) =>
+    { case (id,numPly,startTime,gUser,sUser,gTC,sTC,rated,postal,gameType,tags,(winner,reason,endTime),position,serverInstanceID) =>
       GameMetadata(id,numPly,startTime,
         PlayerArray(gold = gUser, silv = sUser),
         PlayerArray(
           gold = (TimeControl.apply _).tupled.apply(gTC),
           silv = (TimeControl.apply _).tupled.apply(sTC)
         ),
-        rated,gameType,tags,
-        GameResult.tupled.apply(result)
+        rated,postal,GameType.ofString(gameType).get,tags,
+        GameResult.tupled.apply((winner,EndingReason.ofString(reason).get,endTime)),
+        position,
+        serverInstanceID
       )
     },
     //Scala object -> Database shape
@@ -1239,8 +1459,10 @@ class GameTable(tag: Tag) extends Table[GameMetadata](tag, "gameTable") {
         g.id,g.numPly,g.startTime,g.users(GOLD),g.users(SILV),
         TimeControl.unapply(g.tcs(GOLD)).get,
         TimeControl.unapply(g.tcs(SILV)).get,
-        g.rated,g.gameType,g.tags,
-        GameResult.unapply(g.result).get
+        g.rated,g.postal,g.gameType.toString,g.tags,
+        (g.result.winner,g.result.reason.toString,g.result.endTime),
+        g.position,
+        g.serverInstanceID
       ))
     }
   )

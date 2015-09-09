@@ -4,6 +4,9 @@ object TimeControl {
   /* Increment and delay are multiplied by this every turn during overtime
    * If changing this, make sure to update API docs. */
   val OVERTIME_FACTOR_PER_TURN: Double = 1.0 - 1.0 / 30.0
+
+  val POSTAL_RESERVE_THRESHOLD: Double = 86400 * 2 //2 days
+  val POSTAL_PERMOVE_THRESHOLD: Double = 3600 * 2 //2 hours
 }
 
 case class TimeControl(
@@ -52,5 +55,11 @@ case class TimeControl(
    * of time spent on a given move so far */
   def isOutOfTime(clock: Double, timeSpent: Double): Boolean = {
     clock < 0.0 || maxMoveTime.exists(timeSpent > _)
+  }
+
+  /* Determine whether this time control should be considered a postal time control */
+  def isPostal: Boolean = {
+    math.min(initialTime, maxReserve.getOrElse(initialTime)) >= TimeControl.POSTAL_RESERVE_THRESHOLD ||
+    math.min(increment + delay, maxMoveTime.getOrElse(increment+delay)) >= TimeControl.POSTAL_PERMOVE_THRESHOLD
   }
 }

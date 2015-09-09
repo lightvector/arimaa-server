@@ -4,6 +4,7 @@ import scala.io.Source
 import scala.io.Codec
 import java.security.SecureRandom
 import java.io.IOException
+import org.slf4j.{Logger, LoggerFactory}
 
 import org.playarimaa.server.CommonTypes._
 
@@ -15,10 +16,12 @@ object RandGen {
   private val secureRand: SecureRandom = new SecureRandom()
   private var initialized = false
 
+  private val logger =  LoggerFactory.getLogger(getClass)
+
   //This works around Scala being lazy by default - if we write this instead at toplevel 'static'
   //scope, it will get deferred until genToken is called the first time, and initialization
   //may actually take a little time.
-  def initialize: Unit = {
+  def initialize(): Unit = {
     this.synchronized {
       if(!initialized) {
         try {
@@ -31,10 +34,10 @@ object RandGen {
         }
         catch
         {
-          case e: Exception =>
-            //TODO consider logging exception (github issue #48)
-            System.err.println("Error initializing from /dev/urandom, using default seed initialization: " +  e)
+          case e: Exception => {
+            logger.error("Error initializing from /dev/urandom, using default seed initialization: " +  e)
             secureRand.setSeed(SecureRandom.getSeed(NUM_SEED_BYTES))
+          }
         }
         initialized = true
       }
