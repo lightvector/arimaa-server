@@ -12,8 +12,15 @@ var component = React.createClass({
      UserStore.removeChangeListener(this._onGameMetaChange);
   },
 
-  _onGameMetaChange: function() {
+  getInitialState: function() {
+    return {errorMsg:'',openGames:[], createdGames:[]}
+  },
 
+  _onGameMetaChange: function() {
+    this.setState({
+        openGames:UserStore.getOpenGames(),
+        createdGames:UserStore.getCreatedGames()
+    });
   },
 
   _onChange: function() {
@@ -63,17 +70,46 @@ var component = React.createClass({
     SiteActions.getOpenGames();
   },
 
+  joinGameButtonClicked: function(gameID, evt) {
+    evt.target.disabled = true;
+    evt.target.innerHTML = "joined";
+    SiteActions.joinGame(gameID);
+  },
+
+  acceptUserButtonClicked: function(gameID, username, evt) {
+    evt.target.disabled = true;
+    SiteActions.acceptUserForGame(gameID, username);
+    //console.log(event);
+  },
+
   logout: function() {
     SiteActions.logout();
   },
 
   render: function() {
 
-    var openGamesList = UserStore.getOpenGames().map(function(metadata) {
+    var openGamesList = this.state.openGames.map(function(metadata) {
       return (
-        <li>{metadata.gameID}</li>
-      )
-    });
+        <li key={metadata.id}>{metadata.id} <button onClick={this.joinGameButtonClicked.bind(this, metadata.id)}>Join</button></li>
+      );
+    }, this);
+
+    var createdGamesList = this.state.createdGames.map(function(metadata) {
+      //slice since object 0 is creator
+      var joinedUsers = metadata.openGameData.joined.slice(1).map(function(shortUserData, index) {
+        return (<li key={index}>{shortUserData.name} <button onClick={this.acceptUserButtonClicked.bind(this, metadata.id, shortUserData.name)}>Accept</button></li>);
+      },this);
+
+      return (
+        <li key={metadata.id}>
+          {metadata.id}
+          <ul>
+            {joinedUsers}
+          </ul>
+        </li>
+
+      );
+    }, this);
 
     return (
       <div>
@@ -108,10 +144,15 @@ var component = React.createClass({
         <button type="button" onClick={this.accept}>Accept</button>
 
         <p />
-        <button type="button" onClick={this.getOpenGames}>Open Games</button>
-
+        <button type="button" onClick={this.getOpenGames}>Refresh Open Games</button>
+        <p/>
+        Open Games
         <ul>
           {openGamesList}
+        </ul>
+        My Created Games
+        <ul>
+          {createdGamesList}
         </ul>
 
         <p />

@@ -48,6 +48,10 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
     return openGames;
   },
 
+  getCreatedGames: function() {
+    return createdGames;
+  },
+
   dispatcherIndex: ArimaaDispatcher.register(function(action) {
     switch (action.actionType) {
       case SiteConstants.REGISTRATION_FAILED:
@@ -66,7 +70,16 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
       case SiteConstants.GAME_STATUS_UPDATE:
         break;
       case SiteConstants.OPEN_GAMES_LIST:
-        openGames = action.metadatas;
+        createdGames = [];
+        openGames = [];
+        action.metadatas.forEach(function(metadata){
+          if(metadata.openGameData.creator.name === UserStore.getUsername()) {
+            createdGames.push(metadata);
+          } else {
+            openGames.push(metadata);
+          }
+        });
+        UserStore.emitGameMetaChange();
         break;
       default:
         break;

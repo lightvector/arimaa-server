@@ -106,7 +106,7 @@ var APIUtils = {
   },
 
   getOpenGames: function(success, error) {
-    GET('api/search',{open:true}, success, error);
+    GET('/api/games/search',{open:true}, success, error);
   },
 
   do_something_else: 0

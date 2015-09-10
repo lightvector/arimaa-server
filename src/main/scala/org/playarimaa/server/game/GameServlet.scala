@@ -492,7 +492,7 @@ class GameServlet(val accounts: Accounts, val siteLogin: SiteLogin, val games: G
     val id = params("gameID")
     handleGetMetadata(id,params)
   }
-  get("/:gameID/search") {
+  get("/search") {
     handleGetSearch(params)
   }
 
