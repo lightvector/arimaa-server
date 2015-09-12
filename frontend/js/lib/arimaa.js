@@ -4,14 +4,14 @@ var Arimaa = function(options) {
 	const SILVER = 1;
 
  	const SQUARES = {
-      a8:   0, b8:   1, c8:   2, d8:   3, e8:   4, f8:   5, g8:   6, h8:   7,
-      a7:  16, b7:  17, c7:  18, d7:  19, e7:  20, f7:  21, g7:  22, h7:  23,
-      a6:  32, b6:  33, c6:  34, d6:  35, e6:  36, f6:  37, g6:  38, h6:  39,
-      a5:  48, b5:  49, c5:  50, d5:  51, e5:  52, f5:  53, g5:  54, h5:  55,
-      a4:  64, b4:  65, c4:  66, d4:  67, e4:  68, f4:  69, g4:  70, h4:  71,
-      a3:  80, b3:  81, c3:  82, d3:  83, e3:  84, f3:  85, g3:  86, h3:  87,
-      a2:  96, b2:  97, c2:  98, d2:  99, e2: 100, f2: 101, g2: 102, h2: 103,
-      a1: 112, b1: 113, c1: 114, d1: 115, e1: 116, f1: 117, g1: 118, h1: 119
+      a8:   0, b8:   1, c8:   2, d8:   3, e8:   4, f8:   5, g8:   6, h8:   7, //0x00 0x07
+      a7:  16, b7:  17, c7:  18, d7:  19, e7:  20, f7:  21, g7:  22, h7:  23, //0x10 0x17
+      a6:  32, b6:  33, c6:  34, d6:  35, e6:  36, f6:  37, g6:  38, h6:  39, //0x20 0x27
+      a5:  48, b5:  49, c5:  50, d5:  51, e5:  52, f5:  53, g5:  54, h5:  55, //0x30
+      a4:  64, b4:  65, c4:  66, d4:  67, e4:  68, f4:  69, g4:  70, h4:  71, //0x40
+      a3:  80, b3:  81, c3:  82, d3:  83, e3:  84, f3:  85, g3:  86, h3:  87, //0x50
+      a2:  96, b2:  97, c2:  98, d2:  99, e2: 100, f2: 101, g2: 102, h2: 103, //0x60
+      a1: 112, b1: 113, c1: 114, d1: 115, e1: 116, f1: 117, g1: 118, h1: 119  //0x70
  	};
 
 	const TRAPS = {
@@ -230,6 +230,7 @@ var Arimaa = function(options) {
 	}
 
 	//move is a list of step strings
+	//need to call complete move afterwards
 	function add_move(move) {
 		var isValid = true;
 
@@ -392,8 +393,6 @@ var Arimaa = function(options) {
 
 	//returns a 'stepresult' = {success: t/f, stepsLeft: 0-3, step: stepobj}
 	function add_step(stepString) {
-		if(!stepsLeft) return {success:false, stepsLeft: stepsLeft};
-
 		var piece = PIECES.indexOf(stepString.charAt(0));
 		var location = stepString.charAt(1)+stepString.charAt(2);
 		var direction = stepString.charAt(3);
@@ -406,6 +405,8 @@ var Arimaa = function(options) {
 		//or maybe require an explicit step to remove from traps where the only step possible
 		//is to x the trapped piece
 		if(direction === 'x') return {success:true};
+
+		if(!stepsLeft) return {success:false, stepsLeft: stepsLeft};
 
 		var squareNum = SQUARES[location];
 		//var stepObj = {piece:piece,squareNum:squareNum,direction:direction,string:stepString};
@@ -633,11 +634,11 @@ var Arimaa = function(options) {
 	//TEST THIS!!!
 	function is_goal() {
 		var gGoal = false;
-		for (var ix = 0x70; ix < 0x78; ix++) {
+		for (var ix = 0x00; ix < 0x08; ix++) {
 			if (board[ix] == GRABBIT) { gGoal = true; break }
 		}
 		var sGoal = false;
-		for (var ix = 0; ix < 8; ix++) {
+		for (var ix = 0x70; ix < 0x78; ix++) {
 			if (board[ix] == SRABBIT) { sGoal = true; break }
 		}
 		if (gGoal || sGoal) {
@@ -689,20 +690,33 @@ var Arimaa = function(options) {
 
 	}
 
+	/*
+		FROM arimaa.com
+		The order of checking for win/lose conditions is as follows assuming player A just made the move and player B now needs to move:
+		Check if a rabbit of player A reached goal. If so player A wins.
+		Check if a rabbit of player B reached goal. If so player B wins.
+		Check if player B lost all rabbits. If so player A wins.
+		Check if player A lost all rabbits. If so player B wins.
+		Check if player B has no possible move (all pieces are frozen or have no place to move). If so player A wins.
+		Check if the only moves player B has are 3rd time repetitions. If so player A wins.
+	*/
+
+
 	//0 is no victory, 1 is victory, -1 is loss
-	//TODO: add victory type
+	//TODO: Implement no moves available b/c 3-fold repetiton check
+	//Maybe change result to color????
 	function check_victory() {
 		var goal = is_goal();
 		if(goal !== 0) {
-			return {result:goal,type:'g'}
+			return {result:goal,reason:'g'}
 		}
 		var elim = is_elimination();
 		if(elim !== 0) {
-			return {result:elim,type:'e'}
+			return {result:elim,reason:'e'}
 		}
 		var imm = is_immobilization();
 		if(imm !== 0) {
-			return {result:imm,type:'m'}
+			return {result:imm,reason:'m'}
 		}
 		//IMPLEMENT REPETITION CHECK!!!
 		return {result:0};
@@ -755,16 +769,6 @@ var Arimaa = function(options) {
 		PIECES: Piece,
 		SQUARES: SQUARES,
 
-		/*
-			FROM arimaa.com
-			The order of checking for win/lose conditions is as follows assuming player A just made the move and player B now needs to move:
-			Check if a rabbit of player A reached goal. If so player A wins.
-			Check if a rabbit of player B reached goal. If so player B wins.
-			Check if player B lost all rabbits. If so player A wins.
-			Check if player A lost all rabbits. If so player B wins.
-			Check if player B has no possible move (all pieces are frozen or have no place to move). If so player A wins.
-			Check if the only moves player B has are 3rd time repetitions. If so player A wins.
-		*/
 		is_goal: function() {
 			return is_goal();
 		},
@@ -791,9 +795,9 @@ var Arimaa = function(options) {
 		add_move_string: function(moveString) {
 			var stepsList = moveString.split(' ');
 
-			if(moveHistory.length === 0) setup(moveString);
-			else if(moveHistory.length === 1) setup(moveString);
-			else add_move(stepsList);
+			if(moveHistory.length === 0) return setup(moveString);
+			else if(moveHistory.length === 1) return setup(moveString);
+			else return add_move(stepsList);
 		},
 
 		//move is a list of step strings
