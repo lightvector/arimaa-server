@@ -38,6 +38,10 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
     return _viewSide;
   },
 
+  getGameOver: function() {
+    return _gameOver;
+  },
+
   getDebugMsg: function() {
     return debugMsg;
   },
@@ -189,14 +193,30 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
           debugMsg = completed.reason;
           ArimaaStore.emitChange();
         }
-
+        break;
       case ArimaaConstants.ACTIONS.GAME_COMPLETE_MOVE:
         var completed = _arimaa.complete_move();
         if(completed.success) {
           //definitely need a better way of doing this...
+          //converts list of step strings to single move string
           var moves = _arimaa.get_move_list();
           var lastMove = moves[moves.length-1];
           var lastMoveStr = lastMove.map(function(s) {return s.string;}).join(' ');
+
+
+          if(completed.victory.result !== 0) {
+            console.log(completed.victory.result);
+            var winner = "";
+            if(completed.victory.result === 1) {
+              //maybe there should be a better check since _myColor can be null
+              //but if we're completing a move, we should always have a color
+              winner = (_myColor === ArimaaConstants.GAME.GOLD) ? 'g' : 's';
+            } else if(completed.victory.result === -1) {
+              //there's probably a way to combine the two statements better
+              winner = (_myColor === ArimaaConstants.GAME.GOLD) ? 's' : 'g';
+            }
+            _gameOver = {winner:winner, reason:completed.victory.reason};
+          }
 
           //send move to server
           APIUtils.send_move(action.gameID, lastMoveStr, _arimaa.get_halfmove_number()+1, function(){}, function(){});
@@ -205,7 +225,7 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
           _setSelectedSquareToNull();
         } else {
           //alert "can't complete move because..."
-          //undo step
+          //undo step?
           debugMsg = completed.reason;
         }
         ArimaaStore.emitChange();
@@ -213,6 +233,10 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
       case ArimaaConstants.ACTIONS.GAME_FLIP_BOARD:
         _viewSide = ArimaaConstants.GAME.reverseColor(_viewSide);
         ArimaaStore.emitChange();
+      case ArimaaConstants.ACTIONS.GAME_OVER:
+        _gameOver = action.result;
+        ArimaaStore.emitChange();
+        break;
       default:
         break;
     }
