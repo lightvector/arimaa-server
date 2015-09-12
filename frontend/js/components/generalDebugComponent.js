@@ -79,7 +79,10 @@ var component = React.createClass({
   acceptUserButtonClicked: function(gameID, username, evt) {
     evt.target.disabled = true;
     SiteActions.acceptUserForGame(gameID, username);
-    //console.log(event);
+  },
+
+  goToGameButtonClicked: function(gameID) {
+    window.location.pathname = "/game/" + gameID;
   },
 
   logout: function() {
@@ -90,14 +93,24 @@ var component = React.createClass({
 
     var openGamesList = this.state.openGames.map(function(metadata) {
       return (
-        <li key={metadata.id}>{metadata.id} <button onClick={this.joinGameButtonClicked.bind(this, metadata.id)}>Join</button></li>
+        <li key={metadata.id}>
+          {metadata.id}
+          <button onClick={this.joinGameButtonClicked.bind(this, metadata.id)}>Join</button>
+          <button onClick={this.goToGameButtonClicked.bind(this, metadata.id)}>Go To Game</button>
+        </li>
       );
     }, this);
 
     var createdGamesList = this.state.createdGames.map(function(metadata) {
       //slice since object 0 is creator
       var joinedUsers = metadata.openGameData.joined.slice(1).map(function(shortUserData, index) {
-        return (<li key={index}>{shortUserData.name} <button onClick={this.acceptUserButtonClicked.bind(this, metadata.id, shortUserData.name)}>Accept</button></li>);
+        return (
+          <li key={index}>
+            {shortUserData.name}
+            <button onClick={this.acceptUserButtonClicked.bind(this, metadata.id, shortUserData.name)}>Accept</button>
+            <button onClick={this.goToGameButtonClicked.bind(this, metadata.id)}>Go To Game</button>
+          </li>
+        );
       },this);
 
       return (

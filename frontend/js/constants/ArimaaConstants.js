@@ -14,7 +14,8 @@ var ACTION_CONSTANTS = keyMirror({
   GAME_ADD_MOVE: null,
   GAME_FLIP_BOARD: null,
   GAME_SET_COLOR: null,
-  GAME_FORFEIT: null
+  GAME_FORFEIT: null,
+  GAME_OVER: null
 });
 
 const GAME_CONSTANTS = {

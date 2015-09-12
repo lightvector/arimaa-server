@@ -6,7 +6,7 @@ var ArimaaConstants = require('../constants/ArimaaConstants.js');
 
 var component = React.createClass({
   getInitialState: function() {
-    return {debugMsg:"", myColor:ArimaaStore.getMyColor()};
+    return {debugMsg:"", myColor:ArimaaStore.getMyColor(), gameOver:null};
   },
 
   componentDidMount: function() {
@@ -17,7 +17,11 @@ var component = React.createClass({
   },
   _onChange: function() {
     //alert(ArimaaStore.getDebugMsg());
-    this.setState({debugMsg:ArimaaStore.getDebugMsg(), myColor:ArimaaStore.getMyColor()});
+    this.setState({
+      debugMsg:ArimaaStore.getDebugMsg(),
+      myColor:ArimaaStore.getMyColor(),
+      gameOver:ArimaaStore.getGameOver()
+    });
   },
 
   moveFromText: function() {
@@ -73,6 +77,11 @@ var component = React.createClass({
       color = "SILVER";
     }
 
+    var gameOverString = "In progress...";
+    if(this.state.gameOver) {
+      gameOverString = "winner: " + this.state.gameOver.winner + " reason: " + this.state.gameOver.reason;
+    }
+
     return (
       <div>
         <input type="text" placeholder="enter move.. Ra1n Cb1n ..." ref="move"></input>
@@ -93,6 +102,7 @@ var component = React.createClass({
         <button onClick={this.forfeit}>Forfeit</button>
         <button onClick={this.leave}>Leave</button><br/>
         <p/>{color}
+        <p/>{"game status: " + gameOverString}
         <p/>{"gameID: " + this.props.gameID}
         <p/>{"debug msg: " + this.state.debugMsg}<br/>
 

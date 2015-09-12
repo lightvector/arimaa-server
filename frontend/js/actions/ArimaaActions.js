@@ -14,16 +14,15 @@ var ArimaaActions = {
 
   gameStatusSuccess: function(data) {
     var history = data.history;
-    //maybe do a while loop here?
     var n = ArimaaStore.getMoveList().length;
-    while(history.length > ArimaaStore.getMoveList().length) {
+    while(history.length > ArimaaStore.getMoveList().length && n < history.length) {
         ArimaaActions.addMove(history[n]);
         n++;
     }
     if(data.openGameData) {
       //game is still unstarted
     }
-    if(data.meta) {
+    else if(data.meta) { //we can have a meta w/o gUser/sUser if they haven't been accepted
       if(data.meta.gUser.name === UserStore.getUsername() && ArimaaStore.getMyColor() != ArimaaConstants.GAME.GOLD) {
         ArimaaDispatcher.dispatch({
           actionType: ArimaaConstants.ACTIONS.GAME_SET_COLOR,
@@ -37,9 +36,12 @@ var ArimaaActions = {
         });
       }
     }
-    //if(data.)
-
-
+    if(data.result) {
+      ArimaaDispatcher.dispatch({
+        actionType: ArimaaConstants.ACTIONS.GAME_OVER,
+        result: data.result
+      });
+    }
   },
 
   clickSquare: function(sqNum, sqName) {
