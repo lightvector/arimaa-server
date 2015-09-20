@@ -210,9 +210,13 @@ object GameServlet {
       usersInclude: Option[Set[Username]],
       gUser: Option[Username],
       sUser: Option[Username],
+      creator: Option[Username],
+      creatorNot: Option[Username],
 
       minTime: Option[Timestamp],
       maxTime: Option[Timestamp],
+      minDateTime: Option[Timestamp],
+      maxDateTime: Option[Timestamp],
 
       limit: Option[Int]
     )
@@ -233,8 +237,12 @@ object GameServlet {
         ),
         gUser = params.get("gUser"),
         sUser = params.get("sUser"),
+        creator = params.get("creator"),
+        creatorNot = params.get("creatorNot"),
         minTime = params.get("minTime").map(_.toFiniteDouble),
         maxTime = params.get("maxTime").map(_.toFiniteDouble),
+        minDateTime = params.get("minDateTime").map(Timestamp.parse),
+        maxDateTime = params.get("maxDateTime").map(Timestamp.parse),
         limit = params.get("limit").map(_.toInt)
       )
     }
@@ -468,8 +476,10 @@ class GameServlet(val accounts: Accounts, val siteLogin: SiteLogin, val games: G
       usersInclude = query.usersInclude,
       gUser = query.gUser,
       sUser = query.sUser,
-      minTime = query.minTime,
-      maxTime = query.maxTime,
+      creator = query.creator,
+      creatorNot = query.creatorNot,
+      minTime = (query.minTime ++ query.minDateTime).reduceOption[Double](math.max),
+      maxTime = (query.maxTime ++ query.maxDateTime).reduceOption[Double](math.min),
       limit = query.limit
     )
     games.searchMetadata(searchParams).map { data =>
