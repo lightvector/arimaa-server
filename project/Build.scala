@@ -21,6 +21,7 @@ object ArimaaServerBuild extends Build {
         "com.h2database" % "h2" % "1.3.170",
         "com.typesafe.slick" %% "slick" % "3.0.0",
         "javax.servlet" %  "javax.servlet-api" % "3.1.0",
+        "joda-time" % "joda-time" % "2.8.2",
         "net.databinder.dispatch" %% "dispatch-core" % "0.11.1",
         "org.eclipse.jetty"           %  "jetty-plus"          % "9.2.10.v20150310"     % "container;provided",
         "org.eclipse.jetty"           %  "jetty-webapp"        % "9.2.10.v20150310"     % "container",
