@@ -47,6 +47,16 @@ object AccountServlet {
     case class Query(siteAuth: String)
     case class Reply(message: String)
   }
+  case object ForgotPassword extends Action {
+    val name = "forgotPassword"
+    case class Query(username: String)
+    case class Reply(message: String)
+  }
+  case object ResetPassword extends Action {
+    val name = "resetPassword"
+    case class Query(username: String, resetAuth: String, password: String)
+    case class Reply(message: String)
+  }
 }
 
 import org.playarimaa.server.AccountServlet._
@@ -85,6 +95,15 @@ class AccountServlet(val siteLogin: SiteLogin, val ec: ExecutionContext)
         siteLogin.logout(query.siteAuth).map { case () =>
           Json.write(Logout.Reply("Ok"))
         }.get
+      case Some(ForgotPassword) =>
+        val query = Json.read[ForgotPassword.Query](request.body)
+        siteLogin.forgotPassword(query.username): Unit
+        Json.write(ForgotPassword.Reply("An email with further instructions was sent to the address associated with this account."))
+      case Some(ResetPassword) =>
+        val query = Json.read[ResetPassword.Query](request.body)
+        siteLogin.resetPassword(query.username, query.resetAuth, query.password).map { case () =>
+          Json.write(ResetPassword.Reply("New password set."))
+        }
     }
   }
 

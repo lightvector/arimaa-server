@@ -5,11 +5,13 @@ import org.mindrot.jbcrypt.BCrypt
 import org.playarimaa.server.CommonTypes._
 import org.playarimaa.server.Timestamp.Timestamp
 
+//TODO add logging and throttling/bucketing to everything here
 
 object SiteLogin {
 
   object Constants {
     val INACTIVITY_TIMEOUT: Double = 3600 * 24 * 2 //2 days
+    val PASSWORD_RESET_TIMEOUT: Double = 1800 //30 minutes
 
     val USERNAME_MIN_LENGTH: Int = 3
     val USERNAME_MAX_LENGTH: Int = 24
@@ -30,11 +32,16 @@ object SiteLogin {
   }
 }
 
+case class PasswordReset(auth: Auth, time: Timestamp)
+
 import SiteLogin.Constants._
 
-class SiteLogin(val accounts: Accounts, val cryptEC: ExecutionContext)(implicit ec: ExecutionContext) {
+class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: ExecutionContext)(implicit ec: ExecutionContext) {
 
   val logins: LoginTracker = new LoginTracker(None,INACTIVITY_TIMEOUT)
+
+  var passResets: Map[Username,PasswordReset] = Map()
+  val passResetLock = new Object()
 
   def validateEmail(email: Email): Unit = {
     if(!email.contains('@'))
@@ -106,6 +113,57 @@ class SiteLogin(val accounts: Accounts, val cryptEC: ExecutionContext)(implicit 
   def logout(siteAuth: SiteAuth) : Try[Unit] = {
     requiringLogin(siteAuth) { _ =>
       logins.logoutAuth(siteAuth,Timestamp.get)
+    }
+  }
+
+  def forgotPassword(usernameOrEmail: Username) : Unit = {
+    //Spawn off a job to find the user's account if it exists and send the email and don't wait for it
+    accounts.getByNameOrEmail(usernameOrEmail).onComplete { result =>
+      result match {
+        case Failure(_) =>
+          //TODO log the failure
+          ()
+        case Success(None) =>
+          //Looks email-like?
+          if(usernameOrEmail.contains('@'))
+            emailer.sendPasswordResetNoAccount(usernameOrEmail)
+        case Success(Some(account)) =>
+          val auth = RandGen.genAuth
+          passResetLock.synchronized {
+            val now = Timestamp.get
+            //Filter all reset tokens that are too old
+            passResets = passResets.filter { case (user,resetInfo) =>
+              now - resetInfo.time < PASSWORD_RESET_TIMEOUT
+            }
+            //Add the new reset key
+            passResets = passResets + (account.username -> PasswordReset(auth, Timestamp.get))
+          }
+          //Send email to user advising about reset
+          emailer.sendPasswordResetRequest(account.email,account.username,auth)
+      }
+    }
+  }
+
+  def resetPassword(usernameOrEmail: Username, resetAuth: Auth, password: String) : Future[Unit] = {
+    validatePassword(password)
+    accounts.getByNameOrEmail(usernameOrEmail).flatMap { account =>
+      def fail = throw new IllegalArgumentException("Unknown username/email.")
+      account match {
+        case None => fail
+        case Some(account) =>
+          val resetInfo = passResetLock.synchronized { passResets.get(account.username) }
+          val now = Timestamp.get
+          def expired = throw new Exception("Password was NOT reset - request expired due to taking too long (or due to another request). Please try again.")
+          resetInfo match {
+            case None => expired
+            case Some(resetInfo) =>
+              if(now - resetInfo.time >= PASSWORD_RESET_TIMEOUT || resetAuth != resetInfo.auth)
+                expired
+              Future(BCrypt.hashpw(password, BCrypt.gensalt))(cryptEC).flatMap { passwordHash =>
+                accounts.setPasswordHash(account.username,passwordHash)
+              }
+          }
+      }
     }
   }
 
