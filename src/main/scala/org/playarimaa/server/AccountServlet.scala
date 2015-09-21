@@ -28,7 +28,9 @@ object AccountServlet {
     val all: List[Action] = List(
       Register,
       Login,
-      Logout
+      Logout,
+      ForgotPassword,
+      ResetPassword
     )
   }
 
