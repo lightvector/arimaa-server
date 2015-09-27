@@ -16,11 +16,11 @@ var forgotPasswordBox = React.createClass({
 
   componentDidMount: function() {
      UserStore.addChangeListener(this._onChange);
-   },
+  },
 
-   componentWillUnmount: function() {
-     UserStore.removeChangeListener(this._onChange);
-   },
+  componentWillUnmount: function() {
+    UserStore.removeChangeListener(this._onChange);
+  },
 
   _onChange: function() {
     console.log('onchange');
@@ -53,7 +53,7 @@ var forgotPasswordBox = React.createClass({
           </form>
           {errorText}
           {messageText}
-          <div><a href="/login">Login</a></div>
+          <div><a href="/login">Back to login</a></div>
         </div>
       </div>
     )

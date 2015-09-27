@@ -32,15 +32,17 @@ class Emailer(siteName: String, siteAddress: String, smtpHost: String, smtpPort:
   }
 
   def sendPasswordResetRequest(to: Email, username: Username, auth: Auth): Future[Unit] = {
+    val resetUrl = siteAddress + "resetPassword/" + username + "/" + auth
+    val resetLink = "<a href=\"" + resetUrl + "\">" + resetUrl + "</a>"
     val subject = "Password reset requested"
     //TODO make this more user-friendly in conjunction with an appropriate UI page
     val body = List(
       "A password reset was requested for your account \"",
       username,
       "\" at ",
-      siteLink,
-      ". You may reset your password using the following resetAuth: ",
-      auth,
+      siteName,
+      ". You may choose a new password for your account at the following link: ",
+      resetLink,
       ". If you did not make this request or did not intend to request this password reset, please ignore this email."
     ).mkString("")
 

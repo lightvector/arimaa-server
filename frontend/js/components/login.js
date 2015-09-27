@@ -18,12 +18,12 @@ var loginBox = React.createClass({
   },
 
   componentDidMount: function() {
-     UserStore.addChangeListener(this._onChange);
-   },
+    UserStore.addChangeListener(this._onChange);
+  },
 
-   componentWillUnmount: function() {
-     UserStore.removeChangeListener(this._onChange);
-   },
+  componentWillUnmount: function() {
+    UserStore.removeChangeListener(this._onChange);
+  },
 
   _onChange: function() {
     console.log('onchange');
