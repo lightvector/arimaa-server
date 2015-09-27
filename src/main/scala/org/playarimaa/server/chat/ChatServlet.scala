@@ -1,6 +1,8 @@
 package org.playarimaa.server.chat
 import org.scalatra.json.JacksonJsonSupport
-import org.scalatra.{Accepted, FutureSupport, ScalatraServlet}
+import org.scalatra.{Accepted, FutureSupport, SessionSupport, ScalatraServlet}
+import org.scalatra.atmosphere.{AtmosphereSupport,AtmosphereClient}
+import org.scalatra.{atmosphere => Atmosphere}
 import org.scalatra.scalate.ScalateSupport
 
 import scala.concurrent.{ExecutionContext, Future, Promise, future}
@@ -45,6 +47,11 @@ object ChatServlet {
     case class Query(chatAuth: String)
     case class Reply(message: String)
   }
+  case object Heartbeat extends Action {
+    val name = "heartbeat"
+    case class Query(chatAuth: String)
+    case class Reply(message: String)
+  }
   case object Post extends Action {
     val name = "post"
     case class Query(chatAuth: String, text: String)
@@ -63,12 +70,15 @@ object ChatServlet {
       )
   }
 
+  case object SocketMessage {
+    case class Query(action: String, text: String)
+  }
 }
 
 import org.playarimaa.server.chat.ChatServlet._
 
 class ChatServlet(val accounts: Accounts, val siteLogin: SiteLogin, val chat: ChatSystem, val games: Games, val ec: ExecutionContext)
-    extends WebAppStack with JacksonJsonSupport with FutureSupport {
+    extends WebAppStack with JacksonJsonSupport with FutureSupport with SessionSupport with AtmosphereSupport {
   //Sets up automatic case class to JSON output serialization
   protected implicit lazy val jsonFormats: Formats = Json.formats
   protected implicit def executor: ExecutionContext = ec
@@ -105,6 +115,11 @@ class ChatServlet(val accounts: Accounts, val siteLogin: SiteLogin, val chat: Ch
               chat.leave(channel, query.chatAuth).map { case () =>
                 Leave.Reply("Ok")
               }
+            case Heartbeat =>
+              val query = Json.read[Heartbeat.Query](requestBody)
+              chat.heartbeat(channel, query.chatAuth).map { case () =>
+                Heartbeat.Reply("Ok")
+              }
             case Post =>
               val query = Json.read[Post.Query](requestBody)
               chat.post(channel, query.chatAuth, query.text).map { case () =>
@@ -120,7 +135,14 @@ class ChatServlet(val accounts: Accounts, val siteLogin: SiteLogin, val chat: Ch
     isValidChannel.flatMap { isValid =>
       if(!isValid)
         throw new Exception("Unknown chat channel: " + channel)
-      chat.get(channel, query.minId, None, query.minTime, None, query.doWait).map { chatLines =>
+      chat.get(
+        channel = channel,
+        minId = query.minId,
+        maxId = None,
+        minTime = query.minTime,
+        maxTime = None,
+        doWait = query.doWait
+      ).map { chatLines =>
         Get.Reply(chatLines.map { line =>
           IOTypes.ChatLine(
             id = line.id,
@@ -133,6 +155,128 @@ class ChatServlet(val accounts: Accounts, val siteLogin: SiteLogin, val chat: Ch
       }
     }
   }
+
+  //TODO this could be cleaned up slightly
+  def handleAtmosphere(channel: String, params: Map[String,String], isValidChannel: => Future[Boolean]) : AtmosphereClient = {
+    var connected = false
+    var chatAuth : Option[ChatAuth] = None
+    new AtmosphereClient {
+      def sendError(msg: String) =
+        send(Json.write(IOTypes.SimpleError(msg)))
+
+      def receive = {
+        case Atmosphere.Connected =>
+          var minId : Option[Long] = None
+          //TODO: this is a bit inefficient, we should consider broadcasting instead. Although, there are some tricky
+          //invloving the initial get versus any new messages
+          //Loop to report chat lines to this connection
+          def loop(): Unit = {
+            if(connected) {
+              //Heartbeat if applicable, but don't wait on it
+              chatAuth.foreach { chatAuth =>
+                chat.heartbeat(channel,chatAuth)
+                ()
+              }
+              //Loop getting stuff
+              isValidChannel.flatMap { isValid =>
+                if(!isValid)
+                  throw new Exception("Unknown chat channel: " + channel)
+                chat.get(
+                  channel = channel,
+                  minId = minId,
+                  maxId = None,
+                  minTime = None,
+                  maxTime = None,
+                  doWait = Some(true)
+                )
+              }.onComplete { result =>
+                //If still connected after getting chat messages...
+                if(connected) {
+                  result match {
+                    case Failure(e) => sendError(e.getMessage())
+                    case Success(lines) =>
+                      lines.foreach { line =>
+                        if(minId.forall(_ <= line.id))
+                          minId = Some(line.id+1)
+
+                        val output = IOTypes.ChatLine(
+                          id = line.id,
+                          channel = line.channel,
+                          username = line.username,
+                          text = line.text,
+                          timestamp = line.timestamp
+                        )
+                        send(Json.write(output))
+                      }
+                  }
+                  loop()
+                }
+              }
+            }
+          }
+          connected = true
+          loop()
+        case Atmosphere.Disconnected(disconnector, None) =>
+          connected = false
+          chatAuth.foreach { chatAuth => chat.leave(channel,chatAuth) }
+          logger.info("chat channel " + channel + ": " + disconnector + " disconnected")
+        case Atmosphere.Disconnected(disconnector, Some(error)) =>
+          connected = false
+          chatAuth.foreach { chatAuth => chat.leave(channel,chatAuth) }
+          logger.error("chat channel " + channel + ": " + disconnector + " disconnected due to error " + error)
+        case Atmosphere.Error(None) =>
+          logger.error("chat channel " + channel + ": unknown error event")
+        case Atmosphere.Error(Some(error)) =>
+          logger.error("chat channel " + channel + ": " + error)
+        case Atmosphere.TextMessage(_) =>
+          sendError("Unable to parse message")
+          ()
+        case Atmosphere.JsonMessage(json) =>
+          val msg = Try(Json.extract[SocketMessage.Query](json))
+          msg match {
+            case Failure(e) => sendError(e.getMessage())
+            case Success(msg) =>
+              msg.action match {
+                case "join" =>
+                  val siteAuth = msg.text
+                  siteLogin.requiringLogin(siteAuth) { username =>
+                    chat.join(channel,username,siteAuth).onComplete { result =>
+                      if(connected) {
+                        result match {
+                          case Failure(e) => sendError(e.getMessage())
+                          case Success(cAuth) =>
+                            chatAuth.foreach { chatAuth => chat.leave(channel,chatAuth); () }
+                            chatAuth = Some(cAuth)
+                            send(Json.write(Join.Reply(cAuth)))
+                        }
+                      }
+                    }
+                  } match {
+                    case Failure(e) => sendError(e.getMessage())
+                    case Success(()) => ()
+                  }
+                case "post" =>
+                  chatAuth match {
+                    case None =>
+                      sendError("Not logged in")
+                    case Some(chatAuth) =>
+                      chat.post(channel, chatAuth, msg.text).onComplete { result =>
+                        if(connected) {
+                          result match {
+                            case Failure(e) => sendError(e.getMessage())
+                            case Success(()) => ()
+                          }
+                        }
+                      }
+                  }
+                case _ =>
+                  sendError("Unknown action: " + msg.action)
+              }
+          }
+      }
+    }
+  }
+
 
   def isValidBaseChannel(channel: String): Boolean = {
     channel == "main"
@@ -150,6 +294,11 @@ class ChatServlet(val accounts: Accounts, val siteLogin: SiteLogin, val chat: Ch
     val channel = params("channel")
     def isValidChannel: Future[Boolean] = Future.successful(isValidBaseChannel(channel))
     handleAction(channel,params,request.body,isValidChannel)
+  }
+  atmosphere("/:channel/socket") {
+    val channel = params("channel")
+    def isValidChannel: Future[Boolean] = Future.successful(isValidBaseChannel(channel))
+    handleAtmosphere(channel,params,isValidChannel)
   }
 
   get("/game/:gameID") {
@@ -171,6 +320,16 @@ class ChatServlet(val accounts: Accounts, val siteLogin: SiteLogin, val chat: Ch
       }
     val channel = "game/" + gameID
     handleAction(channel,params,request.body,isValidChannel)
+  }
+  atmosphere("/game/:gameID/socket") {
+    val gameID = params("gameID")
+    def isValidChannel: Future[Boolean] =
+      isValidGameID(gameID).map {
+        case false => throw new Exception("Game " + gameID + "does not exist.")
+        case true => true
+      }
+    val channel = "game/" + gameID
+    handleAtmosphere(channel,params,isValidChannel)
   }
 
   error {

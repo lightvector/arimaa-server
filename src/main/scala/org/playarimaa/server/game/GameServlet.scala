@@ -1,6 +1,8 @@
 package org.playarimaa.server.game
 import org.scalatra.json.JacksonJsonSupport
-import org.scalatra.{Accepted, FutureSupport, ScalatraServlet}
+import org.scalatra.{Accepted, FutureSupport, SessionSupport, ScalatraServlet}
+import org.scalatra.atmosphere.{AtmosphereSupport,AtmosphereClient}
+import org.scalatra.{atmosphere => Atmosphere}
 import org.scalatra.scalate.ScalateSupport
 
 import scala.concurrent.{ExecutionContext, Future, Promise, future}
@@ -208,9 +210,13 @@ object GameServlet {
       usersInclude: Option[Set[Username]],
       gUser: Option[Username],
       sUser: Option[Username],
+      creator: Option[Username],
+      creatorNot: Option[Username],
 
       minTime: Option[Timestamp],
       maxTime: Option[Timestamp],
+      minDateTime: Option[Timestamp],
+      maxDateTime: Option[Timestamp],
 
       limit: Option[Int]
     )
@@ -231,8 +237,12 @@ object GameServlet {
         ),
         gUser = params.get("gUser"),
         sUser = params.get("sUser"),
+        creator = params.get("creator"),
+        creatorNot = params.get("creatorNot"),
         minTime = params.get("minTime").map(_.toFiniteDouble),
         maxTime = params.get("maxTime").map(_.toFiniteDouble),
+        minDateTime = params.get("minDateTime").map(Timestamp.parse),
+        maxDateTime = params.get("maxDateTime").map(Timestamp.parse),
         limit = params.get("limit").map(_.toInt)
       )
     }
@@ -244,7 +254,7 @@ object GameServlet {
 import org.playarimaa.server.game.GameServlet._
 
 class GameServlet(val accounts: Accounts, val siteLogin: SiteLogin, val games: Games, val ec: ExecutionContext)
-    extends WebAppStack with JacksonJsonSupport with FutureSupport {
+    extends WebAppStack with JacksonJsonSupport with FutureSupport with SessionSupport with AtmosphereSupport {
   //Sets up automatic case class to JSON output serialization
   protected implicit lazy val jsonFormats: Formats = Json.formats
   protected implicit def executor: ExecutionContext = ec
@@ -443,7 +453,8 @@ class GameServlet(val accounts: Accounts, val siteLogin: SiteLogin, val games: G
 
   def handleGetState(id: GameID, params: Map[String,String]) : AnyRef = {
     val query = GetState.parseQuery(params)
-    games.get(id, query.minSequence, query.timeout.map(_.toDouble)).map { data =>
+    val timeout = math.min(Games.GET_MAX_TIMEOUT, query.timeout.map(_.toDouble).getOrElse(Games.GET_DEFAULT_TIMEOUT))
+    games.get(id, query.minSequence, timeout).map { data =>
       convState(data)
     }
   }
@@ -465,8 +476,10 @@ class GameServlet(val accounts: Accounts, val siteLogin: SiteLogin, val games: G
       usersInclude = query.usersInclude,
       gUser = query.gUser,
       sUser = query.sUser,
-      minTime = query.minTime,
-      maxTime = query.maxTime,
+      creator = query.creator,
+      creatorNot = query.creatorNot,
+      minTime = (query.minTime ++ query.minDateTime).reduceOption[Double](math.max),
+      maxTime = (query.maxTime ++ query.maxDateTime).reduceOption[Double](math.min),
       limit = query.limit
     )
     games.searchMetadata(searchParams).map { data =>
@@ -494,6 +507,57 @@ class GameServlet(val accounts: Accounts, val siteLogin: SiteLogin, val games: G
   }
   get("/search") {
     handleGetSearch(params)
+  }
+
+  //TODO doesn't work yet due to scalatra atmosphere bug
+  atmosphere("/:gameID/stateStream") {
+    val id = params("gameID")
+    var connected = false
+    new AtmosphereClient {
+      def receive = {
+        case Atmosphere.Connected =>
+          var lastSequence = Games.INITIAL_SEQUENCE - 1
+          def loop(): Unit = {
+            if(connected) {
+              games.get(id, Some(lastSequence+1), Games.GET_MAX_TIMEOUT).onComplete { result =>
+                //If the connection is still active after getting the game...
+                if(connected) {
+                  result match {
+                    case Failure(e) =>
+                      send(Json.write(IOTypes.SimpleError(e.getMessage())))
+                    case Success(data) =>
+                      //Send back the gamestate if it's new
+                      if(!data.sequence.exists(_ <= lastSequence))
+                        send(Json.write(convState(data)))
+                      //If the game is active or open (gamestate has a sequence number), then repeat
+                      data.sequence.foreach { sequence =>
+                        lastSequence = sequence
+                        assert(data.meta.openGameData.nonEmpty || data.meta.activeGameData.nonEmpty)
+                        loop
+                      }
+                  }
+                }
+              }
+            }
+          }
+          connected = true
+          loop()
+        case Atmosphere.Disconnected(disconnector, None) =>
+          connected = false
+          ()
+        case Atmosphere.Disconnected(disconnector, Some(error)) =>
+          connected = false
+          logger.error("gameID " + id + ": " + disconnector + " disconnected due to error " + error)
+        case Atmosphere.Error(None) =>
+          logger.error("gameID " + id + ": unknown error event")
+        case Atmosphere.Error(Some(error)) =>
+          logger.error("gameID " + id + ": " + error)
+        case Atmosphere.TextMessage(_) =>
+          ()
+        case Atmosphere.JsonMessage(_) =>
+          ()
+      }
+    }
   }
 
   error {

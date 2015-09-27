@@ -37,6 +37,9 @@ object Games {
   val DEFAULT_SEARCH_LIMIT = 50
   val MAX_SEARCH_LIMIT = 1000
 
+  //Sequence number that game starts on
+  val INITIAL_SEQUENCE = 0L
+
   val gameTable = TableQuery[GameTable]
   val movesTable = TableQuery[MovesTable]
 
@@ -62,6 +65,8 @@ object Games {
     usersInclude: Option[Set[Username]],
     gUser: Option[Username],
     sUser: Option[Username],
+    creator: Option[Username],
+    creatorNot: Option[Username],
 
     minTime: Option[Timestamp],
     maxTime: Option[Timestamp],
@@ -223,10 +228,9 @@ class Games(val db: Database, val parentLogins: LoginTracker, val scheduler: Sch
   }
 
   /* Get the full state of a game */
-  def get(id: GameID, minSequence: Option[Long], timeout: Option[Double]): Future[Games.GetData] = {
+  def get(id: GameID, minSequence: Option[Long], timeout: Double): Future[Games.GetData] = {
     val timeoutFut = minSequence.map { _ =>
-      val dur = math.min(Games.GET_MAX_TIMEOUT, timeout.getOrElse(Games.GET_DEFAULT_TIMEOUT))
-      after(dur seconds,scheduler)(Future.failed(new Exception("Future timed out!")))
+      after(timeout seconds,scheduler)(Future.failed(new Exception("Future timed out!")))
     }
     def loop: Future[Games.GetData] = {
       if(timeoutFut.exists(_.isCompleted))
@@ -283,21 +287,24 @@ class Games(val db: Database, val parentLogins: LoginTracker, val scheduler: Sch
 
 
   def searchMetadata(searchParams: Games.SearchParams): Future[List[Games.GetMetadata]] = {
-    (searchParams.open, searchParams.active) match {
-      case (true,true) => Future.failed(new Exception("Specified both \"open\" and \"active\" in search query"))
-      case (true,false) => Future.successful(openGames.searchMetadata(searchParams))
-      case (false,true) => Future.successful(activeGames.searchMetadata(searchParams))
-      case (false,false) =>
-        GameUtils.searchDB(db, searchParams, serverInstanceID).map { metas =>
-          metas.map { meta =>
-            Games.GetMetadata(
-              meta = meta,
-              openGameData = None,
-              activeGameData = None
-            )
+    if(!searchParams.open && (searchParams.creator.nonEmpty || searchParams.creatorNot.nonEmpty))
+      Future.failed(new Exception("Specified \"creator\" or \"creatorNot\" without specifying \"open\" in search query"))
+    else
+      (searchParams.open, searchParams.active) match {
+        case (true,true) => Future.failed(new Exception("Specified both \"open\" and \"active\" in search query"))
+        case (true,false) => Future.successful(openGames.searchMetadata(searchParams))
+        case (false,true) => Future.successful(activeGames.searchMetadata(searchParams))
+        case (false,false) =>
+          GameUtils.searchDB(db, searchParams, serverInstanceID).map { metas =>
+            metas.map { meta =>
+              Games.GetMetadata(
+                meta = meta,
+                openGameData = None,
+                activeGameData = None
+              )
+            }
           }
-        }
-    }
+      }
   }
 }
 
@@ -453,7 +460,7 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker, val serverInst
       accepted = Map(),
       starting = false,
       sequencePromise = Promise(),
-      sequence = 0L
+      sequence = Games.INITIAL_SEQUENCE
     )
     val gameAuth = game.logins.login(creator,now,Some(siteAuth))
     openGames = openGames + (reservedID -> game)
@@ -515,7 +522,7 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker, val serverInst
               accepted = Map(),
               starting = false,
               sequencePromise = Promise(),
-              sequence = 0L
+              sequence = Games.INITIAL_SEQUENCE
             )
             openGames = openGames + (reservedID -> game)
           }
@@ -740,6 +747,8 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker, val serverInst
       searchParams.usersInclude.forall { set => set.forall { user => game.users.contains(Some(user)) } } &&
       searchParams.gUser.forall { gUser => game.users(GOLD) == Some(gUser) } &&
       searchParams.sUser.forall { sUser => game.users(SILV) == Some(sUser) } &&
+      searchParams.creator.forall { _ == game.creator }
+      searchParams.creatorNot.forall { _ != game.creator }
       searchParams.minTime.forall { game.creationTime >= _ }
       searchParams.maxTime.forall { game.creationTime <= _ }
     }
