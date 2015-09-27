@@ -20,7 +20,8 @@ import akka.pattern.{after}
 
 object Games {
   //Time out users from games if they don't heartbeat at least this often
-  val INACTIVITY_TIMEOUT = 15.0
+  //TODO revert back to 15s after developing js heartbeats
+  val INACTIVITY_TIMEOUT = 3600.0
   //How often to check all timeouts
   val TIMEOUT_CHECK_PERIOD = 3.0
   val TIMEOUT_CHECK_PERIOD_IF_ERROR = 60.0
