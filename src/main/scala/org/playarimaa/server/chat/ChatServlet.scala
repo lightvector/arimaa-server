@@ -5,13 +5,14 @@ import org.scalatra.atmosphere.{AtmosphereSupport,AtmosphereClient}
 import org.scalatra.{atmosphere => Atmosphere}
 import org.scalatra.scalate.ScalateSupport
 
+import scala.language.postfixOps
 import scala.concurrent.{ExecutionContext, Future, Promise, future}
-import scala.concurrent.duration.{DurationInt}
+import scala.concurrent.duration.{DurationInt,DurationDouble}
 import scala.util.{Try, Success, Failure}
 import org.json4s.{DefaultFormats, Formats}
 import org.json4s.jackson.Serialization
 import org.slf4j.{Logger, LoggerFactory}
-import akka.actor.{Actor, ActorRef, ActorSystem, Props}
+import akka.actor.{Actor, ActorRef, ActorSystem, Props, Scheduler}
 import akka.pattern.{ask, pipe, after}
 import akka.util.Timeout
 import slick.driver.H2Driver.api.Database
@@ -22,7 +23,6 @@ import org.playarimaa.server.Timestamp.Timestamp
 import org.playarimaa.server.game.Games
 
 object ChatServlet {
-
   object IOTypes {
     case class SimpleError(error: String)
     case class ChatLine(id: Long, channel: String, username: String, text: String, timestamp: Double)
@@ -77,7 +77,7 @@ object ChatServlet {
 
 import org.playarimaa.server.chat.ChatServlet._
 
-class ChatServlet(val accounts: Accounts, val siteLogin: SiteLogin, val chat: ChatSystem, val games: Games, val ec: ExecutionContext)
+class ChatServlet(val accounts: Accounts, val siteLogin: SiteLogin, val chat: ChatSystem, val games: Games, val scheduler: Scheduler, val ec: ExecutionContext)
     extends WebAppStack with JacksonJsonSupport with FutureSupport with SessionSupport with AtmosphereSupport {
   //Sets up automatic case class to JSON output serialization
   protected implicit lazy val jsonFormats: Formats = Json.formats
@@ -216,6 +216,7 @@ class ChatServlet(val accounts: Accounts, val siteLogin: SiteLogin, val chat: Ch
           }
           connected = true
           loop()
+
         case Atmosphere.Disconnected(disconnector, None) =>
           connected = false
           chatAuth.foreach { chatAuth => chat.leave(channel,chatAuth) }

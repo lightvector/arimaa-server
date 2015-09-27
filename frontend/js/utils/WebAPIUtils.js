@@ -60,10 +60,14 @@ function GET(url, data, success, error) {
   });
 }
 
+function websocketURL(path) {
+  var l = window.location;
+  return ((l.protocol === "https:") ? "wss://" : "ws://") + l.hostname + (((l.port != 80) && (l.port != 443)) ? ":" + l.port : "") + path;
+}
 
 var APIUtils = {
   register_bot: function(username, email, password) {
-    //NOT YET IMPLEMENTED!
+    //TODO: NOT YET IMPLEMENTED!
   },
 
   login: function(username, password, success, error) {
@@ -71,7 +75,7 @@ var APIUtils = {
   },
 
   register: function(username, email, password, success, error) {
-    POST('/api/accounts/register', {username:username, email:email, password:password,isBot:false}, success, error);
+    POST('/api/accounts/register', {username:username, email:email, password:password, isBot:false}, success, error);
   },
 
   logout: function() {
@@ -108,6 +112,7 @@ var APIUtils = {
     POST('/api/games/'+gameID+'/actions/accept', {gameAuth:UserStore.gameAuthToken(), opponent: username}, success, error);
   },
 
+  //TODO: camelcase this function
   send_move: function(gameID, moveStr, plyNum, success, error) {
     console.log(gameID, moveStr, plyNum);
     POST('/api/games/'+gameID+'/actions/move', {gameAuth:UserStore.gameAuthToken(), move:moveStr, plyNum:plyNum}, success, error);
@@ -117,6 +122,36 @@ var APIUtils = {
     GET('/api/games/search',{open:true}, success, error);
   },
 
+  chatSocket: function(chatChannel) {
+    return new WebSocket(websocketURL('/api/chat/'+chatChannel+'/socket'));
+  },
+
+  chatJoin: function(chatChannel, success, error) {
+    POST('/api/chat/'+chatChannel+'/join', {siteAuth:UserStore.siteAuthToken()}, success, error);
+  },
+
+  chatLeave: function(chatChannel, chatAuth, success, error) {
+    POST('/api/chat/'+chatChannel+'/leave', {chatAuth:chatAuth}, success, error);
+  },
+
+  chatHeartbeat: function(chatChannel, chatAuth, success, error) {
+    POST('/api/chat/'+chatChannel+'/heartbeat', {chatAuth:chatAuth}, success, error);
+  },
+
+  chatPost: function(chatChannel, chatAuth, text, success, error) {
+    POST('/api/chat/'+chatChannel+'/post', {chatAuth:chatAuth, text:text}, success, error);
+  },
+
+  chatGet: function(chatChannel, success, error) {
+    GET('/api/chat/'+chatChannel, {}, success, error);
+  },
+
+  chatPoll: function(chatChannel, minId, success, error) {
+    GET('/api/chat/'+chatChannel, {minId:minId, doWait:true}, success, error);
+  },
+
+
+  //TODO: What is this for?
   do_something_else: 0
 }
 
