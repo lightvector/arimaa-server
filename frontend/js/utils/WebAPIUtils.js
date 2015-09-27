@@ -78,6 +78,14 @@ var APIUtils = {
     POST('/api/accounts/logout', {siteAuth:UserStore.siteAuthToken()}, function(){}, function(){});
   },
 
+  forgotPassword: function(username, success, error) {
+    POST('/api/accounts/forgotPassword', {username:username}, success, error);
+  },
+
+  resetPassword: function(username, resetAuth, password, success, error) {
+    POST('/api/accounts/resetPassword', {username:username, resetAuth:resetAuth, password:password}, success, error);
+  },
+
   createGame: function(options, success, error) {
     console.log('creating game ',options);
     POST('/api/games/actions/create', options, success, error);

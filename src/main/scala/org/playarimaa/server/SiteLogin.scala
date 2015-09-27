@@ -153,12 +153,18 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
         case Some(account) =>
           val resetInfo = passResetLock.synchronized { passResets.get(account.username) }
           val now = Timestamp.get
-          def expired = throw new Exception("Password was NOT reset - request expired due to taking too long (or due to another request). Please try again.")
+          def expired = throw new Exception("Password was NOT reset - forgotten password request expired. Please try requesting again.")
           resetInfo match {
             case None => expired
             case Some(resetInfo) =>
               if(now - resetInfo.time >= PASSWORD_RESET_TIMEOUT || resetAuth != resetInfo.auth)
                 expired
+              //Expire all reset tokens for this user
+              passResetLock.synchronized {
+                passResets = passResets.filter { case (user,resetInfo) =>
+                  user != account.username
+                }
+              }
               Future(BCrypt.hashpw(password, BCrypt.gensalt))(cryptEC).flatMap { passwordHash =>
                 accounts.setPasswordHash(account.username,passwordHash)
               }

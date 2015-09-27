@@ -101,7 +101,7 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
     switch(action.actionType) {
       //maybe we should put this in user store? or both???
       case SiteConstants.GAME_CREATED:
-        _gameID = action.gameId;
+        _gameID = action.gameID;
         _gameAuth = action.gameAuth;
         ArimaaStore.emitChange();
         break;
