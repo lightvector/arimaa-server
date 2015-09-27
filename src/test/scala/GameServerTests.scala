@@ -6,6 +6,7 @@ import akka.testkit.{TestKit, ImplicitSender}
 import slick.driver.H2Driver.api._
 import scala.util.{Try, Success, Failure}
 import scala.concurrent.ExecutionContext
+import com.typesafe.config.ConfigFactory
 
 import org.playarimaa.server.CommonTypes._
 import org.playarimaa.server._
@@ -28,13 +29,23 @@ class GameServletTests(_system: ActorSystem) extends TestKit(_system) with Scala
   }
 
   ArimaaServerInit.initialize
+
+  val config = ConfigFactory.load
+  val siteName = config.getString("siteName")
+  val siteAddress = config.getString("siteAddress")
+  val smtpHost = ""//config.getString("smtpHost")
+  val smtpPort = ""//config.getString("smtpPort")
+  val smtpAuth = config.getBoolean("smtpAuth")
+  val noReplyAddress = config.getString("noReplyAddress")
+
   val actorSystem = system
   val mainEC: ExecutionContext = ExecutionContext.Implicits.global
   val cryptEC: ExecutionContext = mainEC
   val serverInstanceID: Long = System.currentTimeMillis
   val db = ArimaaServerInit.createDB("h2memgame")
+  val emailer = new Emailer(siteName,siteAddress,smtpHost,smtpPort,smtpAuth,noReplyAddress)(mainEC)
   val accounts = new Accounts(db)(mainEC)
-  val siteLogin = new SiteLogin(accounts,cryptEC)(mainEC)
+  val siteLogin = new SiteLogin(accounts,emailer,cryptEC)(mainEC)
   val scheduler = actorSystem.scheduler
   val games = new Games(db,siteLogin.logins,scheduler,serverInstanceID)(mainEC)
   addServlet(new AccountServlet(siteLogin,mainEC), "/accounts/*")
