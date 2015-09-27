@@ -57,6 +57,12 @@ class ArimaaServlet extends WebAppStack with JacksonJsonSupport with ScalateSupp
     new java.io.File( getServletContext().getResource(path).getFile )
   }
 
+  get("/forgotPassword") {
+    contentType="text/html"
+    val path = "/board.html"
+    new java.io.File( getServletContext().getResource(path).getFile )
+  }
+
   get("/game/:gameid") {
     contentType="text/html"
     val path = "/board.html"

@@ -44,6 +44,7 @@ var registrationBox = React.createClass({
       errorText = (<div className="error">{this.state.error}</div>);
     }
 
+    //TODO it's weird to use the "forgotpass" class for the div
     return (
       <div>
         <div className="login">
