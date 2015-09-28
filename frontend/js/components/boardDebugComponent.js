@@ -6,7 +6,12 @@ var ArimaaConstants = require('../constants/ArimaaConstants.js');
 
 var component = React.createClass({
   getInitialState: function() {
-    return {debugMsg:"", myColor:ArimaaStore.getMyColor(), gameOver:null};
+    return {
+      debugMsg: "",
+      myColor: ArimaaStore.getMyColor(),
+      gameOver: ArimaaStore.getGameOver(),
+      arimaa: ArimaaStore.getArimaa()
+    };
   },
 
   componentDidMount: function() {
@@ -20,7 +25,8 @@ var component = React.createClass({
     this.setState({
       debugMsg:ArimaaStore.getDebugMsg(),
       myColor:ArimaaStore.getMyColor(),
-      gameOver:ArimaaStore.getGameOver()
+      gameOver:ArimaaStore.getGameOver(),
+      arimaa:ArimaaStore.getArimaa()
     });
   },
 
@@ -30,19 +36,25 @@ var component = React.createClass({
   },
 
   completeMove: function() {
-    ArimaaActions.completeMove(this.props.gameID);
+    if(ArimaaStore.getSetupColor() === ArimaaConstants.GAME.GOLD) {
+      ArimaaActions.sendGoldSetup(this.props.gameID);
+    } else if(ArimaaStore.getSetupColor() === ArimaaConstants.GAME.SILVER) {
+      ArimaaActions.sendSilverSetup(this.props.gameID);
+    } else {
+      ArimaaActions.completeMove(this.props.gameID);
+    }
   },
 
   //TODO: change these debugs so only the relevant one for our color shows
   //or condense them into 1 function
   goldSetup: function() {
     //ArimaaActions.completeMove(this.props.gameID, this.refs.goldSetup.getDOMNode().value, 0);
-    ArimaaActions.setupGold(this.props.gameID, this.refs.goldSetup.getDOMNode().value);
+    ArimaaActions.debugSendGoldSetup(this.props.gameID, this.refs.goldSetup.getDOMNode().value);
   },
 
   silverSetup: function() {
     //ArimaaActions.completeMove(this.props.gameID, this.refs.silverSetup.getDOMNode().value, 1);
-    ArimaaActions.setupSilver(this.props.gameID, this.refs.silverSetup.getDOMNode().value);
+    ArimaaActions.debugSendGoldSetup(this.props.gameID, this.refs.silverSetup.getDOMNode().value);
   },
 
   undoStep: function() {

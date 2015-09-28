@@ -16,6 +16,11 @@ var debugMsg = "";
 var _gameID;
 var _gameAuth;
 
+var _setupGold   = ['C','D','H','E','M','H','D','C','R','R','R','R','R','R','R','R']; //a2-h2, a1-h1 //default gold setup
+var _setupSilver = ['r','r','r','r','r','r','r','r','c','d','h','m','e','h','d','c']; //a8-h8, a7-h7 //default silver setup
+var _currentSetup = []; //the current setup the user chooses
+var _setupColor = ArimaaConstants.GAME.NULL_COLOR;
+
 var _arimaa = new Arimaa();
 var _selSquareNum = ArimaaConstants.GAME.NULL_SQUARE_NUM;
 var _selSquareName = "";
@@ -30,6 +35,14 @@ var _sequenceNum = 0;
 setInitialState();
 
 const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
+  getSetupColor: function() {
+    return _setupColor;
+  },
+
+  getSetup: function() {
+    return _currentSetup;
+  },
+
   getMyColor: function() {
     return _myColor;
   },
@@ -97,7 +110,6 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
       _validSteps = [];
     }
 
-
     switch(action.actionType) {
       //maybe we should put this in user store? or both???
       case SiteConstants.GAME_CREATED:
@@ -114,16 +126,96 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
         }
         ArimaaStore.emitChange();
         break;
+      //used after getting game status from server
+      //to signal we should enter a setup
       case ArimaaConstants.ACTIONS.GAME_SETUP_GOLD:
+        //we only show the pieces for setup when its our turn to setup
+        if(_myColor === ArimaaConstants.GAME.GOLD) {
+          _currentSetup = _setupGold;
+          _setupColor = ArimaaConstants.GAME.GOLD;
+        }
+        ArimaaStore.emitChange();
+        break;
+      //also used after getting status from server
+      case ArimaaConstants.ACTIONS.GAME_SETUP_SILVER:
+        //we only show the pieces for setup when its our turn to setup,
+        if(_myColor === ArimaaConstants.GAME.SILVER) {
+          _currentSetup = _setupSilver;
+          _setupColor = ArimaaConstants.GAME.SILVER;
+        }
+        ArimaaStore.emitChange();
+        break;
+      case ArimaaConstants.ACTIONS.GAME_SETUP_OVER:
+        _setupColor = ArimaaConstants.GAME.NULL_COLOR;
+        ArimaaStore.emitChange();
+        break;
+      case ArimaaConstants.ACTIONS.GAME_SEND_SETUP_GOLD:
+        var moveStr = "";
+        for(var i=0;i<2;i++) {
+          for(var j=0;j<8;j++) {
+            moveStr += _currentSetup[8*i+j]+ArimaaConstants.GAME.FILES[j]+(2-i).toString()+" ";
+          }
+        }
+        _arimaa.setup_gold(moveStr); //NO ERROR CHECKING YET
+        APIUtils.send_move(action.gameID, moveStr, 0, function(){}, function(){});
+        break;
+      case ArimaaConstants.ACTIONS.GAME_SEND_SETUP_SILVER:
+        var moveStr = "";
+        for(var i=0;i<2;i++) {
+          for(var j=0;j<8;j++) {
+            moveStr += _currentSetup[8*i+j]+ArimaaConstants.GAME.FILES[j]+(8-i).toString()+" ";
+          }
+        }
+        _arimaa.setup_silver(moveStr); //NO ERROR CHECKING YET
+        APIUtils.send_move(action.gameID, moveStr, 1, function(){}, function(){});
+        break;
+
+      //debug methods to send setup as text
+      //only used in debug component
+      case ArimaaConstants.ACTIONS.DEBUG_SEND_SETUP_GOLD:
         _arimaa.setup_gold(action.text);
         APIUtils.send_move(action.gameID, action.text, 0, function(){}, function(){});
         ArimaaStore.emitChange();
+        //usually, this is done with the game_setup_silver action,
+        //but for local games where we don't go through the network
+        //we do this here
+        _currentSetup = _silverSetup;
+
         break;
-      case ArimaaConstants.ACTIONS.GAME_SETUP_SILVER:
+      case ArimaaConstants.ACTIONS.DEBUG_SEND_SETUP_SILVER:
         _arimaa.setup_silver(action.text);
         APIUtils.send_move(action.gameID, action.text, 1, function(){}, function(){});
         ArimaaStore.emitChange();
         break;
+      case ArimaaConstants.ACTIONS.GAME_CLICK_SQUARE_SETUP:
+        //there's probably a way to use bitwise operations
+        //to simplify these conditionals, but this will work
+        if(_setupColor === ArimaaConstants.GAME.GOLD) { //gold to setup
+          if(action.squareNum < 48) { //ideally, we wouldn't use theses magic numbers
+            _setSelectedSquareToNull();
+          } else if(_selSquareNum === ArimaaConstants.GAME.NULL_SQUARE_NUM) {
+            _setSelectedSquare(action);
+          } else {
+            var temp = _currentSetup[action.squareNum-48];
+            _currentSetup[action.squareNum-48] = _currentSetup[_selSquareNum-48];
+            _currentSetup[_selSquareNum-48] = temp;
+            _setSelectedSquareToNull();
+          }
+        } else { //silver to setup
+          if(action.squareNum > 16) {
+            _setSelectedSquareToNull();
+          } else if(_selSquareNum === ArimaaConstants.GAME.NULL_SQUARE_NUM) {
+            _setSelectedSquare(action);
+          } else {
+            var temp = _currentSetup[action.squareNum];
+            _currentSetup[action.squareNum] = _currentSetup[_selSquareNum];
+            _currentSetup[_selSquareNum] = temp;
+            _setSelectedSquareToNull();
+          }
+        }
+        ArimaaStore.emitChange();
+        break;
+
       case ArimaaConstants.ACTIONS.GAME_CLICK_SQUARE:
         //DEFINITELY NEED TO SIMPLIFY THESE CONDITIONALS
 
@@ -203,7 +295,6 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
           var lastMove = moves[moves.length-1];
           var lastMoveStr = lastMove.map(function(s) {return s.string;}).join(' ');
 
-
           if(completed.victory.result !== 0) {
             console.log(completed.victory.result);
             var winner = "";
@@ -245,13 +336,9 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
 
 });
 
-//debug only???
 function setInitialState() {
-  var options = {fen:"8/8/3CR3/3r4/8/8/8/8"};
   _arimaa = new Arimaa();
-  //
-  //_arimaa.add_step("Cd6n");
-  //_arimaa.complete_move();
+  _currentSetup = _setupGold;
 }
 
 module.exports = ArimaaStore;

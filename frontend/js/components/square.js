@@ -5,7 +5,8 @@ var Square = React.createClass({
   propTypes: {
     black: PropTypes.bool,
     trap: PropTypes.bool,
-    selected: PropTypes.bool
+    selected: PropTypes.bool,
+    sqName: PropTypes.string
   },
 
   render: function () {
@@ -13,7 +14,7 @@ var Square = React.createClass({
     var trap = this.props.trap;
     var selected = this.props.selected;
     var stepTo = this.props.stepTo;
-
+    var sqName = this.props.sqName;
 
     var className = black ? "white" : "black";
 
@@ -28,6 +29,7 @@ var Square = React.createClass({
 
     return (
       <div className={className}>
+        {sqName}
         {this.props.children}
       </div>
     );
