@@ -110,7 +110,7 @@ var SiteActions = {
       actionType: SiteConstants.GAME_CREATED,
       gameID: data.gameID,
       gameAuth: data.gameAuth
-    })
+    });
     APIUtils.gameStatus(data.gameID, 0, SiteActions.gameStatusSuccess, FUNC_NOP);
   },
   createGameError: function(data) {

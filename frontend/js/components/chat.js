@@ -3,145 +3,145 @@ var APIUtils = require('../utils/WebAPIUtils.js');
 var SiteActions = require('../actions/SiteActions.js');
 var UserStore = require('../stores/UserStore.js');
 
+const FUNC_NOP = function(){};
+
 var chatBox = React.createClass({
   getInitialState: function() {
-    var ws = APIUtils.chatSocket(this.props.chatChannel);
-    ws.onopen = this.onWSOpen;
-    ws.onclose = this.onWSClose;
-    ws.onmessage = this.onWSMessage;
-    ws.onerror = this.onWSError;
-    return {lines:[], chatAuth:null, userInput:"", ws:ws, wsOpen:false};
+    return {lines:[], nextMinId:-1, chatAuth:null, userInput:"", error:""};
   },
-  handleUserInputChange: function(e) {
-    this.setState({userInput: e.target.value});
-  },
-
-  doJoin: function() {
-    if(this.state.wsOpen) {
-      this.state.ws.send(JSON.stringify({action:"join",text:UserStore.siteAuthToken()}));
-    }
-  },
-
-  submitJoin: function(event) {
-    event.preventDefault();
+  componentDidMount: function() {
     this.doJoin();
   },
 
+  clearError: function() {
+    this.setState({error:""});
+  },
+
+  handleUserInputChange: function(e) {
+    this.setState({userInput: e.target.value});
+    this.clearError();
+  },
   submitUserInput: function(event) {
     event.preventDefault();
-    if(this.state.wsOpen && this.state.chatAuth) {
+    this.clearError();
+    if(this.state.chatAuth !== null) {
       var userInput = this.state.userInput.trim();
       this.setState({userInput:""});
       if(userInput.length > 0) {
-        this.state.ws.send(JSON.stringify({action:"post",text:userInput}));
+        APIUtils.chatPost(this.props.chatChannel, this.state.chatAuth, userInput, FUNC_NOP, this.onUserInputError);
       }
     }
   },
-
-  submitClose: function(event) {
-    event.preventDefault();
-    this.state.ws.close();
+  onUserInputError: function(data) {
+    this.setState({error:data.error});
+    this.setState({chatAuth:null});
   },
 
-  onWSOpen: function () {
-    this.setState({wsOpen:true});
+  doJoin: function() {
+    APIUtils.chatJoin(this.props.chatChannel, this.onJoinSuccess, this.onJoinError);
+  },
+  onJoinSuccess: function(data) {
+    var chatAuth = data.chatAuth;
+    var that = this;
+    this.setState({chatAuth:chatAuth}, function() { that.startPollLoop(chatAuth); that.startHeartbeatLoop(chatAuth); });
+  },
+  onJoinError: function(data) {
+    this.setState({error:data.error});
+    this.setState({chatAuth:null});
+  },
+  submitJoin: function(event) {
+    event.preventDefault();
+    this.clearError();
     this.doJoin();
   },
 
-  onWSClose: function () {
-    this.setState({wsOpen:false, chatAuth:null});
-  },
-
-  onWSMessage: function (wsmessage) {
-    var data = wsmessage.data.trim();
-    if(data.length > 0) {
-      var message = JSON.parse(data);
-      if(message.error) {
-        //TODO
-        console.log(message.error);
-      }
-      else if(message.chatAuth) {
-        this.setState({chatAuth:message.chatAuth});
-      }
-      else if(message.id) {
-        this.setState({lines: this.state.lines.concat([message])});
-      }
+  doLeave: function() {
+    if(this.state.chatAuth !== null) {
+      APIUtils.chatLeave(this.props.chatChannel, this.state.chatAuth, this.onLeaveSuccess, this.onLeaveError);
     }
   },
+  onLeaveSuccess: function(data) {
+    this.setState({chatAuth:null});
+  },
+  onLeaveError: function(data) {
+    this.setState({error:data.error});
+    this.setState({chatAuth:null});
+  },
+  submitLeave: function(event) {
+    event.preventDefault();
+    this.clearError();
+    this.doLeave();
+  },
 
-  onWSError: function (error) {
-    //TODO
-    console.log(error);
+  startHeartbeatLoop: function(chatAuth) {
+    if(this.state.chatAuth !== null && this.state.chatAuth == chatAuth) {
+      APIUtils.chatHeartbeat(this.props.chatChannel, chatAuth, FUNC_NOP, this.onHeartbeatError);
+      //TODO sleep 30s
+      var that = this;
+      setTimeout(function () {that.startHeartbeatLoop(chatAuth);}, 30000);
+    }
+  },
+  onHeartbeatError: function(data) {
+    this.setState({error:data.error});
+    this.setState({chatAuth:null});
+  },
+
+  startPollLoop: function(chatAuth) {
+    if(this.state.chatAuth !== null && this.state.chatAuth == chatAuth) {
+      var that = this;
+      if(this.state.nextMinId < 0)
+        APIUtils.chatGet(this.props.chatChannel,
+                         function(data) {that.onLinesSuccess(data,chatAuth);}, function(data) {that.onLinesError(data,chatAuth);});
+      else
+        APIUtils.chatPoll(this.props.chatChannel, this.state.nextMinId,
+                          function(data) {that.onLinesSuccess(data,chatAuth);}, function(data) {that.onLinesError(data,chatAuth);});
+    }
+  },
+  onLinesSuccess: function(data, chatAuth) {
+    var nextMinId = this.state.nextMinId;
+    for(var i = 0; i<data.lines.length; i++) {
+      if(data.lines[i].id >= nextMinId)
+        nextMinId = data.lines[i].id + 1;
+    }
+    if(nextMinId < 0)
+      nextMinId = 0;
+
+    //TODO max 10000 lines in chat history
+    this.setState({lines:this.state.lines.concat(data.lines).slice(-10000), nextMinId:nextMinId});
+    //TODO sleep 300 ms
+    var that = this;
+    setTimeout(function () {that.startPollLoop(chatAuth);}, 300);
+  },
+  onLinesError: function(data, chatAuth) {
+    this.setState({error:data.error});
+    var that = this;
+    setTimeout(function () {that.startPollLoop(chatAuth);}, 5000); //TODO 5 second wait on error
   },
 
   render: function() {
-    //TODO
-    if(!this.state.chatAuth) {
-      // return(
-      //   React.createElement("div", {className: "loginBox"},
-      //     React.createElement("h1", null, "Login"),
-      //     React.createElement("form", {className: "commentForm", onSubmit: this.joinChatRoom},
-      //       React.createElement("input", {type: "text", ref: "username", placeholder: "Username"}),
-      //       React.createElement("input", {type: "submit", value: "Join"})
-      //     )
-      //   )
-      // )
-    }
-
     var lines = this.state.lines.map(function(line) {
-      return React.createElement("tr", {key: line.id}, React.createElement("td", {key: line.id}, React.createElement("b", null, line.username + ": "), line.text));
+      return React.createElement("tr", {key: line.id}, React.createElement("td", {key: line.id + "td"}, React.createElement("b", null, line.username + ": "), line.text));
     });
 
-    return (
-      React.createElement("div", {className: "commentBox"},
-        React.createElement("h1", null, "Chat"),
-        React.createElement("table", null,
-          lines
-        ),
-        React.createElement("form", {className: "commentForm", onSubmit: this.submitUserInput},
-          React.createElement("input", {type: "text", ref: "text", value: this.state.userInput, onChange: this.handleUserInputChange, placeholder: "Say something..."}),
-          React.createElement("input", {type: "submit", disabled: !this.state.chatAuth, value: "Post"})
-        ),
-        React.createElement("button", {onClick: this.submitJoin, disabled: !(!this.state.chatAuth)}, "Join"),
-        React.createElement("button", {onClick: this.submitClose, disabled: !this.state.chatAuth}, "Leave")
-      )
-    );
+    var contents = [
+      React.createElement("h1", null, "Chat"),
+      React.createElement("table", null, lines),
+      React.createElement(
+        "form", {className: "commentForm", onSubmit: this.submitUserInput},
+        React.createElement("input", {type: "text", ref: "text", value: this.state.userInput, onChange: this.handleUserInputChange, placeholder: "Say something..."}),
+        React.createElement("input", {type: "submit", disabled: !this.state.chatAuth, value: "Post"})
+      ),
+      React.createElement("button", {onClick: this.submitJoin, disabled: !(!this.state.chatAuth)}, "Join"),
+      React.createElement("button", {onClick: this.submitLeave, disabled: !this.state.chatAuth}, "Leave"),
+    ];
+
+    if(this.state.error != "") {
+      contents.push(React.createElement("div", {className:"error"}, this.state.error));
+    }
+
+    return React.createElement("div", {className: "commentBox"}, contents);
   }
 
-
-  // render: function() {
-  //   //var value = this.state.value;
-  //   //return <input type="text" value={value} onChange={this.handleChange} />;
-
-  //   var errorText = null;
-  //   var messageText = null;
-  //   //is empty string falsey?
-  //   if(this.state.error != "") {
-  //     errorText = (<div className="error">{this.state.error}</div>);
-  //   }
-  //   var messageText = null;
-  //   //TODO it's weird to use the "forgotpass" class for the div
-  //   if(this.state.message != "") {
-  //     messageText = (<div className="forgotpass">{this.state.message}</div>);
-  //   }
-
-  //   //TODO here and elsewhere, should we be disabling the buttons upon submit so that we don't accidentally get double-sends of requests?
-  //   //TODO it's weird to use the "forgotpass" class for the div
-  //   return (
-  //     <div>
-  //       <div className="login">
-  //         <h1>Reset Password</h1>
-  //         <form method="post" action="index.html">
-  //           <input type="password" name="password" value={this.state.pass} onChange={this.handlePasswordChange} placeholder="New Password"/>
-  //           <input type="password" name="confirmPassword" value={this.state.confirmPass} onChange={this.handleConfirmPasswordChange} placeholder="Confirm New Password"/>
-  //           <input type="submit" className="submit" name="commit" value="Set New Password" onClick={this.submitResetPassword}/>
-  //         </form>
-  //         {errorText}
-  //         <div className="forgotpass"><a href="/login">Back to login</a></div>
-  //       </div>
-  //     </div>
-  //   )
-  // }
 });
 
 module.exports = chatBox;

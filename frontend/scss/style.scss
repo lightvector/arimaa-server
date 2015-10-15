@@ -55,8 +55,10 @@ h1 {
 }
 
 .login {
-  top: 200px;
-  position: relative;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%,-50%);
+  position: absolute;
   margin: 0px auto;
   width: 310px;
   padding: 10px 10px 5px 10px;

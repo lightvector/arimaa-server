@@ -14,7 +14,7 @@ function POST(url, data, success, error) {
     success: function(data, textStatus, xhr) {
       if(PRINT_DATA) { console.log("url: " + url + "\ndata: ", data);}
 
-      if(data['error']) {
+      if('error' in data) {
         error(data);
       } else {
         success(data);
@@ -27,7 +27,7 @@ function POST(url, data, success, error) {
         console.log('auth fail');
         //logout();
       } else {
-        error(err);
+        error({error: err});
       }
     }
   });
@@ -41,7 +41,7 @@ function GET(url, data, success, error) {
     data: data,
     success: function(data, textStatus, xhr) {
       if(PRINT_DATA) {console.log("url: " + url + "\ndata: ", data);}
-      if(data['error']) {
+      if('error' in data) {
         error(data);
       } else {
         success(data);
@@ -54,7 +54,7 @@ function GET(url, data, success, error) {
         console.log('auth fail');
         //logout();
       } else {
-        error(err);
+        error({error: err});
       }
     }
   });

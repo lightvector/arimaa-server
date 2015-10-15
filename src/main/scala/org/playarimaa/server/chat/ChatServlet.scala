@@ -34,7 +34,7 @@ object ChatServlet {
     abstract class Reply
   }
   object Action {
-    val all: List[Action] = List(Join,Leave,Post)
+    val all: List[Action] = List(Join,Leave,Heartbeat,Post)
   }
 
   case object Join extends Action {
