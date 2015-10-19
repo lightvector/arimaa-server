@@ -60,10 +60,10 @@ var component = React.createClass({
     SiteActions.acceptUserForGame(gID, username);
   },
 
-  gameStatus: function() {
+  gameState: function() {
     var gID = this.refs.statusGameID.getDOMNode().value;
     var minSeq = this.refs.statusMinSeq.getDOMNode().value;
-    SiteActions.gameStatus(gID, minSeq);
+    SiteActions.gameState(gID, minSeq);
   },
 
   getOpenGames: function() {
@@ -149,7 +149,7 @@ var component = React.createClass({
         <p />
         <input type="text" ref="statusGameID" placeholder="gameID"/>
         <input type="text" ref="statusMinSeq" placeholder="sequence" defaultValue="0"/>
-        <button type="button" onClick={this.gameStatus}>Status</button>
+        <button type="button" onClick={this.gameState}>Game State</button>
 
         <p />
         <input type="text" ref="acceptGameID" placeholder="gameID"/>

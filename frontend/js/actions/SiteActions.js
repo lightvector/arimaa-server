@@ -94,6 +94,7 @@ var SiteActions = {
     console.log("creating game with type: ", gameType);
     var opts = {
       tc: {
+        //TODO specify TC
         initialTime: 3600 //1 hr
       },
       rated: false,
@@ -104,19 +105,21 @@ var SiteActions = {
   },
   createGameSuccess: function(data) {
     console.log("create game data ", data);
-    cookie.save('gameAuth',data.gameAuth, {path:'/'}); //need a way to save multiple gameauths
+    cookie.save('gameAuth',data.gameAuth, {path:'/'}); //TODO need a way to save multiple gameauths
 
     ArimaaDispatcher.dispatch({
       actionType: SiteConstants.GAME_CREATED,
       gameID: data.gameID,
       gameAuth: data.gameAuth
     });
-    APIUtils.gameStatus(data.gameID, 0, SiteActions.gameStatusSuccess, FUNC_NOP);
+    APIUtils.gameState(data.gameID, 0, SiteActions.gameStateSuccess, FUNC_NOP);
   },
   createGameError: function(data) {
 
   },
-  gameStatusSuccess: function(data) {
+
+  
+  gameStateSuccess: function(data) {
     seqNum = data.sequence;
 
     if(data.meta.openGameData && data.meta.openGameData.joined.length > 1) {
@@ -127,14 +130,14 @@ var SiteActions = {
       });
       ArimaaDispatcher.dispatch({
         actionType: SiteConstants.GAME_STATUS_UPDATE,
-        data: data //pass all the data. maybe we can be more selective later on
+        data: data //pass all the data
       });
     }
 
-    APIUtils.gameStatus(data.meta.id, seqNum+1, SiteActions.gameStatusSuccess, FUNC_NOP); //hopefully the compiler tail recurses this
+    APIUtils.gameState(data.meta.id, seqNum+1, SiteActions.gameStateSuccess, FUNC_NOP);
   },
-  gameStatus: function(gameID, sequence) {
-    APIUtils.gameStatus(gameID, sequence, SiteActions.gameStatusSuccess, FUNC_NOP);
+  gameState: function(gameID, sequence) {
+    APIUtils.gameState(gameID, sequence, SiteActions.gameStateSuccess, FUNC_NOP);
   },
 
 

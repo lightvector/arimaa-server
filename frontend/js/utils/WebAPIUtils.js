@@ -100,7 +100,7 @@ var APIUtils = {
     POST('/api/games/'+gameID+'/actions/join', {siteAuth:UserStore.siteAuthToken()}, success, error);
   },
 
-  gameStatus: function(gameID, seq, success, error) {
+  gameState: function(gameID, seq, success, error) {
     GET('/api/games/'+gameID+'/state', {minSequence:seq}, success, error);
   },
 
