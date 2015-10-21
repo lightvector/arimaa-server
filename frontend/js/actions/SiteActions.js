@@ -4,7 +4,7 @@ var SiteConstants = require('../constants/SiteConstants.js');
 var UserStore = require('../stores/UserStore.js');
 var cookie = require('react-cookie');
 
-const FUNC_NOP = function(){}
+const FUNC_NOP = function(){};
 
 var seqNum = 0; //maybe move this to the store?
 
@@ -117,7 +117,8 @@ var SiteActions = {
       gameID: data.gameID,
       gameAuth: data.gameAuth
     });
-    APIUtils.gameState(data.gameID, 0, SiteActions.gameStateSuccess, FUNC_NOP);
+    //TODO
+    //APIUtils.gameState(data.gameID, 0, SiteActions.gameStateSuccess, FUNC_NOP);
   },
   createGameError: function(data) {
     //TODO
@@ -163,68 +164,98 @@ var SiteActions = {
     }, 30000);
   },
 
-
-  //Initiates a loop querying for the result of this game state and heartbeating it so long as the game
-  //exists and is open and is a game we created
-  beginCreatedGameStateLoop: function(gameID) {
-    APIUtils.gameState(gameID, 0, SiteActions.gameStateSuccess, SiteActions.gameStateError);
+  //Initiates a loop querying for the list of active games every few seconds, continuing forever.
+  beginActiveGamesLoop: function() {
+    APIUtils.getActiveGames(SiteActions.activeGamesLoopSuccess, SiteActions.activeGamesLoopError);
   },
-  gameStateSuccess: function(data) {
+  activeGamesLoopSuccess: function(data) {
+    ArimaaDispatcher.dispatch({
+      actionType: SiteConstants.ACTIVE_GAMES_LIST,
+      metadatas: data
+    });
+
+    //TODO sleep 6s
+    setTimeout(function () {
+      APIUtils.getActiveGames(SiteActions.activeGamesLoopSuccess, SiteActions.activeGamesLoopError);
+    }, 6000);
+  },
+  activeGamesLoopError: function(data) {
+    //TODO
+    console.log(data);
+    //TODO sleep 30s
+    setTimeout(function () {
+      APIUtils.getActiveGames(SiteActions.activeGamesLoopSuccess, SiteActions.activeGamesLoopError);
+    }, 30000);
+  },
+
+
+  //Initiates a loop querying for the result of this game metadata so long as the game
+  //exists and is open and is a game we created OR that directly involves us
+  beginOwnOpenGameMetadataLoop: function(gameID) {
+    APIUtils.gameMetadata(gameID, 0, SiteActions.ownOpenGameMetadataSuccess, function(data) {return SiteActions.ownOpenGameMetadataError(gameID,data);});
+  },
+  ownOpenGameMetadataSuccess: function(data) {
     seqNum = data.sequence;
 
-    if(data.meta.openGameData && data.meta.openGameData.joined.length > 1) {
+    if(data.openGameData && data.openGameData.joined.length > 1) {
       ArimaaDispatcher.dispatch({
         actionType: SiteConstants.PLAYER_JOINED,
-        players: data.meta.openGameData.joined, //note this includes the creator
-        gameID: data.meta.id
+        players: data.openGameData.joined, //note this includes the creator
+        gameID: data.id
       });
       ArimaaDispatcher.dispatch({
-        actionType: SiteConstants.GAME_STATUS_UPDATE,
+        actionType: SiteConstants.GAME_METADATA_UPDATE,
         data: data //pass all the data
       });
     }
 
     //TODO sleep 200ms
     setTimeout(function () {
-      APIUtils.gameState(data.meta.id, seqNum+1, SiteActions.gameStateSuccess, SiteActions.gameStateError);
+      APIUtils.gameMetadata(data.meta.id, seqNum+1, SiteActions.ownOpenGameMetadataSuccess, function(data) {return SiteActions.ownOpenGameMetadataError(data.meta.id,data);});
     }, 200);
 
   },
-  gameStateError: function(gameID,data) {
+  ownOpenGameMetadataError: function(gameID,data) {
     //TODO
     console.log(data);
-    if(createdGameExistsInStore(gameID)) {
+    if(isOwnOpenGameInStore(gameID)) {
       //TODO sleep 2000 ms
       setTimeout(function () {
-        APIUtils.gameState(id, 0, SiteActions.gameStateSuccess, SiteActions.gameStateError);
+        APIUtils.gameMetadata(gameID, 0, SiteActions.ownOpenGameMetadataSuccess, function(data) {return SiteActions.ownOpenGameMetadataError(gameID,data);});
       }, 2000);
     }
   },
-  createdGameExistsInStore: function(gameID) {
-    var games = UserStore.getCreatedGames();
+  isOwnOpenGameInStore: function(gameID) {
+    var games = UserStore.getOwnOpenGamesDict();
+    if(!(gameID in games))
+      return false;
+    return games[gameID] !== undefined;
+  },
+
+  //Initiates a loop going forever heartbeating all games that are open and that we've joined this game so long as the game
+  //exists and is open and is a game we joined.
+  startOpenJoinedHeartbeatLoop: function() {
+    var games = UserStore.getOwnGames().concat(UserStore.getJoinableOpenGames());
+    var username = UserStore.getUsername();
     for(var i = 0; i<games.length; i++) {
-      if(games[i].openGameData !== undefined
-         && games[i].id == gameID
-         && games[i].openGameData.creator !== undefined
-         && games[i].openGameData.creator == UserStore.getUsername()) {
-        return true;
+      if(games[i].openGameData !== undefined) {
+        var joined = false;
+        for(var j = 0; j<games[i].openGameData.joined.length; j++) {
+          if(games[i].openGameData.joined[j].name == username) {
+            joined = true; break;
+          }
+        }
+        if(joined)
+          APIUtils.gameHeartbeat(games[i].id, FUNC_NOP, this.onHeartbeatError);
       }
     }
-    return false;
-  },
-  startHeartbeatLoop: function(gameID) {
-    if(createdGameExistsInStore(gameID)) {
-      APIUtils.gameHeartbeat(gameID, FUNC_NOP, this.onHeartbeatError);
-      //TODO sleep 5s
-      var that = this;
-      setTimeout(function () {that.startHeartbeatLoop(gameID);}, 5000);
-    }
+    var that = this;
+    setTimeout(function () {that.startOpenJoinedHeartbeatLoop();}, 5000);
   },
   onHeartbeatError: function(data) {
     //TODO
     console.log(data);
   },
-
 
   //starts a game
   acceptUserForGame: function(gameID, username) {

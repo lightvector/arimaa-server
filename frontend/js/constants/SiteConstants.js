@@ -11,7 +11,7 @@ var SiteConstants = keyMirror({
   RESET_PASSWORD_SUCCESS: null,
   GAME_CREATED: null,
   PLAYER_JOINED: null,
-  GAME_STATUS_UPDATE: null,
+  GAME_METADATA_UPDATE: null,
   OPEN_GAMES_LIST: null
 });
 

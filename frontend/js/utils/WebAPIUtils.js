@@ -1,7 +1,7 @@
 //we're only using jquery to do ajax, so
 //it might be better to use a lighter library for that
 var $ = require('jquery');
-var UserStore = require('../stores/UserStore.js')
+var UserStore = require('../stores/UserStore.js');
 
 var PRINT_DATA = true;
 
@@ -109,7 +109,7 @@ var APIUtils = {
   },
 
   gameHeartbeat: function(gameID, success, error) {
-    POST('/api/games/'+gameID+'/heartbeat', {gameAuth:""}, success, error);
+    POST('/api/games/'+gameID+'/actions/heartbeat', {gameAuth:""}, success, error);
   },
 
   acceptUserForGame: function(gameID, username, success, error) {
