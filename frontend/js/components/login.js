@@ -54,7 +54,7 @@ var loginBox = React.createClass({
           <div><a href="/register">Register</a></div>
         </div>
       </div>
-    )
+    );
   }
 });
 

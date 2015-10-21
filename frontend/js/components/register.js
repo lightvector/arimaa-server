@@ -60,7 +60,7 @@ var registrationBox = React.createClass({
           <div className="forgotpass"><a href="/login">Back to login</a></div>
         </div>
       </div>
-    )
+    );
   }
 });
 

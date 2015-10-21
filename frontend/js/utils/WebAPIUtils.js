@@ -104,6 +104,10 @@ var APIUtils = {
     GET('/api/games/'+gameID+'/state', {minSequence:seq}, success, error);
   },
 
+  gameMetadata: function(gameID, seq, success, error) {
+    GET('/api/games/'+gameID+'/metadata', {minSequence:seq}, success, error);
+  },
+
   gameHeartbeat: function(gameID, success, error) {
     POST('/api/games/'+gameID+'/heartbeat', {gameAuth:""}, success, error);
   },

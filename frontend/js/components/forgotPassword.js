@@ -56,7 +56,7 @@ var forgotPasswordBox = React.createClass({
           <div><a href="/login">Back to login</a></div>
         </div>
       </div>
-    )
+    );
   }
 });
 

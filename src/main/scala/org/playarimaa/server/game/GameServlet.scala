@@ -75,7 +75,8 @@ object GameServlet {
       activeGameData: Option[ActiveGameData],
       result: Option[GameResult],
       position: String,
-      now: Double
+      now: Double,
+      sequence: Option[Long]
     )
 
     case class MoveTime(
@@ -87,8 +88,7 @@ object GameServlet {
       history: Vector[String],
       moveTimes: Vector[MoveTime],
       toMove: String,
-      meta: GameMetadata,
-      sequence: Option[Long]
+      meta: GameMetadata
     )
     //Uses lists instead of vectors to support deserialization.
     //TODO - see https://github.com/json4s/json4s/issues/82
@@ -96,8 +96,7 @@ object GameServlet {
       history: List[String],
       moveTimes: List[MoveTime],
       toMove: String,
-      meta: GameMetadata,
-      sequence: Option[Long]
+      meta: GameMetadata
     )
   }
 
@@ -195,7 +194,15 @@ object GameServlet {
   }
 
   case object GetMetadata {
+    case class Query(minSequence: Option[Long], timeout: Option[Int])
     type Reply = IOTypes.GameMetadata
+
+    def parseQuery(params: Map[String,String]): Query = {
+      new Query(
+        params.get("minSequence").map(_.toLong),
+        params.get("timeout").map(_.toInt)
+      )
+    }
   }
 
   case object GetSearch {
@@ -437,7 +444,8 @@ class GameServlet(val accounts: Accounts, val siteLogin: SiteLogin, val games: G
         ))
       },
       position = data.meta.position,
-      now = Timestamp.get
+      now = Timestamp.get,
+      sequence = data.sequence
     )
   }
 
@@ -446,8 +454,7 @@ class GameServlet(val accounts: Accounts, val siteLogin: SiteLogin, val games: G
       history = data.moves.map(_.move),
       moveTimes = data.moves.map { info => IOTypes.MoveTime(start = info.start, time = info.time) },
       toMove = GameUtils.nextPlayer(data.moves.length).toString,
-      meta = convMeta(data.meta),
-      sequence = data.sequence
+      meta = convMeta(data.meta)
     )
   }
 
@@ -460,7 +467,9 @@ class GameServlet(val accounts: Accounts, val siteLogin: SiteLogin, val games: G
   }
 
   def handleGetMetadata(id: GameID, params: Map[String,String]) : AnyRef = {
-    games.getMetadata(id).map { data =>
+    val query = GetMetadata.parseQuery(params)
+    val timeout = math.min(Games.GET_MAX_TIMEOUT, query.timeout.map(_.toDouble).getOrElse(Games.GET_DEFAULT_TIMEOUT))
+    games.getMetadata(id, query.minSequence, timeout).map { data =>
       convMeta(data)
     }
   }
@@ -527,10 +536,10 @@ class GameServlet(val accounts: Accounts, val siteLogin: SiteLogin, val games: G
                       send(Json.write(IOTypes.SimpleError(e.getMessage())))
                     case Success(data) =>
                       //Send back the gamestate if it's new
-                      if(!data.sequence.exists(_ <= lastSequence))
+                      if(!data.meta.sequence.exists(_ <= lastSequence))
                         send(Json.write(convState(data)))
                       //If the game is active or open (gamestate has a sequence number), then repeat
-                      data.sequence.foreach { sequence =>
+                      data.meta.sequence.foreach { sequence =>
                         lastSequence = sequence
                         assert(data.meta.openGameData.nonEmpty || data.meta.activeGameData.nonEmpty)
                         loop

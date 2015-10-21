@@ -6,7 +6,7 @@ var component = React.createClass({
   getInitialState: function() {
     return {error:'', createdGames:[], openGames:[]};
   },
-  
+
   componentDidMount: function() {
     UserStore.addChangeListener(this._onChange);
     UserStore.addGameMetaChangeListener(this._onGameMetaChange);
