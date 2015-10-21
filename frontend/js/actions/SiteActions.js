@@ -34,6 +34,7 @@ var SiteActions = {
       actionType: SiteConstants.LOGIN_SUCCESS
     });
   },
+
   register: function(username, email, password) {
     console.log("do some registering");
     APIUtils.register(username, email, password, this.registerSuccess, this.registerError);
@@ -52,12 +53,14 @@ var SiteActions = {
       reason: data.error
     });
   },
+
   logout: function() {
     APIUtils.logout();
     cookie.remove('siteAuth','/');//TODO: create logout_success/error and remove cookie there
     cookie.remove('username','/');
     window.location.pathname = "/login"; //make the login page nicer
   },
+
   forgotPassword: function(username) {
     APIUtils.forgotPassword(username, this.forgotPasswordSuccess, this.forgotPasswordError);
   },
@@ -74,6 +77,7 @@ var SiteActions = {
       reason: data.message
     });
   },
+
   resetPassword: function(username, resetAuth, password) {
     APIUtils.resetPassword(username, resetAuth, password, this.resetPasswordSuccess, this.resetPasswordError);
   },
@@ -90,6 +94,7 @@ var SiteActions = {
       reason: data.message
     });
   },
+
   createGame: function(gameType) {
     console.log("creating game with type: ", gameType);
     var opts = {
@@ -115,10 +120,55 @@ var SiteActions = {
     APIUtils.gameState(data.gameID, 0, SiteActions.gameStateSuccess, FUNC_NOP);
   },
   createGameError: function(data) {
-
+    //TODO
+    console.log(data);
   },
 
-  
+  //A single point query to update the list of open games
+  getOpenGames: function() {
+    APIUtils.getOpenGames(SiteActions.getOpenGamesSuccess, SiteActions.getOpenGamesError);
+  },
+  getOpenGamesSuccess: function(data) {
+    ArimaaDispatcher.dispatch({
+      actionType: SiteConstants.OPEN_GAMES_LIST,
+      metadatas: data
+    });
+  },
+  getOpenGamesError: function(data) {
+    //TODO
+    console.log(data);
+  },
+
+  //Initiates a loop querying for the list of open games every few seconds, continuing forever.
+  beginOpenGamesLoop: function() {
+    APIUtils.getOpenGames(SiteActions.openGamesLoopSuccess, SiteActions.openGamesLoopError);
+  },
+  openGamesLoopSuccess: function(data) {
+    ArimaaDispatcher.dispatch({
+      actionType: SiteConstants.OPEN_GAMES_LIST,
+      metadatas: data
+    });
+
+    //TODO sleep 6s
+    setTimeout(function () {
+      APIUtils.getOpenGames(SiteActions.openGamesLoopSuccess, SiteActions.openGamesLoopError);
+    }, 6000);
+  },
+  openGamesLoopError: function(data) {
+    //TODO
+    console.log(data);
+    //TODO sleep 30s
+    setTimeout(function () {
+      APIUtils.getOpenGames(SiteActions.openGamesLoopSuccess, SiteActions.openGamesLoopError);
+    }, 30000);
+  },
+
+
+  //Initiates a loop querying for the result of this game state and heartbeating it so long as the game
+  //exists and is open and is a game we created
+  beginCreatedGameStateLoop: function(gameID) {
+    APIUtils.gameState(gameID, 0, SiteActions.gameStateSuccess, SiteActions.gameStateError);
+  },
   gameStateSuccess: function(data) {
     seqNum = data.sequence;
 
@@ -134,10 +184,45 @@ var SiteActions = {
       });
     }
 
-    APIUtils.gameState(data.meta.id, seqNum+1, SiteActions.gameStateSuccess, FUNC_NOP);
+    //TODO sleep 200ms
+    setTimeout(function () {
+      APIUtils.gameState(data.meta.id, seqNum+1, SiteActions.gameStateSuccess, SiteActions.gameStateError);
+    }, 200);
+
   },
-  gameState: function(gameID, sequence) {
-    APIUtils.gameState(gameID, sequence, SiteActions.gameStateSuccess, FUNC_NOP);
+  gameStateError: function(gameID,data) {
+    //TODO
+    console.log(data);
+    if(createdGameExistsInStore(gameID)) {
+      //TODO sleep 2000 ms
+      setTimeout(function () {
+        APIUtils.gameState(id, 0, SiteActions.gameStateSuccess, SiteActions.gameStateError);
+      }, 2000);
+    }
+  },
+  createdGameExistsInStore: function(gameID) {
+    var games = UserStore.getCreatedGames();
+    for(var i = 0; i<games.length; i++) {
+      if(games[i].openGameData !== undefined
+         && games[i].id == gameID
+         && games[i].openGameData.creator !== undefined
+         && games[i].openGameData.creator == UserStore.getUsername()) {
+        return true;
+      }
+    }
+    return false;
+  },
+  startHeartbeatLoop: function(gameID) {
+    if(createdGameExistsInStore(gameID)) {
+      APIUtils.gameHeartbeat(gameID, FUNC_NOP, this.onHeartbeatError);
+      //TODO sleep 5s
+      var that = this;
+      setTimeout(function () {that.startHeartbeatLoop(gameID);}, 5000);
+    }
+  },
+  onHeartbeatError: function(data) {
+    //TODO
+    console.log(data);
   },
 
 
@@ -149,16 +234,7 @@ var SiteActions = {
     APIUtils.joinGame(gameID, SiteActions.joinGameSuccess, FUNC_NOP);
   },
   joinGameSuccess: function(data) {
-    cookie.save('gameAuth',data.gameAuth, {path:'/'});//once again, we'll need a way to save multiple gameauths
-  },
-  getOpenGames: function() {
-    APIUtils.getOpenGames(SiteActions.getOpenGamesSuccess, FUNC_NOP);
-  },
-  getOpenGamesSuccess: function(data) {
-    ArimaaDispatcher.dispatch({
-      actionType: SiteConstants.OPEN_GAMES_LIST,
-      metadatas: data
-    });
+    cookie.save('gameAuth',data.gameAuth, {path:'/'});//TODO once again, we'll need a way to save multiple gameauths
   }
 
 };

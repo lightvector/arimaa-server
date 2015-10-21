@@ -13,13 +13,13 @@ var component = React.createClass({
   },
 
   getInitialState: function() {
-    return {errorMsg:'',openGames:[], createdGames:[]}
+    return {errorMsg:'',openGames:[], createdGames:[]};
   },
 
   _onGameMetaChange: function() {
     this.setState({
-        openGames:UserStore.getOpenGames(),
-        createdGames:UserStore.getCreatedGames()
+      openGames:UserStore.getOpenGames(),
+      createdGames:UserStore.getCreatedGames()
     });
   },
 

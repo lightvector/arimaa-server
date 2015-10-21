@@ -81,11 +81,25 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
       case SiteConstants.GAME_STATUS_UPDATE:
         break;
       case SiteConstants.OPEN_GAMES_LIST:
+        var oldCreatedGames = createdGames;
         createdGames = [];
         openGames = [];
         action.metadatas.forEach(function(metadata){
           if(metadata.openGameData.creator.name === UserStore.getUsername()) {
             createdGames.push(metadata);
+            //Check if this is the first time we've seen this game
+            var isNewCreatedGame = true;
+            for(var i = 0; i<oldCreatedGames.length; i++) {
+              if(oldCreatedGames[i].id == metadata.id) {
+                isNewCreatedGame = false;
+                break;
+              }
+            }
+            //If this is the first time we've seen this game, start a loop for update its detailed state
+            if(isNewCreatedGame) {
+              SiteActions.beginCreatedGameStateLoop(metadata.id);
+            }
+
           } else {
             openGames.push(metadata);
           }
