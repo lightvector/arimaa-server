@@ -1,6 +1,6 @@
 var React = require('react');
 var $ = require('jquery');
-var cookie = require('react-cookie'); 
+var cookie = require('react-cookie');
 
 var ChatApp = React.createClass({displayName: "ChatApp",
   handleChange: function(e) {
@@ -34,7 +34,7 @@ var ChatApp = React.createClass({displayName: "ChatApp",
       error : function(xhr, status, err) {
         console.error(this.props.url, status, err.toString());
       }.bind(this)
-    })
+    });
   },
 
   leaveChatRoom: function() {
@@ -60,7 +60,7 @@ var ChatApp = React.createClass({displayName: "ChatApp",
         console.log("JOIN SUCCESS data: ", data);
         cookie.save('username', data.username);
         cookie.save('auth', data.auth);
-        this.setState({username:data.username,auth:data.auth})
+        this.setState({username:data.username,auth:data.auth});
       }.bind(this),
       error : function(xhr, status, err) {
         console.error(this.props.url, status, err.toString());
@@ -92,7 +92,7 @@ var ChatApp = React.createClass({displayName: "ChatApp",
     if(auth) this.setState({auth:auth});
     if(username) this.setState({username:username});
 
-    console.log('user: ' + username + '\nauth: '+auth)
+    console.log('user: ' + username + '\nauth: '+auth);
 
     this.loadCommentsFromServer();
     setInterval(this.loadCommentsFromServer, 10000);
@@ -108,11 +108,11 @@ var ChatApp = React.createClass({displayName: "ChatApp",
             React.createElement("input", {type: "submit", value: "Join"})
           )
         )
-      )
+      );
     }
 
     var lines = this.state.lines.map(function(line) {
-      return React.createElement("tr", {key: line.id}, React.createElement("td", {key: line.id}, React.createElement("b", null, line.username + ": "), line.text))
+      return React.createElement("tr", {key: line.id}, React.createElement("td", {key: line.id}, React.createElement("b", null, line.username + ": "), line.text));
     });
 
     return (

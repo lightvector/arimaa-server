@@ -3,7 +3,7 @@ var SiteConstants = require('../constants/SiteConstants.js');
 var EventEmitter = require('events').EventEmitter;
 var cookie = require('react-cookie');
 
-var CHANGE_EVENT = 'login-or-registration-change'; //rename this later
+var CHANGE_EVENT = 'login-or-registration-change'; //TODO: rename this later
 var GAME_CHANGE_EVENT = 'game-change'; //player made move, timeout, etc
 var GAME_META_CHANGE_EVENT = 'meta-game-change' //player joined, left
 
