@@ -33,7 +33,7 @@ input:-webkit-autofill {
 }
 input:-webkit-autofill:focus {
     -webkit-box-shadow: 0 0 0 1000px #777 inset;
-    -webkit-text-fill-color: #fff; 
+    -webkit-text-fill-color: #fff;
     color: #fff !important;
 }
 
@@ -55,8 +55,10 @@ h1 {
 }
 
 .login {
-  top: 200px;
-  position: relative;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%,-50%);
+  position: absolute;
   margin: 0px auto;
   width: 310px;
   padding: 10px 10px 5px 10px;

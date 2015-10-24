@@ -3,7 +3,7 @@ var SiteConstants = require('../constants/SiteConstants.js');
 var EventEmitter = require('events').EventEmitter;
 var cookie = require('react-cookie');
 
-var CHANGE_EVENT = 'login-or-registration-change'; //rename this later
+var CHANGE_EVENT = 'login-or-registration-change'; //TODO: rename this later
 var GAME_CHANGE_EVENT = 'game-change'; //player made move, timeout, etc
 var GAME_META_CHANGE_EVENT = 'meta-game-change' //player joined, left
 
@@ -12,6 +12,7 @@ var openGames = []; //games the user can join
 var ongoingGames = []; //games you can spectate
 //not included: game rooms with 2 people that haven't started, private games?
 
+var messageText = "";
 var errorText = "";
 
 const UserStore = Object.assign({}, EventEmitter.prototype, {
@@ -29,7 +30,7 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
 
   //use this function later for both registration and login errors
   getLoginState: function() {
-    return {error: errorText};
+    return {message: messageText, error: errorText};
   },
 
   getUsername: function() {
@@ -56,11 +57,21 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
     switch (action.actionType) {
       case SiteConstants.REGISTRATION_FAILED:
       case SiteConstants.LOGIN_FAILED:
+      case SiteConstants.FORGOT_PASSWORD_FAILED:
+      case SiteConstants.RESET_PASSWORD_FAILED:
+        messageText = "";
         errorText = action.reason;
         UserStore.emitChange();
         break;
       case SiteConstants.REGISTRATION_SUCCESS:
       case SiteConstants.LOGIN_SUCCESS:
+        messageText = "";
+        errorText = "";
+        UserStore.emitChange();
+        break;
+      case SiteConstants.FORGOT_PASSWORD_SUCCESS:
+      case SiteConstants.RESET_PASSWORD_SUCCESS:
+        messageText = action.reason;
         errorText = "";
         UserStore.emitChange();
         break;

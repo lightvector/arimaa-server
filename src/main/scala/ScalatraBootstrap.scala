@@ -66,6 +66,12 @@ class ScalatraBootstrap extends LifeCycle {
     val config = ConfigFactory.load
     val cryptThreadPoolSize = config.getInt("cryptThreadPoolSize")
     val mainThreadPoolSizeFactor = config.getDouble("mainThreadPoolSizeFactor")
+    val siteName = config.getString("siteName")
+    val siteAddress = config.getString("siteAddress")
+    val smtpHost = config.getString("smtpHost")
+    val smtpPort = config.getString("smtpPort")
+    val smtpAuth = config.getBoolean("smtpAuth")
+    val noReplyAddress = config.getString("noReplyAddress")
 
     val actorEC: ExecutionContext = actorSystem.dispatcher
     val mainEC: ExecutionContext = createPool(math.ceil(numProcessors * mainThreadPoolSizeFactor).toInt)
@@ -75,13 +81,14 @@ class ScalatraBootstrap extends LifeCycle {
     val serverInstanceID: Long = System.currentTimeMillis
 
     val db = ArimaaServerInit.createDB("h2mem1")
+    val emailer = new Emailer(siteName,siteAddress,smtpHost,smtpPort,smtpAuth,noReplyAddress)(mainEC)
     val accounts = new Accounts(db)(mainEC)
-    val siteLogin = new SiteLogin(accounts,cryptEC)(mainEC)
+    val siteLogin = new SiteLogin(accounts,emailer,cryptEC)(mainEC)
     val scheduler = actorSystem.scheduler
     val games = new Games(db,siteLogin.logins,scheduler,serverInstanceID)(mainEC)
     val chat = new ChatSystem(db,siteLogin.logins,actorSystem)(actorEC)
 
-    context.mount(new ChatServlet(accounts,siteLogin,chat,games,actorEC), "/api/chat/*")
+    context.mount(new ChatServlet(accounts,siteLogin,chat,games,scheduler,actorEC), "/api/chat/*")
     context.mount(new AccountServlet(siteLogin,mainEC), "/api/accounts/*")
     context.mount(new GameServlet(accounts,siteLogin,games,mainEC), "/api/games/*")
   }

@@ -29,7 +29,7 @@ var SiteActions = {
     cookie.save('siteAuth',data.siteAuth, {path:'/'});
     cookie.save('username',data.username, {path:'/'});
 
-    window.location.pathname = "/"; //we should track where the user was before and then redirect there instead
+    window.location.pathname = "/"; //TODO we should track where the user was before and then redirect there instead
     ArimaaDispatcher.dispatch({
       actionType: SiteConstants.LOGIN_SUCCESS
     });
@@ -44,7 +44,7 @@ var SiteActions = {
     ArimaaDispatcher.dispatch({
       actionType: SiteConstants.REGISTRATION_SUCCESS
     });
-    window.location.pathname = "/"; //we should track where the user was before and then redirect there instead
+    window.location.pathname = "/"; //TODO we should track where the user was before and then redirect there instead
   },
   registerError: function(data) {
     ArimaaDispatcher.dispatch({
@@ -57,6 +57,38 @@ var SiteActions = {
     cookie.remove('siteAuth','/');//TODO: create logout_success/error and remove cookie there
     cookie.remove('username','/');
     window.location.pathname = "/login"; //make the login page nicer
+  },
+  forgotPassword: function(username) {
+    APIUtils.forgotPassword(username, this.forgotPasswordSuccess, this.forgotPasswordError);
+  },
+  forgotPasswordError: function(data) {
+    ArimaaDispatcher.dispatch({
+      actionType: SiteConstants.FORGOT_PASSWORD_FAILED,
+      reason: data.error
+    });
+  },
+  forgotPasswordSuccess: function(data) {
+    console.log('forgot password success');
+    ArimaaDispatcher.dispatch({
+      actionType: SiteConstants.FORGOT_PASSWORD_SUCCESS,
+      reason: data.message
+    });
+  },
+  resetPassword: function(username, resetAuth, password) {
+    APIUtils.resetPassword(username, resetAuth, password, this.resetPasswordSuccess, this.resetPasswordError);
+  },
+  resetPasswordError: function(data) {
+    ArimaaDispatcher.dispatch({
+      actionType: SiteConstants.RESET_PASSWORD_FAILED,
+      reason: data.error
+    });
+  },
+  resetPasswordSuccess: function(data) {
+    console.log('reset password success');
+    ArimaaDispatcher.dispatch({
+      actionType: SiteConstants.RESET_PASSWORD_SUCCESS,
+      reason: data.message
+    });
   },
   createGame: function(gameType) {
     console.log("creating game with type: ", gameType);
@@ -78,7 +110,7 @@ var SiteActions = {
       actionType: SiteConstants.GAME_CREATED,
       gameID: data.gameID,
       gameAuth: data.gameAuth
-    })
+    });
     APIUtils.gameStatus(data.gameID, 0, SiteActions.gameStatusSuccess, FUNC_NOP);
   },
   createGameError: function(data) {

@@ -27,6 +27,7 @@ class Accounts(val db: Database)(implicit ec: ExecutionContext) {
     db.run(query.result).map(_.headOption)
   }
 
+  //TODO consider what happens if a user tries to use the same email for multiple accounts
   def getByNameOrEmail(usernameOrEmail: String): Future[Option[Account]] = {
     val lowercaseName = usernameOrEmail.toLowerCase
     val query = Accounts.table.filter(_.lowercaseName === lowercaseName)
@@ -44,6 +45,13 @@ class Accounts(val db: Database)(implicit ec: ExecutionContext) {
     val query = Accounts.table += account
     db.run(DBIO.seq(query))
   }
+
+  def setPasswordHash(username: Username, passwordHash: String): Future[Unit] = {
+    val lowercaseName = username.toLowerCase
+    val query: DBIO[Int] = Accounts.table.filter(_.lowercaseName === lowercaseName).map(_.passwordHash).update(passwordHash)
+    db.run(DBIO.seq(query))
+  }
+
 }
 
 class AccountTable(tag: Tag) extends Table[Account](tag, "accountTable") {

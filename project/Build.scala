@@ -20,6 +20,7 @@ object ArimaaServerBuild extends Build {
         "com.typesafe.akka" %% "akka-testkit" % "2.3.4",
         "com.h2database" % "h2" % "1.3.170",
         "com.typesafe.slick" %% "slick" % "3.0.0",
+        "javax.mail" % "javax.mail-api" % "1.5.4",
         "javax.servlet" %  "javax.servlet-api" % "3.1.0",
         "joda-time" % "joda-time" % "2.8.2",
         "net.databinder.dispatch" %% "dispatch-core" % "0.11.1",

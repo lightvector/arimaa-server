@@ -45,36 +45,50 @@ class ArimaaServlet extends WebAppStack with JacksonJsonSupport with ScalateSupp
     new java.io.File( getServletContext().getResource(path).getFile )
   }
 
-  get("/login") {
+  get("/login/?") {
     contentType="text/html"
     val path = "/board.html"
     new java.io.File( getServletContext().getResource(path).getFile )
   }
 
-  get("/register") {
+  get("/register/?") {
     contentType="text/html"
     val path = "/board.html"
     new java.io.File( getServletContext().getResource(path).getFile )
   }
 
-  get("/game/:gameid") {
+  get("/forgotPassword/?") {
     contentType="text/html"
     val path = "/board.html"
     new java.io.File( getServletContext().getResource(path).getFile )
   }
 
-  get("/chat") {
+  get("/resetPassword/:username/:resetAuth/?") {
     contentType="text/html"
-    val path = "/chat.html"
+    val path = "/board.html"
     new java.io.File( getServletContext().getResource(path).getFile )
   }
 
+  get("/game/:gameid/?") {
+    contentType="text/html"
+    val path = "/board.html"
+    new java.io.File( getServletContext().getResource(path).getFile )
+  }
+
+  get("/chat/:chatchannel/?") {
+    contentType="text/html"
+    val path = "/board.html"
+    new java.io.File( getServletContext().getResource(path).getFile )
+  }
+
+  //TODO delete this when testing done
   //curl -i -X POST -d "name=sally" http://localhost:8080/test
   post("/test") {
     val name = params("name")
     Response.create("Hello " + name,"foo")
   }
 
+  //TODO delete this when testing done
   //curl -i -H "Content-Type: application/json" -X POST -d '{"a":2, "b":3}' http://localhost:8080/test2
   post("/test2") {
     val r = parse(request.body).extract[Request]
