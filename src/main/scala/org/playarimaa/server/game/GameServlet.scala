@@ -61,7 +61,7 @@ object GameServlet {
     )
 
     case class GameMetadata(
-      id: String,
+      gameID: String,
       numPly: Int,
       startTime: Option[Double],
       gUser: Option[ShortUserInfo],
@@ -407,7 +407,7 @@ class GameServlet(val accounts: Accounts, val siteLogin: SiteLogin, val games: G
 
   def convMeta(data: Games.GetMetadata): IOTypes.GameMetadata = {
     IOTypes.GameMetadata(
-      id = data.meta.id,
+      gameID = data.meta.id,
       numPly = data.meta.numPly,
       startTime = data.meta.startTime,
       gUser = data.openGameData.map(_.users(GOLD)).getOrElse(Some(data.meta.users(GOLD))).map(convUser(_)),

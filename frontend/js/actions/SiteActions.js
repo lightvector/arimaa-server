@@ -7,7 +7,7 @@ var cookie = require('react-cookie');
 const FUNC_NOP = function(){};
 
 var SiteActions = {
-  
+
   login: function(username, password) {
     APIUtils.login(username, password, SiteActions.loginSuccess, SiteActions.loginError);
   },
@@ -132,11 +132,11 @@ var SiteActions = {
     SiteActions.beginOwnOpenGameMetadataLoop(gameID);
     SiteActions.startOpenJoinedHeartbeatLoop(gameID,data.gameAuth);
   },
-  
+
   acceptUserForGame: function(gameID, gameAuth, username) {
     APIUtils.acceptUserForGame(gameID, gameAuth, username, FUNC_NOP, FUNC_NOP);
   },
-  
+
 
   //A single point query to update the list of open games
   getOpenGames: function() {
@@ -223,7 +223,7 @@ var SiteActions = {
       ArimaaDispatcher.dispatch({
         actionType: SiteConstants.PLAYER_JOINED,
         players: data.openGameData.joined, //note this includes the creator
-        gameID: data.id
+        gameID: data.gameID
       });
       ArimaaDispatcher.dispatch({
         actionType: SiteConstants.GAME_METADATA_UPDATE,
@@ -233,7 +233,9 @@ var SiteActions = {
 
     //TODO sleep 200ms
     setTimeout(function () {
-      APIUtils.gameMetadata(data.meta.id, seqNum+1, SiteActions.ownOpenGameMetadataSuccess, function(data) {return SiteActions.ownOpenGameMetadataError(data.meta.id,data);});
+      APIUtils.gameMetadata(data.meta.gameID, seqNum+1,
+                            SiteActions.ownOpenGameMetadataSuccess,
+                            function(data) {return SiteActions.ownOpenGameMetadataError(data.meta.gameID,data);});
     }, 200);
 
   },

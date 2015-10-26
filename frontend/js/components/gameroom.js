@@ -141,23 +141,23 @@ var component = React.createClass({
         //TODO figure out why heartbeats are getting errors
 
         if(joined)
-          buttons.push(<button disabled="true" onClick={that.joinGameButtonClicked.bind(that, metadata.id)}>Joined</button>);
+          buttons.push(<button disabled="true" onClick={that.joinGameButtonClicked.bind(that, metadata.gameID)}>Joined</button>);
         else
-          buttons.push(<button onClick={that.joinGameButtonClicked.bind(that, metadata.id)}>Join</button>);
+          buttons.push(<button onClick={that.joinGameButtonClicked.bind(that, metadata.gameID)}>Join</button>);
 
         for(var i = 0; i<metadata.openGameData.joined.length; i++) {
           var userinfo = metadata.openGameData.joined[i];
           if(userinfo.name != username) {
-            buttons.push(<button onClick={that.acceptUserButtonClicked.bind(that, metadata.id, userinfo.name)}>Accept {userinfo.name}</button>);
+            buttons.push(<button onClick={that.acceptUserButtonClicked.bind(that, metadata.gameID, userinfo.name)}>Accept {userinfo.name}</button>);
           }
         }
-        // <button onClick={that.goToGameButtonClicked.bind(that, metadata.id)}>Go To Game</button>
+        // <button onClick={that.goToGameButtonClicked.bind(that, metadata.gameID)}>Go To Game</button>
 
-        elts.push(React.createElement("div", {key: "title_"+metadata.id}, title));
-        elts.push(React.createElement("div", {key: "info_"+metadata.id}, info));
-        elts.push(React.createElement("div", {key: "buttons_"+metadata.id},buttons));
+        elts.push(React.createElement("div", {key: "title_"+metadata.gameID}, title));
+        elts.push(React.createElement("div", {key: "info_"+metadata.gameID}, info));
+        elts.push(React.createElement("div", {key: "buttons_"+metadata.gameID},buttons));
 
-        return React.createElement("div", {key: "main_"+metadata.id}, elts);
+        return React.createElement("div", {key: "main_"+metadata.gameID}, elts);
       });
 
       ownGamesList.unshift(React.createElement("h3", {}, "My Current Games"));
@@ -181,15 +181,15 @@ var component = React.createClass({
         }
 
         if(joined)
-          buttons.push(<button disabled="true" onClick={that.joinGameButtonClicked.bind(that, metadata.id)}>Joined</button>);
+          buttons.push(<button disabled="true" onClick={that.joinGameButtonClicked.bind(that, metadata.gameID)}>Joined</button>);
         else
-          buttons.push(<button onClick={that.joinGameButtonClicked.bind(that, metadata.id)}>Join</button>);
+          buttons.push(<button onClick={that.joinGameButtonClicked.bind(that, metadata.gameID)}>Join</button>);
 
-        elts.push(React.createElement("div", {key: "title_"+metadata.id}, title));
-        elts.push(React.createElement("div", {key: "info_"+metadata.id}, info));
-        elts.push(React.createElement("div", {key: "buttons_"+metadata.id},buttons));
+        elts.push(React.createElement("div", {key: "title_"+metadata.gameID}, title));
+        elts.push(React.createElement("div", {key: "info_"+metadata.gameID}, info));
+        elts.push(React.createElement("div", {key: "buttons_"+metadata.gameID},buttons));
 
-        return React.createElement("div", {key: "main_"+metadata.id}, elts);
+        return React.createElement("div", {key: "main_"+metadata.gameID}, elts);
       });
 
       joinableOpenGamesList.unshift(React.createElement("h3", {}, "Open Games"));
@@ -206,11 +206,11 @@ var component = React.createClass({
         var elts = [];
         var buttons = [];
 
-        elts.push(React.createElement("div", {key: "title_"+metadata.id}, title));
-        elts.push(React.createElement("div", {key: "info_"+metadata.id}, info));
-        elts.push(React.createElement("div", {key: "buttons_"+metadata.id},buttons));
+        elts.push(React.createElement("div", {key: "title_"+metadata.gameID}, title));
+        elts.push(React.createElement("div", {key: "info_"+metadata.gameID}, info));
+        elts.push(React.createElement("div", {key: "buttons_"+metadata.gameID},buttons));
 
-        return React.createElement("div", {key: "main_"+metadata.id}, elts);
+        return React.createElement("div", {key: "main_"+metadata.gameID}, elts);
       });
 
       watchableGamesList.unshift(React.createElement("h3", {}, "Active Games"));

@@ -13,12 +13,12 @@ var component = React.createClass({
   getInitialState: function() {
     return {message: "", error: "", openGames:[], createdGames:[]};
   },
-  
+
   onUserStoreChange: function() {
     this.setState(UserStore.getMessageError());
     this.setState({
-      openGames:UserStore.getOpenGames(),
-      createdGames:UserStore.getCreatedGames()
+      openGames:UserStore.getJoinableOpenGames(),
+      createdGames:UserStore.getWatchableGames()
     });
   },
 
@@ -88,10 +88,10 @@ var component = React.createClass({
 
     var openGamesList = this.state.openGames.map(function(metadata) {
       return (
-        <li key={metadata.id}>
-          {metadata.id}
-          <button onClick={this.joinGameButtonClicked.bind(this, metadata.id)}>Join</button>
-          <button onClick={this.goToGameButtonClicked.bind(this, metadata.id)}>Go To Game</button>
+        <li key={metadata.gameID}>
+          {metadata.gameID}
+          <button onClick={this.joinGameButtonClicked.bind(this, metadata.gameID)}>Join</button>
+          <button onClick={this.goToGameButtonClicked.bind(this, metadata.gameID)}>Go To Game</button>
         </li>
       );
     }, this);
@@ -102,15 +102,15 @@ var component = React.createClass({
         return (
           <li key={index}>
             {shortUserData.name}
-            <button onClick={this.acceptUserButtonClicked.bind(this, metadata.id, shortUserData.name)}>Accept</button>
-            <button onClick={this.goToGameButtonClicked.bind(this, metadata.id)}>Go To Game</button>
+            <button onClick={this.acceptUserButtonClicked.bind(this, metadata.gameID, shortUserData.name)}>Accept</button>
+            <button onClick={this.goToGameButtonClicked.bind(this, metadata.gameID)}>Go To Game</button>
           </li>
         );
       },this);
 
       return (
-        <li key={metadata.id}>
-          {metadata.id}
+        <li key={metadata.gameID}>
+          {metadata.gameID}
           <ul>
             {joinedUsers}
           </ul>
