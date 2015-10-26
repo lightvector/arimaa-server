@@ -33,9 +33,9 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
   emitChange: function() {this.emit(CHANGE_EVENT);},
 
   //Subscribe to the detection of new open joined games
-  emitNewOpenJoinedGame: function(gameID) {this.emit(NEW_OPEN_JOINED_GAME, gameID);},
   addNewOpenJoinedGameListener: function(callback) {this.on(NEW_OPEN_JOINED_GAME, callback);},
   removeNewOpenJoinedGameListener: function(callback) {this.removeListener(NEW_OPEN_JOINED_GAME, callback);},
+  emitNewOpenJoinedGame: function(gameID) {this.emit(NEW_OPEN_JOINED_GAME, gameID);},
 
   getMessageError: function() {
     return {message: messageText, error: errorText};
@@ -118,8 +118,8 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
       action.metadatas.forEach(function(metadata){
         openGames[metadata.gameID] = metadata;
         if(metadata.openGameData.creator.name === username ||
-           metadata.gUser.name == username ||
-           metadata.sUser.name == username) {
+           (metadata.gUser !== undefined && metadata.gUser.name == username) ||
+           (metadata.sUser !== undefined && metadata.sUser.name == username)) {
           ownOpenGames[metadata.gameID] = metadata;
         }
         else if(metadata.gUser === undefined || metadata.sUser === undefined) {
@@ -143,8 +143,8 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
         }
       });
       UserStore.emitChange();
-      for(var metadata in newOpenJoinedGames) {
-        UserStore.emitNewOpenJoinedGame(metadata.gameID);
+      for(var i = 0; i < newOpenJoinedGames.length; i++) {
+        UserStore.emitNewOpenJoinedGame(newOpenJoinedGames[i].gameID);
       }
       break;
     case SiteConstants.ACTIVE_GAMES_LIST:

@@ -233,16 +233,16 @@ var SiteActions = {
 
     //TODO sleep 200ms
     setTimeout(function () {
-      APIUtils.gameMetadata(data.meta.gameID, seqNum+1,
+      APIUtils.gameMetadata(data.gameID, seqNum+1,
                             SiteActions.ownOpenGameMetadataSuccess,
-                            function(data) {return SiteActions.ownOpenGameMetadataError(data.meta.gameID,data);});
+                            function(data) {return SiteActions.ownOpenGameMetadataError(data.gameID,data);});
     }, 200);
 
   },
   ownOpenGameMetadataError: function(gameID,data) {
     //TODO
     console.log(data);
-    if(isOwnOpenGameInStore(gameID)) {
+    if(SiteActions.isOwnOpenGameInStore(gameID)) {
       //TODO sleep 2000 ms
       setTimeout(function () {
         APIUtils.gameMetadata(gameID, 0, SiteActions.ownOpenGameMetadataSuccess, function(data) {return SiteActions.ownOpenGameMetadataError(gameID,data);});
