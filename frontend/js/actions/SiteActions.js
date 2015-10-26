@@ -6,16 +6,10 @@ var cookie = require('react-cookie');
 
 const FUNC_NOP = function(){};
 
-var seqNum = 0; //maybe move this to the store?
-
-
-/*********
-MOVE ALL API CALLS TO STORES????
-********/
-
 var SiteActions = {
+  
   login: function(username, password) {
-    APIUtils.login(username, password, this.loginSuccess, this.loginError);
+    APIUtils.login(username, password, SiteActions.loginSuccess, SiteActions.loginError);
   },
   loginError: function(data) {
     ArimaaDispatcher.dispatch({
@@ -37,7 +31,7 @@ var SiteActions = {
 
   register: function(username, email, password) {
     console.log("do some registering");
-    APIUtils.register(username, email, password, this.registerSuccess, this.registerError);
+    APIUtils.register(username, email, password, SiteActions.registerSuccess, SiteActions.registerError);
   },
   registerSuccess: function(data) {
     cookie.save('siteAuth',data.siteAuth, {path:'/'});
@@ -62,7 +56,7 @@ var SiteActions = {
   },
 
   forgotPassword: function(username) {
-    APIUtils.forgotPassword(username, this.forgotPasswordSuccess, this.forgotPasswordError);
+    APIUtils.forgotPassword(username, SiteActions.forgotPasswordSuccess, SiteActions.forgotPasswordError);
   },
   forgotPasswordError: function(data) {
     ArimaaDispatcher.dispatch({
@@ -79,7 +73,7 @@ var SiteActions = {
   },
 
   resetPassword: function(username, resetAuth, password) {
-    APIUtils.resetPassword(username, resetAuth, password, this.resetPasswordSuccess, this.resetPasswordError);
+    APIUtils.resetPassword(username, resetAuth, password, SiteActions.resetPasswordSuccess, SiteActions.resetPasswordError);
   },
   resetPasswordError: function(data) {
     ArimaaDispatcher.dispatch({
@@ -106,24 +100,43 @@ var SiteActions = {
       gameType: gameType,
       siteAuth: UserStore.siteAuthToken()
     };
-    APIUtils.createGame(opts, this.createGameSuccess, this.createGameError);
+    APIUtils.createGame(opts, SiteActions.createGameSuccess, SiteActions.createGameError);
   },
   createGameSuccess: function(data) {
     console.log("create game data ", data);
-    cookie.save('gameAuth',data.gameAuth, {path:'/'}); //TODO need a way to save multiple gameauths
 
     ArimaaDispatcher.dispatch({
-      actionType: SiteConstants.GAME_CREATED,
+      actionType: SiteConstants.GAME_JOINED,
       gameID: data.gameID,
       gameAuth: data.gameAuth
     });
-    //TODO
-    //APIUtils.gameState(data.gameID, 0, SiteActions.gameStateSuccess, FUNC_NOP);
+
+    SiteActions.beginOwnOpenGameMetadataLoop(data.gameID);
+    SiteActions.startOpenJoinedHeartbeatLoop(data.gameID,data.gameAuth);
   },
   createGameError: function(data) {
     //TODO
     console.log(data);
   },
+
+  joinGame: function(gameID) {
+    APIUtils.joinGame(gameID, function(data) {SiteActions.joinGameSuccess(gameID,data);}, FUNC_NOP);
+  },
+  joinGameSuccess: function(gameID, data) {
+    ArimaaDispatcher.dispatch({
+      actionType: SiteConstants.GAME_JOINED,
+      gameID: gameID,
+      gameAuth: data.gameAuth
+    });
+
+    SiteActions.beginOwnOpenGameMetadataLoop(gameID);
+    SiteActions.startOpenJoinedHeartbeatLoop(gameID,data.gameAuth);
+  },
+  
+  acceptUserForGame: function(gameID, gameAuth, username) {
+    APIUtils.acceptUserForGame(gameID, gameAuth, username, FUNC_NOP, FUNC_NOP);
+  },
+  
 
   //A single point query to update the list of open games
   getOpenGames: function() {
@@ -143,6 +156,7 @@ var SiteActions = {
   //Initiates a loop querying for the list of open games every few seconds, continuing forever.
   beginOpenGamesLoop: function() {
     APIUtils.getOpenGames(SiteActions.openGamesLoopSuccess, SiteActions.openGamesLoopError);
+    UserStore.addNewOpenJoinedGameListener(SiteActions.newOpenJoinedGame);
   },
   openGamesLoopSuccess: function(data) {
     ArimaaDispatcher.dispatch({
@@ -162,6 +176,14 @@ var SiteActions = {
     setTimeout(function () {
       APIUtils.getOpenGames(SiteActions.openGamesLoopSuccess, SiteActions.openGamesLoopError);
     }, 30000);
+  },
+
+  newOpenJoinedGame: function(gameID) {
+    //If this game is one we don't have a gameAuth for (ex: user joined this game in a different tab)
+    //then join it in this tab as well to obtain a gameAuth so that we can heartbeat the game and keep it alive.
+    var gameAuth = UserStore.getJoinedGameAuth(gameID);
+    if(gameAuth === null)
+      SiteActions.joinGame(gameID);
   },
 
   //Initiates a loop querying for the list of active games every few seconds, continuing forever.
@@ -195,7 +217,7 @@ var SiteActions = {
     APIUtils.gameMetadata(gameID, 0, SiteActions.ownOpenGameMetadataSuccess, function(data) {return SiteActions.ownOpenGameMetadataError(gameID,data);});
   },
   ownOpenGameMetadataSuccess: function(data) {
-    seqNum = data.sequence;
+    var seqNum = data.sequence;
 
     if(data.openGameData && data.openGameData.joined.length > 1) {
       ArimaaDispatcher.dispatch({
@@ -205,7 +227,7 @@ var SiteActions = {
       });
       ArimaaDispatcher.dispatch({
         actionType: SiteConstants.GAME_METADATA_UPDATE,
-        data: data //pass all the data
+        data: data
       });
     }
 
@@ -232,40 +254,38 @@ var SiteActions = {
     return games[gameID] !== undefined;
   },
 
-  //Initiates a loop going forever heartbeating all games that are open and that we've joined this game so long as the game
-  //exists and is open and is a game we joined.
-  startOpenJoinedHeartbeatLoop: function() {
-    var games = UserStore.getOwnGames().concat(UserStore.getJoinableOpenGames());
+  //Initiates a loop heartbeating this game so long as this game exists and we're joined with it
+  startOpenJoinedHeartbeatLoop: function(gameID, gameAuth) {
     var username = UserStore.getUsername();
-    for(var i = 0; i<games.length; i++) {
-      if(games[i].openGameData !== undefined) {
-        var joined = false;
-        for(var j = 0; j<games[i].openGameData.joined.length; j++) {
-          if(games[i].openGameData.joined[j].name == username) {
-            joined = true; break;
-          }
-        }
-        if(joined)
-          APIUtils.gameHeartbeat(games[i].id, FUNC_NOP, this.onHeartbeatError);
+    var game = UserStore.getOpenGame(gameID);
+    //If we've since changed our auth or closed this game, terminate the loop
+    var storedGameAuth = UserStore.getJoinedGameAuth(gameID);
+    if(storedGameAuth === null || storedGameAuth != gameAuth)
+      return;
+    //If the game is not open, terminate
+    if(game.openGameData === undefined)
+      return;
+
+    //If we're not one of the players joined to this game, terminate.
+    var joined = false;
+    for(var j = 0; j<game.openGameData.joined.length; j++) {
+      if(game.openGameData.joined[j].name == username) {
+        joined = true; break;
       }
     }
-    var that = this;
-    setTimeout(function () {that.startOpenJoinedHeartbeatLoop();}, 5000);
+    if(!joined)
+      return;
+
+    APIUtils.gameHeartbeat(gameID, gameAuth, FUNC_NOP, function (data) {SiteActions.onHeartbeatError(gameID,data);});
+     setTimeout(function () {SiteActions.startOpenJoinedHeartbeatLoop(gameID, gameAuth);}, 5000);
   },
-  onHeartbeatError: function(data) {
+  onHeartbeatError: function(gameID,data) {
     //TODO
     console.log(data);
-  },
-
-  //starts a game
-  acceptUserForGame: function(gameID, username) {
-    APIUtils.acceptUserForGame(gameID, username, FUNC_NOP, FUNC_NOP);
-  },
-  joinGame: function(gameID) {
-    APIUtils.joinGame(gameID, SiteActions.joinGameSuccess, FUNC_NOP);
-  },
-  joinGameSuccess: function(data) {
-    cookie.save('gameAuth',data.gameAuth, {path:'/'});//TODO once again, we'll need a way to save multiple gameauths
+    ArimaaDispatcher.dispatch({
+      actionType: SiteConstants.HEARTBEAT_FAILED,
+      gameID: gameID
+    });
   }
 
 };

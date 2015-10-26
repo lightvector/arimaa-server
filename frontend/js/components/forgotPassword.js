@@ -6,25 +6,24 @@ var forgotPasswordBox = React.createClass({
   getInitialState: function() {
     return {user: "", message: "", error: ""};
   },
+
+  componentDidMount: function() {
+    UserStore.addChangeListener(this.onUserStoreChange);
+  },
+  componentWillUnmount: function() {
+    UserStore.removeChangeListener(this.onUserStoreChange);
+  },
+
+  onUserStoreChange: function() {
+    this.setState(UserStore.getMessageError());
+  },
+
   handleUsernameChange: function(event) {
     this.setState({user: event.target.value});
   },
   submitForgotPassword: function(event) {
     event.preventDefault();
     SiteActions.forgotPassword(this.state.user);
-  },
-
-  componentDidMount: function() {
-     UserStore.addChangeListener(this._onChange);
-  },
-
-  componentWillUnmount: function() {
-    UserStore.removeChangeListener(this._onChange);
-  },
-
-  _onChange: function() {
-    console.log('onchange');
-    this.setState(UserStore.getLoginState());
   },
 
   render: function() {

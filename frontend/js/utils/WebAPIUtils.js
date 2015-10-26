@@ -108,22 +108,26 @@ var APIUtils = {
     GET('/api/games/'+gameID+'/metadata', {minSequence:seq}, success, error);
   },
 
-  gameHeartbeat: function(gameID, success, error) {
-    POST('/api/games/'+gameID+'/actions/heartbeat', {gameAuth:""}, success, error);
+  gameHeartbeat: function(gameID, gameAuth, success, error) {
+    POST('/api/games/'+gameID+'/actions/heartbeat', {gameAuth:gameAuth}, success, error);
   },
 
-  acceptUserForGame: function(gameID, username, success, error) {
-    POST('/api/games/'+gameID+'/actions/accept', {gameAuth:UserStore.gameAuthToken(), opponent: username}, success, error);
+  acceptUserForGame: function(gameID, gameAuth, username, success, error) {
+    POST('/api/games/'+gameID+'/actions/accept', {gameAuth:gameAuth, opponent:username}, success, error);
   },
 
   //TODO: camelcase this function
-  send_move: function(gameID, moveStr, plyNum, success, error) {
+  send_move: function(gameID, gameAuth, moveStr, plyNum, success, error) {
     console.log(gameID, moveStr, plyNum);
-    POST('/api/games/'+gameID+'/actions/move', {gameAuth:UserStore.gameAuthToken(), move:moveStr, plyNum:plyNum}, success, error);
+    POST('/api/games/'+gameID+'/actions/move', {gameAuth:gameAuth, move:moveStr, plyNum:plyNum}, success, error);
   },
 
   getOpenGames: function(success, error) {
     GET('/api/games/search',{open:true}, success, error);
+  },
+
+  getActiveGames: function(success, error) {
+    GET('/api/games/search',{active:true}, success, error);
   },
 
   chatSocket: function(chatChannel) {

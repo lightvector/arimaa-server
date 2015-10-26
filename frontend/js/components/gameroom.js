@@ -4,32 +4,26 @@ var UserStore = require('../stores/UserStore.js');
 
 var component = React.createClass({
   getInitialState: function() {
-    return {error:'', ownGames:[], joinableOpenGames:[], watchableGames:[]};
+    return {message: "", error:"", ownGames:[], joinableOpenGames:[], watchableGames:[]};
   },
 
   componentDidMount: function() {
-    UserStore.addChangeListener(this._onChange);
-    UserStore.addGameMetaChangeListener(this._onGameMetaChange);
+    UserStore.addChangeListener(this.onUserStoreChange);
     SiteActions.beginOpenGamesLoop();
-    SiteActions.startOpenJoinedHeartbeatLoop();
+    SiteActions.beginActiveGamesLoop();
   },
   componentWillUnmount: function() {
-    UserStore.removeChangeListener(this._onChange);
-    UserStore.removeChangeListener(this._onGameMetaChange);
+    UserStore.removeChangeListener(this.onUserStoreChange);
   },
 
-  _onGameMetaChange: function() {
+  onUserStoreChange: function() {
+    this.setState(UserStore.getMessageError());
     this.setState({
       ownGames:UserStore.getOwnGames(),
       joinableOpenGames:UserStore.getJoinableOpenGames(),
       watchableGames:UserStore.getWatchableGames()
     });
   },
-
-  _onChange: function() {
-
-  },
-
 
   //TODO
   joinGameButtonClicked: function(gameID, evt) {
@@ -53,12 +47,20 @@ var component = React.createClass({
     var hasCreator = metadata.openGameData !== undefined && metadata.openGameData.creator !== undefined;
 
     //TODO ban "anyone" or super-short usernames as usernames??
-    if(metadata.gUser !== undefined && metadata.sUser !== undefined) title = metadata.gUser + " vs " + metadata.sUser;
-    else if(metadata.gUser !== undefined && hasCreator && metadata.openGameData.creator != metadata.gUser) title = metadata.gUser + " vs " + metadata.openGameData.creator;
-    else if(metadata.sUser !== undefined && hasCreator && metadata.openGameData.creator != metadata.sUser) title = metadata.openGameData.creator + " vs " + metadata.sUser;
-    else if(metadata.gUser !== undefined) title = metadata.gUser + " vs " + "anyone";
-    else if(metadata.sUser !== undefined) title = "anyone" + " vs " + metadata.sUser;
-    else title = "Open game";
+    if(metadata.gUser !== undefined && metadata.sUser !== undefined)
+      title = metadata.gUser.name + " (G) vs " + metadata.sUser.name + " (S)";
+    else if(metadata.gUser !== undefined && hasCreator && metadata.openGameData.creator != metadata.gUser)
+      title = metadata.gUser.name + " (G) vs " + metadata.openGameData.creator.name + " (S)";
+    else if(metadata.sUser !== undefined && hasCreator && metadata.openGameData.creator != metadata.sUser)
+      title = metadata.openGameData.creator.name + " (G) vs " + metadata.sUser.name + " (S)";
+    else if(metadata.gUser !== undefined)
+      title = metadata.gUser.name + " (G) vs " + "anyone" + " (S)";
+    else if(metadata.sUser !== undefined)
+      title = "anyone (G)" + " vs " + metadata.sUser.name + " (S)";
+    else if(metadata.openGameData.creator !== undefined)
+      title = metadata.openGameData.creator.name + " vs " + "anyone" + " (random color)";
+    else
+      title = "anyone" + " vs " + "anyone" + " (random color)";
 
     if(metadata.tags.length > 0)
       title = title + " (" + metadata.tags.join(", ") + ")";
@@ -82,21 +84,22 @@ var component = React.createClass({
     if(tc.maxReserve !== undefined) s += "(" + this.gameSpanString(tc.maxReserve) + ")";
     if(tc.maxMoveTime !== undefined) s += "(" + this.gameSpanString(tc.maxMaxMoveTime) + " max/mv)";
     if(tc.overtimeAfter !== undefined) s += "(max " + tc.overtimeAfter + "t)";
-    return s
+    return s;
   },
 
   gameInfoString: function(metadata) {
     var infos = [];
 
-    infos.push(metadata.gameType);
+    if(metadata.gameType !== undefined && metadata.gameType.length > 0)
+      infos.push(metadata.gameType.charAt(0).toUpperCase() + metadata.gameType.slice(1));
 
     if(metadata.rated)
-      infos.push("rated");
+      infos.push("Rated");
     else
-      infos.push("unrated");
+      infos.push("Unrated");
 
     if(metadata.postal)
-      infos.push("postal");
+      infos.push("Postal");
 
     if(metadata.result !== undefined)
       infos.push(metadata.result.winner + "+" + metadata.result.reason);
@@ -104,13 +107,14 @@ var component = React.createClass({
     var gTC = this.gameTCString(metadata.gTC);
     var sTC = this.gameTCString(metadata.sTC);
     if(gTC != sTC) {
-      infos.push("G:"+gTC);
-      infos.push("S:"+sTC);
+      infos.push("Gold TC:"+gTC);
+      infos.push("Silver TC:"+sTC);
     }
     else
-      infos.push("TC:"+gTC);
+      infos.push("Time control:"+gTC);
 
-    infos.push("move " + (Math.floor((metadata.numPly+2)/2)) + (metadata.numPly % 2 == 0 ? "g" : "s"));
+    if(metadata.numPly > 0)
+      infos.push("Move " + (Math.floor((metadata.numPly+2)/2)) + (metadata.numPly % 2 == 0 ? "g" : "s"));
 
     return infos.join(", ");
   },

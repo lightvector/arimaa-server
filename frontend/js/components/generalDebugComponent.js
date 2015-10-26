@@ -4,27 +4,22 @@ var UserStore = require('../stores/UserStore.js');
 
 var component = React.createClass({
   componentDidMount: function() {
-     UserStore.addChangeListener(this._onChange);
-     UserStore.addGameMetaChangeListener(this._onGameMetaChange);
+    UserStore.addChangeListener(this.onUserStoreChange);
   },
   componentWillUnmount: function() {
-     UserStore.removeChangeListener(this._onChange);
-     UserStore.removeChangeListener(this._onGameMetaChange);
+    UserStore.removeChangeListener(this.onUserStoreChange);
   },
 
   getInitialState: function() {
-    return {errorMsg:'',openGames:[], createdGames:[]};
+    return {message: "", error: "", openGames:[], createdGames:[]};
   },
-
-  _onGameMetaChange: function() {
+  
+  onUserStoreChange: function() {
+    this.setState(UserStore.getMessageError());
     this.setState({
       openGames:UserStore.getOpenGames(),
       createdGames:UserStore.getCreatedGames()
     });
-  },
-
-  _onChange: function() {
-
   },
 
   fastRegister: function() {

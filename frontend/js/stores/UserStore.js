@@ -3,12 +3,14 @@ var SiteConstants = require('../constants/SiteConstants.js');
 var EventEmitter = require('events').EventEmitter;
 var cookie = require('react-cookie');
 
-var CHANGE_EVENT = 'login-or-registration-change'; //TODO: rename this later
-var GAME_CHANGE_EVENT = 'game-change'; //player made move, timeout, etc
-var GAME_META_CHANGE_EVENT = 'meta-game-change'; //player joined, left
+var CHANGE_EVENT = 'USERSTORE-CHANGE';
+var NEW_OPEN_JOINED_GAME = 'USERSTORE-NEW-OPEN-JOINED-GAME';
 
-var openGames = {};   //Set of open gameIDs, dictionary mapping gameID -> gameMetadata
-var activeGames = {}; //Set of active gameIDs, dictionary mapping gameID -> gameMetadata
+//STATE/MODEL-----------------------------------------------------------------
+//All of the state associated with being logged into the Arimaa gameroom
+
+var openGames = {};   //Open games, dictionary mapping gameID -> gameMetadata
+var activeGames = {}; //Active games, dictionary mapping gameID -> gameMetadata
 
 var ownOpenGames = {};         //Games the user created OR that directly involve the current player
 var ownActiveGames = {};       //Games the user created OR that directly involve the current player
@@ -16,27 +18,26 @@ var joinableOpenGames = {};    //Games the user can join from other users
 var watchableOpenGames = {};   //Games that the user cannot join but can watch
 var watchableActiveGames = {}; //Games that the user cannot join but can watch
 
-
-//TODO not included: game rooms with 2 people that haven't started, private games?
+var joinedGameAuths = {}; //GameAuths for games that we've joined
 
 var messageText = "";
 var errorText = "";
 
+//IMPLEMENTATION---------------------------------------------------------------
+
 const UserStore = Object.assign({}, EventEmitter.prototype, {
-  emitChange: function() {this.emit(CHANGE_EVENT);},
-  emitGameMetaChange: function() {this.emit(GAME_META_CHANGE_EVENT);},
-  emitGameChange: function() {this.emit(GAME_CHANGE_EVENT);},
 
+  //Subscribe to changes to any of the above state/model
   addChangeListener: function(callback) {this.on(CHANGE_EVENT, callback);},
-  addGameMetaChangeListener: function(callback) {this.on(GAME_META_CHANGE_EVENT, callback);},
-  addGameChangeListener: function(callback) {this.on(GAME_CHANGE_EVENT, callback);},
-
   removeChangeListener: function(callback) {this.removeListener(CHANGE_EVENT, callback);},
-  removeGameMetaChangeListener: function(callback) {this.removeListener(GAME_META_CHANGE_EVENT, callback);},
-  removeGameChangeListener: function(callback) {this.removeListener(GAME_CHANGE_EVENT, callback);},
+  emitChange: function() {this.emit(CHANGE_EVENT);},
 
-  //use this function later for both registration and login errors
-  getLoginState: function() {
+  //Subscribe to the detection of new open joined games
+  emitNewOpenJoinedGame: function(gameID) {this.emit(NEW_OPEN_JOINED_GAME, gameID);}, 
+  addNewOpenJoinedGameListener: function(callback) {this.on(NEW_OPEN_JOINED_GAME, callback);},
+  removeNewOpenJoinedGameListener: function(callback) {this.removeListener(NEW_OPEN_JOINED_GAME, callback);},
+  
+  getMessageError: function() {
     return {message: messageText, error: errorText};
   },
 
@@ -46,10 +47,6 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
 
   siteAuthToken: function() {
     return cookie.load('siteAuth');
-  },
-
-  gameAuthToken: function() {
-    return cookie.load('gameAuth');
   },
 
   getOwnOpenGamesDict: function() {
@@ -79,6 +76,18 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
     return arr;
   },
 
+  getOpenGame: function(gameID) {
+    if(gameID in openGames)
+      return openGames[gameID];
+    return null;
+  },
+
+  getJoinedGameAuth: function(gameID) {
+    if(gameID in joinedGameAuths)
+      return joinedGameAuths[gameID];
+    return null;
+  },
+  
   dispatcherIndex: ArimaaDispatcher.register(function(action) {
     switch (action.actionType) {
     case SiteConstants.REGISTRATION_FAILED:
@@ -105,11 +114,12 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
       var oldOpenGames = openGames;
       var username = UserStore.getUsername();
       openGames = {};
+      var newOpenJoinedGames = [];
       action.metadatas.forEach(function(metadata){
         openGames[metadata.id] = metadata;
         if(metadata.openGameData.creator.name === username ||
-           metadata.gUser == username ||
-           metadata.sUser == username) {
+           metadata.gUser.name == username ||
+           metadata.sUser.name == username) {
           ownOpenGames[metadata.id] = metadata;
         }
         else if(metadata.gUser === undefined || metadata.sUser === undefined) {
@@ -119,30 +129,39 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
           watchableOpenGames[metadata.id] = metadata;
         }
 
-        //TODO
-        //If this is the first time we've seen this game, start a loop for update its detailed metadata
-        // if(!(metadata.id in oldOpenGames)) {
-        //   SiteActions.beginCreatedGameMetadataLoop(metadata.id);
-        // }
+        //If this is the first time we've seen this game, and we're joined to the game, record it so
+        //that we can report the event
+        if(!(metadata.id in oldOpenGames)) {
+          var joined = false;
+          for(var j = 0; j<metadata.openGameData.joined.length; j++) {
+            if(metadata.openGameData.joined[j].name == username) {
+              joined = true; break;
+            }
+          }
+          if(joined)
+            newOpenJoinedGames.append(metadata);
+        }
       });
-      UserStore.emitGameMetaChange();
+      UserStore.emitChange();
+      for(var metadata in newOpenJoinedGames) {
+        UserStore.emitNewOpenJoinedGame(metadata.id);
+      }
       break;
     case SiteConstants.ACTIVE_GAMES_LIST:
       var username = UserStore.getUsername();
       activeGames = {};
       action.metadatas.forEach(function(metadata){
         activeGames[metadata.id] = metadata;
-        if(metadata.gUser == username ||
-           metadata.sUser == username) {
+        if(metadata.gUser.name == username ||
+           metadata.sUser.name == username) {
           ownActiveGames[metadata.id] = metadata;
         }
         else {
           watchableActiveGames[metadata.id] = metadata;
         }
       });
-      UserStore.emitGameMetaChange();
+      UserStore.emitChange();
       break;
-        var oldCreatedGames = createdGames;
     case SiteConstants.GAME_METADATA_UPDATE:
       if(metadata.id in openGames) openGames[metadata.id] = metadata;
       if(metadata.id in activeGames) activeGames[metadata.id] = metadata;
@@ -151,12 +170,18 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
       if(metadata.id in joinableOpenGames) joinableOpenGames[metadata.id] = metadata;
       if(metadata.id in watchableOpenGames) watchableOpenGames[metadata.id] = metadata;
       if(metadata.id in watchableActiveGames) watchableActiveGames[metadata.id] = metadata;
-      UserStore.emitGameMetaChange();
+      UserStore.emitChange();
       break;
     case SiteConstants.PLAYER_JOINED:
       var players = action.players; //TODO do something with this...
-      UserStore.emitGameMetaChange();
+      UserStore.emitChange();
       break;
+    case SiteConstants.GAME_JOINED:
+      joinedGameAuths[action.gameID] = action.gameAuth;      
+      UserStore.emitChange();
+    case SiteConstants.HEARTBEAT_FAILED:
+      delete joinedGameAuths[action.gameID];      
+      UserStore.emitChange();
     default:
       break;
     }
