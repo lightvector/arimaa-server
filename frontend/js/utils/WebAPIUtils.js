@@ -101,7 +101,7 @@ var APIUtils = {
   },
 
   leaveGame: function(gameID, gameAuth, success, error) {
-    console.log('leaveing game ', gameID);
+    console.log('leaving game ', gameID);
     POST('/api/games/'+gameID+'/actions/leave', {gameAuth:gameAuth}, success, error);
   },
 

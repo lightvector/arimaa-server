@@ -14,7 +14,8 @@ var SiteConstants = keyMirror({
   GAME_METADATA_UPDATE: null,
   PLAYER_JOINED: null,
   GAME_JOINED: null,
-  HEARTBEAT_FAILED: null
+  HEARTBEAT_FAILED: null,
+  LEAVE_GAME_SUCCESS: null
 });
 
 module.exports = SiteConstants;

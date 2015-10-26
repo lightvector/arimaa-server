@@ -140,7 +140,13 @@ var SiteActions = {
     APIUtils.declineUserForGame(gameID, gameAuth, username, FUNC_NOP, FUNC_NOP);
   },
   leaveGame: function(gameID, gameAuth) {
-    APIUtils.declineUserForGame(gameID, gameAuth, FUNC_NOP, FUNC_NOP);
+    APIUtils.leaveGame(gameID, gameAuth, function(data) {SiteActions.leaveGameSuccess(gameID,data);}, FUNC_NOP);
+  },
+  leaveGameSuccess: function(gameID,data) {
+    ArimaaDispatcher.dispatch({
+      actionType: SiteConstants.LEAVE_GAME_SUCCESS,
+      gameID: gameID
+    });
   },
 
 
@@ -224,24 +230,25 @@ var SiteActions = {
   },
   ownOpenGameMetadataSuccess: function(data) {
     var seqNum = data.sequence;
+    var gameID = data.gameID;
 
     if(data.openGameData && data.openGameData.joined.length > 1) {
       ArimaaDispatcher.dispatch({
         actionType: SiteConstants.PLAYER_JOINED,
         players: data.openGameData.joined, //note this includes the creator
-        gameID: data.gameID
+        gameID: gameID
       });
       ArimaaDispatcher.dispatch({
         actionType: SiteConstants.GAME_METADATA_UPDATE,
-        data: data
+        metadata: data
       });
     }
 
     //TODO sleep 200ms
     setTimeout(function () {
-      APIUtils.gameMetadata(data.gameID, seqNum+1,
+      APIUtils.gameMetadata(gameID, seqNum+1,
                             SiteActions.ownOpenGameMetadataSuccess,
-                            function(data) {return SiteActions.ownOpenGameMetadataError(data.gameID,data);});
+                            function(data) {return SiteActions.ownOpenGameMetadataError(gameID,data);});
     }, 200);
 
   },
@@ -268,7 +275,7 @@ var SiteActions = {
     var game = UserStore.getOpenGame(gameID);
     //If we've since changed our auth or closed this game, terminate the loop
     var storedGameAuth = UserStore.getJoinedGameAuth(gameID);
-    if(storedGameAuth === null || storedGameAuth != gameAuth)
+    if(storedGameAuth === null || storedGameAuth != gameAuth || game === null)
       return;
     //If the game is not open, terminate
     if(game.openGameData === undefined)

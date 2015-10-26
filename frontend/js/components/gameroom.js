@@ -28,7 +28,7 @@ var component = React.createClass({
   handleJoinedPlayerSelection: function(gameID, evt) {
     console.log(evt);
     var playerName = evt.target.value;
-    var selectedPlayers = clone(this.selectedPlayers);
+    var selectedPlayers = clone(this.state.selectedPlayers);
     selectedPlayers[gameID] = playerName;
     this.setState({selectedPlayers: selectedPlayers});
   },
@@ -50,7 +50,7 @@ var component = React.createClass({
 
   leaveButtonClicked: function(gameID, gameAuth, evt) {
     // evt.target.disabled = true;
-    SiteActions.declineUserForGame(gameID, gameAuth);
+    SiteActions.leaveGame(gameID, gameAuth);
   },
 
   gameButtonClicked: function(gameID) {
@@ -162,12 +162,12 @@ var component = React.createClass({
 
       if(!joined)
         joinAccepts.push(<button onClick={this.joinGameButtonClicked.bind(this, metadata.gameID)}>Play</button>);
-      else if(joinedNotUs.length <= 0 || (metadata.openGameData.creator !== undefined && metadata.openGameData.creator != username))
+      else if(joinedNotUs.length <= 0 || (metadata.openGameData.creator !== undefined && metadata.openGameData.creator.name != username))
         joinAccepts.push(<span>Waiting for opponent...</span>);
       else {
         var selectedPlayer = null;
-        if(metadata.gameID in this.selectedPlayers) {
-          var name = this.selectedPlayers[metadata.gameID];
+        if(metadata.gameID in this.state.selectedPlayers) {
+          var name = this.state.selectedPlayers[metadata.gameID];
           for(var i = 0; i<joinedNotUs.length; i++) {
             if(joinedNotUs[i].name == name) {
               selectedPlayer = name;
@@ -176,7 +176,7 @@ var component = React.createClass({
           }
         }
         else {
-          selectedPlayer = joinedNotUs[0].length;
+          selectedPlayer = joinedNotUs[0].name;
         }
 
         var selections = [];

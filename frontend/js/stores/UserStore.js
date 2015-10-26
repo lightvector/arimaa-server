@@ -18,7 +18,8 @@ var joinableOpenGames = {};    //Games the user can join from other users
 var watchableOpenGames = {};   //Games that the user cannot join but can watch
 var watchableActiveGames = {}; //Games that the user cannot join but can watch
 
-var joinedGameAuths = {}; //GameAuths for games that we've joined
+var joinedGameAuths = {};      //GameAuths for games that we've joined
+var leftCreatedGameIDs = {}; //GameIDs for games that we've left that we created
 
 var messageText = "";
 var errorText = "";
@@ -88,6 +89,49 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
     return null;
   },
 
+  removeGame: function(gameID) {
+    if(gameID in openGames) delete openGames[gameID];
+    if(gameID in activeGames) delete activeGames[gameID];
+    if(gameID in ownOpenGames) delete ownOpenGames[gameID];
+    if(gameID in ownActiveGames) delete ownActiveGames[gameID];
+    if(gameID in joinableOpenGames) delete joinableOpenGames[gameID];
+    if(gameID in watchableOpenGames) delete watchableOpenGames[gameID];
+    if(gameID in watchableActiveGames) delete watchableActiveGames[gameID];
+  },
+
+  addGame: function(metadata) {
+    var username = UserStore.getUsername();
+    var gameID = metadata.gameID;
+    if(metadata.openGameData !== undefined) {
+      //Prevent races where we try to add a metadata back for something we successfully left and closed
+      if(metadata.gameID in leftCreatedGameIDs)
+        return;
+
+      openGames[gameID] = metadata;
+      if(metadata.openGameData.creator.name === username ||
+         (metadata.gUser !== undefined && metadata.gUser.name == username) ||
+         (metadata.sUser !== undefined && metadata.sUser.name == username)) {
+        ownOpenGames[gameID] = metadata;
+      }
+      else if(metadata.gUser === undefined || metadata.sUser === undefined) {
+        joinableOpenGames[gameID] = metadata;
+      }
+      else {
+        watchableOpenGames[gameID] = metadata;
+      }
+    }
+    else if(metadata.activeGameData !== undefined) {
+      activeGames[gameID] = metadata;
+      if(metadata.gUser.name == username ||
+         metadata.sUser.name == username) {
+        ownActiveGames[gameID] = metadata;
+      }
+      else {
+        watchableActiveGames[gameID] = metadata;
+      }
+    }
+  },
+
   dispatcherIndex: ArimaaDispatcher.register(function(action) {
     switch (action.actionType) {
     case SiteConstants.REGISTRATION_FAILED:
@@ -114,20 +158,16 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
       var oldOpenGames = openGames;
       var username = UserStore.getUsername();
       openGames = {};
+      ownOpenGames = {};
+      joinableOpenGames = {};
+      watchableOpenGames = {};
       var newOpenJoinedGames = [];
       action.metadatas.forEach(function(metadata){
-        openGames[metadata.gameID] = metadata;
-        if(metadata.openGameData.creator.name === username ||
-           (metadata.gUser !== undefined && metadata.gUser.name == username) ||
-           (metadata.sUser !== undefined && metadata.sUser.name == username)) {
-          ownOpenGames[metadata.gameID] = metadata;
-        }
-        else if(metadata.gUser === undefined || metadata.sUser === undefined) {
-          joinableOpenGames[metadata.gameID] = metadata;
-        }
-        else {
-          watchableOpenGames[metadata.gameID] = metadata;
-        }
+        //Keep the highest sequence number
+        if(metadata.gameID in oldOpenGames && oldOpenGames[metadata.gameID].sequence > metadata.sequence)
+          metadata = oldOpenGames[metadata.gameID];
+
+        UserStore.addGame(metadata);
 
         //If this is the first time we've seen this game, and we're joined to the game, record it so
         //that we can report the event
@@ -148,28 +188,29 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
       }
       break;
     case SiteConstants.ACTIVE_GAMES_LIST:
-      var username = UserStore.getUsername();
+      var oldActiveGames = activeGames;
       activeGames = {};
+      ownActiveGames = {};
+      watchableActiveGames = {};
       action.metadatas.forEach(function(metadata){
-        activeGames[metadata.gameID] = metadata;
-        if(metadata.gUser.name == username ||
-           metadata.sUser.name == username) {
-          ownActiveGames[metadata.gameID] = metadata;
-        }
-        else {
-          watchableActiveGames[metadata.gameID] = metadata;
-        }
+        //Keep the highest sequence number
+        if(metadata.gameID in oldActiveGames && oldActiveGames[metadata.gameID].sequence > metadata.sequence)
+          metadata = oldActiveGames[metadata.gameID];
+
+        UserStore.addGame(metadata);
       });
       UserStore.emitChange();
       break;
     case SiteConstants.GAME_METADATA_UPDATE:
-      if(metadata.gameID in openGames) openGames[metadata.gameID] = metadata;
-      if(metadata.gameID in activeGames) activeGames[metadata.gameID] = metadata;
-      if(metadata.gameID in ownOpenGames) ownOpenGames[metadata.gameID] = metadata;
-      if(metadata.gameID in ownActiveGames) ownActiveGames[metadata.gameID] = metadata;
-      if(metadata.gameID in joinableOpenGames) joinableOpenGames[metadata.gameID] = metadata;
-      if(metadata.gameID in watchableOpenGames) watchableOpenGames[metadata.gameID] = metadata;
-      if(metadata.gameID in watchableActiveGames) watchableActiveGames[metadata.gameID] = metadata;
+      var metadata = action.metadata;
+      //Keep the highest sequence number
+      if(metadata.gameID in openGames && openGames[metadata.gameID].sequence > metadata.sequence)
+        break;
+      else if(metadata.gameID in activeGames && activeGames[metadata.gameID].sequence > metadata.sequence)
+        break;
+
+      UserStore.removeGame(metadata.gameID);
+      UserStore.addGame(metadata);
       UserStore.emitChange();
       break;
     case SiteConstants.PLAYER_JOINED:
@@ -179,9 +220,25 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
     case SiteConstants.GAME_JOINED:
       joinedGameAuths[action.gameID] = action.gameAuth;
       UserStore.emitChange();
+      break;
     case SiteConstants.HEARTBEAT_FAILED:
       delete joinedGameAuths[action.gameID];
       UserStore.emitChange();
+      break;
+    case SiteConstants.LEAVE_GAME_SUCCESS:
+      //If we created the game and it was an open game, record so and eliminate the game from our store
+      if(action.gameID in openGames &&
+         openGames[action.gameID].openGameData !== undefined &&
+         openGames[action.gameID].openGameData.creator !== undefined &&
+         openGames[action.gameID].openGameData.creator.name == UserStore.getUsername()) {
+        leftCreatedGameIDs[action.gameID] = action.gameID;
+        if(action.gameID in openGames) delete openGames[action.gameID];
+        if(action.gameID in ownOpenGames) delete ownOpenGames[action.gameID];
+        if(action.gameID in joinableOpenGames) delete joinableOpenGames[action.gameID];
+        if(action.gameID in watchableOpenGames) delete watchableOpenGames[action.gameID];
+        UserStore.emitChange();
+      }
+      break;
     default:
       break;
     }
