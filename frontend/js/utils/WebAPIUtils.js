@@ -11,13 +11,13 @@ function POST(url, data, success, error) {
     url: url,
     contentType: 'application/json; charset=utf-8',
     data: JSON.stringify(data),
-    success: function(data, textStatus, xhr) {
-      if(PRINT_DATA) { console.log("url: " + url + "\ndata: ", data);}
+    success: function(received, textStatus, xhr) {
+      if(PRINT_DATA) { console.log("url: " + url + "\ndata: " + data + "\nreceived: ", received);}
 
-      if('error' in data) {
-        error(data);
+      if('error' in received) {
+        error(received);
       } else {
-        success(data);
+        success(received);
       }
     },
     error: function(xhr, textStatus, err) {
@@ -39,12 +39,12 @@ function GET(url, data, success, error) {
     url: url,
     contentType: 'application/json; charset-utf-8',
     data: data,
-    success: function(data, textStatus, xhr) {
-      if(PRINT_DATA) {console.log("url: " + url + "\ndata: ", data);}
-      if('error' in data) {
-        error(data);
+    success: function(received, textStatus, xhr) {
+      if(PRINT_DATA) {console.log("url: " + url + "\ndata: " + data + "\nreceived: ", received);}
+      if('error' in received) {
+        error(received);
       } else {
-        success(data);
+        success(received);
       }
     },
     error: function(xhr, textStatus, err) {
