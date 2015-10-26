@@ -100,6 +100,11 @@ var APIUtils = {
     POST('/api/games/'+gameID+'/actions/join', {siteAuth:UserStore.siteAuthToken()}, success, error);
   },
 
+  leaveGame: function(gameID, gameAuth, success, error) {
+    console.log('leaveing game ', gameID);
+    POST('/api/games/'+gameID+'/actions/leave', {gameAuth:gameAuth}, success, error);
+  },
+
   gameState: function(gameID, seq, success, error) {
     GET('/api/games/'+gameID+'/state', {minSequence:seq}, success, error);
   },
@@ -114,6 +119,9 @@ var APIUtils = {
 
   acceptUserForGame: function(gameID, gameAuth, username, success, error) {
     POST('/api/games/'+gameID+'/actions/accept', {gameAuth:gameAuth, opponent:username}, success, error);
+  },
+  declineUserForGame: function(gameID, gameAuth, username, success, error) {
+    POST('/api/games/'+gameID+'/actions/decline', {gameAuth:gameAuth, opponent:username}, success, error);
   },
 
   //TODO: camelcase this function

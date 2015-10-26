@@ -136,6 +136,12 @@ var SiteActions = {
   acceptUserForGame: function(gameID, gameAuth, username) {
     APIUtils.acceptUserForGame(gameID, gameAuth, username, FUNC_NOP, FUNC_NOP);
   },
+  declineUserForGame: function(gameID, gameAuth, username) {
+    APIUtils.declineUserForGame(gameID, gameAuth, username, FUNC_NOP, FUNC_NOP);
+  },
+  leaveGame: function(gameID, gameAuth) {
+    APIUtils.declineUserForGame(gameID, gameAuth, FUNC_NOP, FUNC_NOP);
+  },
 
 
   //A single point query to update the list of open games
