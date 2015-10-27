@@ -9,10 +9,13 @@ var SiteConstants = keyMirror({
   FORGOT_PASSWORD_SUCCESS: null,
   RESET_PASSWORD_FAILED: null,
   RESET_PASSWORD_SUCCESS: null,
-  GAME_CREATED: null,
+  OPEN_GAMES_LIST: null,
+  ACTIVE_GAMES_LIST: null,
+  GAME_METADATA_UPDATE: null,
   PLAYER_JOINED: null,
-  GAME_STATUS_UPDATE: null,
-  OPEN_GAMES_LIST: null
+  GAME_JOINED: null,
+  HEARTBEAT_FAILED: null,
+  LEAVE_GAME_SUCCESS: null
 });
 
 module.exports = SiteConstants;

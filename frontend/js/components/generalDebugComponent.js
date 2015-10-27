@@ -4,27 +4,22 @@ var UserStore = require('../stores/UserStore.js');
 
 var component = React.createClass({
   componentDidMount: function() {
-     UserStore.addChangeListener(this._onChange);
-     UserStore.addGameMetaChangeListener(this._onGameMetaChange);
+    UserStore.addChangeListener(this.onUserStoreChange);
   },
   componentWillUnmount: function() {
-     UserStore.removeChangeListener(this._onChange);
-     UserStore.removeChangeListener(this._onGameMetaChange);
+    UserStore.removeChangeListener(this.onUserStoreChange);
   },
 
   getInitialState: function() {
-    return {errorMsg:'',openGames:[], createdGames:[]}
+    return {message: "", error: "", openGames:[], createdGames:[]};
   },
 
-  _onGameMetaChange: function() {
+  onUserStoreChange: function() {
+    this.setState(UserStore.getMessageError());
     this.setState({
-        openGames:UserStore.getOpenGames(),
-        createdGames:UserStore.getCreatedGames()
+      openGames:UserStore.getJoinableOpenGames(),
+      createdGames:UserStore.getWatchableGames()
     });
-  },
-
-  _onChange: function() {
-
   },
 
   fastRegister: function() {
@@ -60,10 +55,10 @@ var component = React.createClass({
     SiteActions.acceptUserForGame(gID, username);
   },
 
-  gameStatus: function() {
+  gameState: function() {
     var gID = this.refs.statusGameID.getDOMNode().value;
     var minSeq = this.refs.statusMinSeq.getDOMNode().value;
-    SiteActions.gameStatus(gID, minSeq);
+    SiteActions.gameState(gID, minSeq);
   },
 
   getOpenGames: function() {
@@ -93,10 +88,10 @@ var component = React.createClass({
 
     var openGamesList = this.state.openGames.map(function(metadata) {
       return (
-        <li key={metadata.id}>
-          {metadata.id}
-          <button onClick={this.joinGameButtonClicked.bind(this, metadata.id)}>Join</button>
-          <button onClick={this.goToGameButtonClicked.bind(this, metadata.id)}>Go To Game</button>
+        <li key={metadata.gameID}>
+          {metadata.gameID}
+          <button onClick={this.joinGameButtonClicked.bind(this, metadata.gameID)}>Join</button>
+          <button onClick={this.goToGameButtonClicked.bind(this, metadata.gameID)}>Go To Game</button>
         </li>
       );
     }, this);
@@ -107,15 +102,15 @@ var component = React.createClass({
         return (
           <li key={index}>
             {shortUserData.name}
-            <button onClick={this.acceptUserButtonClicked.bind(this, metadata.id, shortUserData.name)}>Accept</button>
-            <button onClick={this.goToGameButtonClicked.bind(this, metadata.id)}>Go To Game</button>
+            <button onClick={this.acceptUserButtonClicked.bind(this, metadata.gameID, shortUserData.name)}>Accept</button>
+            <button onClick={this.goToGameButtonClicked.bind(this, metadata.gameID)}>Go To Game</button>
           </li>
         );
       },this);
 
       return (
-        <li key={metadata.id}>
-          {metadata.id}
+        <li key={metadata.gameID}>
+          {metadata.gameID}
           <ul>
             {joinedUsers}
           </ul>
@@ -149,7 +144,7 @@ var component = React.createClass({
         <p />
         <input type="text" ref="statusGameID" placeholder="gameID"/>
         <input type="text" ref="statusMinSeq" placeholder="sequence" defaultValue="0"/>
-        <button type="button" onClick={this.gameStatus}>Status</button>
+        <button type="button" onClick={this.gameState}>Game State</button>
 
         <p />
         <input type="text" ref="acceptGameID" placeholder="gameID"/>

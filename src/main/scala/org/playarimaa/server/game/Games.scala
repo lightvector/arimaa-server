@@ -27,7 +27,7 @@ object Games {
   val TIMEOUT_CHECK_PERIOD_IF_ERROR = 60.0
 
   //Default and max timeout for "get" function
-  val GET_DEFAULT_TIMEOUT = 15.0
+  val GET_DEFAULT_TIMEOUT = 20.0
   val GET_MAX_TIMEOUT = 120.0
 
   //Clean up a game with no creator after this many seconds if there is nobody in it
@@ -47,12 +47,12 @@ object Games {
   case class GetMetadata(
     meta: GameMetadata,
     openGameData: Option[OpenGames.GetData],
-    activeGameData: Option[ActiveGames.GetData]
+    activeGameData: Option[ActiveGames.GetData],
+    sequence: Option[Long]
   )
   case class GetData(
     meta: GetMetadata,
-    moves: Vector[MoveInfo],
-    sequence: Option[Long]
+    moves: Vector[MoveInfo]
   )
 
   case class SearchParams(
@@ -230,7 +230,7 @@ class Games(val db: Database, val parentLogins: LoginTracker, val scheduler: Sch
   /* Get the full state of a game */
   def get(id: GameID, minSequence: Option[Long], timeout: Double): Future[Games.GetData] = {
     val timeoutFut = minSequence.map { _ =>
-      after(timeout seconds,scheduler)(Future.failed(new Exception("Future timed out!")))
+      after(timeout seconds,scheduler)(get(id, None, 0))
     }
     def loop: Future[Games.GetData] = {
       if(timeoutFut.exists(_.isCompleted))
@@ -249,10 +249,10 @@ class Games(val db: Database, val parentLogins: LoginTracker, val scheduler: Sch
                     meta = Games.GetMetadata(
                       meta = meta,
                       openGameData = None,
-                      activeGameData = None
+                      activeGameData = None,
+                      sequence = None
                     ),
-                    moves = moves,
-                    sequence = None
+                    moves = moves
                   )
                 }
               }
@@ -267,21 +267,36 @@ class Games(val db: Database, val parentLogins: LoginTracker, val scheduler: Sch
   }
 
   /* Get only the metadata associated with a game */
-  def getMetadata(id: GameID): Future[Games.GetMetadata] = {
-    openGames.getMetadata(id) match {
-      case Some(data) => Future.successful(data)
-      case None =>
-        activeGames.getMetadata(id) match {
-          case Some(data) => Future.successful(data)
-          case None =>
-            GameUtils.loadMetaFromDB(db,id).map { meta =>
-              Games.GetMetadata(
-                meta = meta,
-                openGameData = None,
-                activeGameData = None
-              )
-            }
-        }
+  def getMetadata(id: GameID, minSequence: Option[Long], timeout: Double): Future[Games.GetMetadata] = {
+    val timeoutFut = minSequence.map { _ =>
+      after(timeout seconds,scheduler)(getMetadata(id,None,0))
+    }
+    def loop: Future[Games.GetMetadata] = {
+      if(timeoutFut.exists(_.isCompleted))
+        throw new Exception("Done")
+      openGames.get(id,minSequence) match {
+        case Some(Right(data)) => Future.successful(data.meta)
+        case Some(Left(fut)) => fut.flatMap { case () => loop }
+        case None =>
+          activeGames.get(id,minSequence) match {
+            case Some(Right(data)) => Future.successful(data.meta)
+            case Some(Left(fut)) => fut.flatMap { case () => loop }
+            case None =>
+              GameUtils.loadMetaFromDB(db,id).map { meta =>
+                Games.GetMetadata(
+                  meta = meta,
+                  openGameData = None,
+                  activeGameData = None,
+                  sequence = None
+                )
+              }
+          }
+      }
+    }
+    timeoutFut match {
+      case None => loop
+      case Some(timeoutFut) =>
+        Future.firstCompletedOf(Seq(timeoutFut,loop))
     }
   }
 
@@ -300,7 +315,8 @@ class Games(val db: Database, val parentLogins: LoginTracker, val scheduler: Sch
               Games.GetMetadata(
                 meta = meta,
                 openGameData = None,
-                activeGameData = None
+                activeGameData = None,
+                sequence = None
               )
             }
           }
@@ -613,13 +629,13 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker, val serverInst
     ifLoggedInOpt(id,gameAuth) { case _ => Success(()) }
   }
 
-  /* Attempt to leave an open game with the specified id
+  /* Attempt to leave an open game with the specified id. Logs out all of the user's auths.
    * Returns None if there was no game, Some(Failure(...)) if there was but it failed, and Some(Success(...)) on success.
    */
   def leave(id: GameID, gameAuth: GameAuth): Option[Try[Unit]] = this.synchronized {
     ifLoggedInOpt(id,gameAuth) { case (user,game) =>
       val now = Timestamp.get
-      game.logins.logout(user,gameAuth,now)
+      game.logins.logoutUser(user,now)
       game.filterAcceptedByLogins()
       game.advanceSequence()
       Success(())
@@ -710,7 +726,8 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker, val serverInst
         accepted = game.accepted,
         creationTime = game.creationTime
       )),
-      activeGameData = None
+      activeGameData = None,
+      sequence = Some(game.sequence)
     )
   }
 
@@ -725,8 +742,7 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker, val serverInst
       else
         Right(Games.GetData(
           meta = metadataOfGame(game),
-          moves = game.moves,
-          sequence = Some(game.sequence)
+          moves = game.moves
         ))
     }
   }
@@ -930,13 +946,13 @@ class ActiveGames(val db: Database, val scheduler: Scheduler, val serverInstance
     ifLoggedInOpt(id,gameAuth) { case _ => Success(()) }
   }
 
-  /* Attempt to leave an active game with the specified id
+  /* Attempt to leave an active game with the specified id. Logs out all of the user's auths.
    * Returns None if there was no game, Some(Failure(...)) if there was but it failed, and Some(Success(...)) on success.
    */
   def leave(id: GameID, gameAuth: GameAuth): Option[Try[Unit]] = this.synchronized {
     ifLoggedInOpt(id,gameAuth) { case (user,game) =>
       val now = Timestamp.get
-      game.logins.logout(user,gameAuth,now)
+      game.logins.logoutUser(user,now)
       game.advanceSequence()
       Success(())
     }
@@ -986,7 +1002,9 @@ class ActiveGames(val db: Database, val scheduler: Scheduler, val serverInstance
       meta = meta,
       openGameData = None,
       //This will be None if the game is ended but is not yet cleaned up
-      activeGameData = activeGameData
+      activeGameData = activeGameData,
+      //Only provide the sequence number if the game is still going
+      sequence = activeGameData.map { case _ => game.sequence }
     )
     (gm,moves)
   }
@@ -1006,13 +1024,13 @@ class ActiveGames(val db: Database, val scheduler: Scheduler, val serverInstance
           meta = meta,
           openGameData = None,
           //This will be None if the game is ended but is not yet cleaned up
-          activeGameData = activeGameData
+          activeGameData = activeGameData,
+          //Only provide the sequence number if the game is still going
+          sequence = activeGameData.map { case _ => game.sequence }
         )
         Right(Games.GetData(
           meta = gmeta,
-          moves = moves,
-          //Only provide the sequence number if the game is still going
-          sequence = activeGameData.map { case _ => game.sequence }
+          moves = moves
         ))
       }
     }
@@ -1025,7 +1043,9 @@ class ActiveGames(val db: Database, val scheduler: Scheduler, val serverInstance
       meta = meta,
       openGameData = None,
       //This will be None if the game is ended but is not yet cleaned up
-      activeGameData = activeGameData
+      activeGameData = activeGameData,
+      //Only provide the sequence number if the game is still going
+      sequence = activeGameData.map { case _ => game.sequence }
     )
   }
 

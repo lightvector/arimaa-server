@@ -7,12 +7,12 @@ var UserStore = require('../stores/UserStore.js');
 const FUNC_NOP = function(){}
 
 var ArimaaActions = {
-  //we shouldn't
-  gameStatus: function(gameID, sequence) {
-    APIUtils.gameStatus(gameID, sequence, ArimaaActions.gameStatusSuccess, FUNC_NOP);
+
+  gameState: function(gameID, sequence) {
+    APIUtils.gameState(gameID, sequence, ArimaaActions.gameStateSuccess, FUNC_NOP);
   },
 
-  gameStatusSuccess: function(data) {
+  gameStateSuccess: function(data) {
     var history = data.history;
     var n = ArimaaStore.getMoveList().length;
     while(history.length > ArimaaStore.getMoveList().length && n < history.length) {

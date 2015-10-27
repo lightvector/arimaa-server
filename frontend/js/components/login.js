@@ -4,38 +4,34 @@ var UserStore = require('../stores/UserStore.js');
 
 var loginBox = React.createClass({
   getInitialState: function() {
-    return {user: "", pass: "", error: ""};
+    return {user: "", pass: "", message: "", error: ""};
   },
+
+  componentDidMount: function() {
+    UserStore.addChangeListener(this.onUserStoreChange);
+  },
+  componentWillUnmount: function() {
+    UserStore.removeChangeListener(this.onUserStoreChange);
+  },
+
+  onUserStoreChange: function() {
+    this.setState(UserStore.getMessageError());
+  },
+  
   handleUsernameChange: function(event) {
     this.setState({user: event.target.value});
   },
   handlePasswordChange: function(event) {
     this.setState({pass: event.target.value});
   },
+
   submitLogin: function(event) {
     event.preventDefault();
     SiteActions.login(this.state.user, this.state.pass);
   },
 
-  componentDidMount: function() {
-    UserStore.addChangeListener(this._onChange);
-  },
-
-  componentWillUnmount: function() {
-    UserStore.removeChangeListener(this._onChange);
-  },
-
-  _onChange: function() {
-    console.log('onchange');
-    this.setState(UserStore.getLoginState());
-  },
-
   render: function() {
-    //var value = this.state.value;
-    //return <input type="text" value={value} onChange={this.handleChange} />;
-
     var errorText = null;
-    //is empty string falsey?
     if(this.state.error != "") {
       errorText = (<div className="error">{this.state.error}</div>);
     }
@@ -54,7 +50,7 @@ var loginBox = React.createClass({
           <div><a href="/register">Register</a></div>
         </div>
       </div>
-    )
+    );
   }
 });
 

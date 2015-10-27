@@ -10,6 +10,7 @@ var Login = require('./components/login.js');
 var Register = require('./components/register.js');
 var ForgotPassword = require('./components/forgotPassword.js');
 var ResetPassword = require('./components/resetPassword.js');
+var Gameroom = require('./components/gameroom.js');
 var Chat = require('./components/chat.js');
 var DebugComp = require('./components/generalDebugComponent.js');
 
@@ -35,6 +36,8 @@ if(url == "/login") {
   React.render(<ForgotPassword/>, document.getElementById('board_container'));
 } else if(resetMatch) {
   React.render(<ResetPassword username={resetMatch[1]} resetAuth={resetMatch[2]}/>, document.getElementById('board_container'));
+} else if(url == "/gameroom") {
+  React.render(<Gameroom/>, document.getElementById('board_container'));
 } else if(gameMatch) {
   console.log("game id: " + gameMatch[1]);
   React.render(<Game gameID={gameMatch[1]}/>, document.getElementById('board_container'));

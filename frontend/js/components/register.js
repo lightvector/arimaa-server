@@ -4,8 +4,20 @@ var UserStore = require('../stores/UserStore.js');
 
 var registrationBox = React.createClass({
   getInitialState: function() {
-    return {user: "", pass: "", email: "", confirmPass: "", error: ""};
+    return {user: "", pass: "", email: "", confirmPass: "", message: "", error: ""};
   },
+  
+  componentDidMount: function() {
+    UserStore.addChangeListener(this.onUserStoreChange);
+  },
+  componentWillUnmount: function() {
+    UserStore.removeChangeListener(this.onUserStoreChange);
+  },
+  
+  onUserStoreChange: function() {
+    this.setState(UserStore.getMessageError());
+  },
+
   handleUsernameChange: function(event) {
     this.setState({user: event.target.value});
   },
@@ -18,28 +30,15 @@ var registrationBox = React.createClass({
   handleConfirmPasswordChange: function(event) {
     this.setState({confirmPass: event.target.value});
   },
+
   submitRegister: function(event) {
     event.preventDefault();
     //TODO eventually, we will have to add a local check for valid username, email, pass match, etc
     SiteActions.register(this.state.user, this.state.email, this.state.pass);
   },
-  componentDidMount: function() {
-     UserStore.addChangeListener(this._onChange);
-   },
-   componentWillUnmount: function() {
-     UserStore.removeChangeListener(this._onChange);
-   },
-
-  _onChange: function() {
-    this.setState(UserStore.getLoginState());
-  },
 
   render: function() {
-    //var value = this.state.value;
-    //return <input type="text" value={value} onChange={this.handleChange} />;
-
     var errorText = null;
-    //is empty string falsey?
     if(this.state.error != "") {
       errorText = (<div className="error">{this.state.error}</div>);
     }
@@ -60,7 +59,7 @@ var registrationBox = React.createClass({
           <div className="forgotpass"><a href="/login">Back to login</a></div>
         </div>
       </div>
-    )
+    );
   }
 });
 
