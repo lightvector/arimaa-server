@@ -53,8 +53,8 @@ var component = React.createClass({
     ArimaaActions.redoStep();
   },
 
-  gameStatus: function() {
-    ArimaaActions.gameStatus(this.props.gameID, this.refs.statusMinSeq.getDOMNode().value);
+  gameState: function() {
+    ArimaaActions.gameState(this.props.gameID, this.refs.statusMinSeq.getDOMNode().value);
   },
 
   flipBoard: function() {
@@ -94,7 +94,7 @@ var component = React.createClass({
         <button onClick={this.silverSetup}>Send silver setup</button>
         <br/>
         <input type="text" defaultValue="0" ref="statusMinSeq"></input>
-        <button onClick={this.gameStatus}>Game Status</button>
+        <button onClick={this.gameState}>Game State</button>
         <button onClick={this.completeMove}>Complete Move</button>
         <button onClick={this.undoStep}>Undo Step</button>
         <button onClick={this.redoStep}>Redo Step</button>

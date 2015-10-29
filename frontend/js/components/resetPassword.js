@@ -2,10 +2,22 @@ var React = require('react');
 var SiteActions = require('../actions/SiteActions.js');
 var UserStore = require('../stores/UserStore.js');
 
-var registrationBox = React.createClass({
+var resetPasswordBox = React.createClass({
   getInitialState: function() {
     return {pass: "", confirmPass: "", message: "", error: ""};
   },
+
+  componentDidMount: function() {
+    UserStore.addChangeListener(this.onUserStoreChange);
+  },
+  componentWillUnmount: function() {
+    UserStore.removeChangeListener(this.onUserStoreChange);
+  },
+
+  onUserStoreChange: function() {
+    this.setState(UserStore.getMessageError());
+  },
+  
   handlePasswordChange: function(event) {
     this.setState({pass: event.target.value});
   },
@@ -16,16 +28,6 @@ var registrationBox = React.createClass({
     event.preventDefault();
     //TODO eventually, we will have to add a local check for pass match, etc
     SiteActions.resetPassword(this.props.username, this.props.resetAuth, this.state.pass);
-  },
-  componentDidMount: function() {
-     UserStore.addChangeListener(this._onChange);
-  },
-  componentWillUnmount: function() {
-    UserStore.removeChangeListener(this._onChange);
-  },
-
-  _onChange: function() {
-    this.setState(UserStore.getLoginState());
   },
 
   render: function() {
@@ -59,8 +61,8 @@ var registrationBox = React.createClass({
           <div className="forgotpass"><a href="/login">Back to login</a></div>
         </div>
       </div>
-    )
+    );
   }
 });
 
-module.exports = registrationBox;
+module.exports = resetPasswordBox;

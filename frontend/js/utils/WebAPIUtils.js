@@ -1,7 +1,7 @@
 //we're only using jquery to do ajax, so
 //it might be better to use a lighter library for that
 var $ = require('jquery');
-var UserStore = require('../stores/UserStore.js')
+var UserStore = require('../stores/UserStore.js');
 
 var PRINT_DATA = true;
 
@@ -11,13 +11,13 @@ function POST(url, data, success, error) {
     url: url,
     contentType: 'application/json; charset=utf-8',
     data: JSON.stringify(data),
-    success: function(data, textStatus, xhr) {
-      if(PRINT_DATA) { console.log("url: " + url + "\ndata: ", data);}
+    success: function(received, textStatus, xhr) {
+      if(PRINT_DATA) { console.log("url: " + url + "\ndata: " + data + "\nreceived: ", received);}
 
-      if('error' in data) {
-        error(data);
+      if('error' in received) {
+        error(received);
       } else {
-        success(data);
+        success(received);
       }
     },
     error: function(xhr, textStatus, err) {
@@ -39,12 +39,12 @@ function GET(url, data, success, error) {
     url: url,
     contentType: 'application/json; charset-utf-8',
     data: data,
-    success: function(data, textStatus, xhr) {
-      if(PRINT_DATA) {console.log("url: " + url + "\ndata: ", data);}
-      if('error' in data) {
-        error(data);
+    success: function(received, textStatus, xhr) {
+      if(PRINT_DATA) {console.log("url: " + url + "\ndata: " + data + "\nreceived: ", received);}
+      if('error' in received) {
+        error(received);
       } else {
-        success(data);
+        success(received);
       }
     },
     error: function(xhr, textStatus, err) {
@@ -100,26 +100,42 @@ var APIUtils = {
     POST('/api/games/'+gameID+'/actions/join', {siteAuth:UserStore.siteAuthToken()}, success, error);
   },
 
-  gameStatus: function(gameID, seq, success, error) {
+  leaveGame: function(gameID, gameAuth, success, error) {
+    console.log('leaving game ', gameID);
+    POST('/api/games/'+gameID+'/actions/leave', {gameAuth:gameAuth}, success, error);
+  },
+
+  gameState: function(gameID, seq, success, error) {
     GET('/api/games/'+gameID+'/state', {minSequence:seq}, success, error);
   },
 
-  gameHeartbeat: function(gameID, success, error) {
-    POST('/api/games/'+gameID+'/heartbeat', {gameAuth:""}, success, error);
+  gameMetadata: function(gameID, seq, success, error) {
+    GET('/api/games/'+gameID+'/metadata', {minSequence:seq}, success, error);
   },
 
-  acceptUserForGame: function(gameID, username, success, error) {
-    POST('/api/games/'+gameID+'/actions/accept', {gameAuth:UserStore.gameAuthToken(), opponent: username}, success, error);
+  gameHeartbeat: function(gameID, gameAuth, success, error) {
+    POST('/api/games/'+gameID+'/actions/heartbeat', {gameAuth:gameAuth}, success, error);
+  },
+
+  acceptUserForGame: function(gameID, gameAuth, username, success, error) {
+    POST('/api/games/'+gameID+'/actions/accept', {gameAuth:gameAuth, opponent:username}, success, error);
+  },
+  declineUserForGame: function(gameID, gameAuth, username, success, error) {
+    POST('/api/games/'+gameID+'/actions/decline', {gameAuth:gameAuth, opponent:username}, success, error);
   },
 
   //TODO: camelcase this function
-  send_move: function(gameID, moveStr, plyNum, success, error) {
+  send_move: function(gameID, gameAuth, moveStr, plyNum, success, error) {
     console.log(gameID, moveStr, plyNum);
-    POST('/api/games/'+gameID+'/actions/move', {gameAuth:UserStore.gameAuthToken(), move:moveStr, plyNum:plyNum}, success, error);
+    POST('/api/games/'+gameID+'/actions/move', {gameAuth:gameAuth, move:moveStr, plyNum:plyNum}, success, error);
   },
 
   getOpenGames: function(success, error) {
     GET('/api/games/search',{open:true}, success, error);
+  },
+
+  getActiveGames: function(success, error) {
+    GET('/api/games/search',{active:true}, success, error);
   },
 
   chatSocket: function(chatChannel) {
