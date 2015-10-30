@@ -23,7 +23,7 @@ var SiteActions = {
     cookie.save('siteAuth',data.siteAuth, {path:'/'});
     cookie.save('username',data.username, {path:'/'});
 
-    window.location.pathname = "/"; //TODO we should track where the user was before and then redirect there instead
+    window.location.pathname = "/gameroom"; //TODO we should track where the user was before and then redirect there instead
     ArimaaDispatcher.dispatch({
       actionType: SiteConstants.LOGIN_SUCCESS
     });
@@ -39,7 +39,7 @@ var SiteActions = {
     ArimaaDispatcher.dispatch({
       actionType: SiteConstants.REGISTRATION_SUCCESS
     });
-    window.location.pathname = "/"; //TODO we should track where the user was before and then redirect there instead
+    window.location.pathname = "/gameroom"; //TODO we should track where the user was before and then redirect there instead
   },
   registerError: function(data) {
     ArimaaDispatcher.dispatch({
@@ -52,7 +52,7 @@ var SiteActions = {
     APIUtils.logout();
     cookie.remove('siteAuth','/');//TODO: create logout_success/error and remove cookie there
     cookie.remove('username','/');
-    window.location.pathname = "/login"; //make the login page nicer
+    window.location.pathname = "/login";
   },
 
   forgotPassword: function(username) {

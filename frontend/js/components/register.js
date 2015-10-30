@@ -6,14 +6,14 @@ var registrationBox = React.createClass({
   getInitialState: function() {
     return {user: "", pass: "", email: "", confirmPass: "", message: "", error: ""};
   },
-  
+
   componentDidMount: function() {
     UserStore.addChangeListener(this.onUserStoreChange);
   },
   componentWillUnmount: function() {
     UserStore.removeChangeListener(this.onUserStoreChange);
   },
-  
+
   onUserStoreChange: function() {
     this.setState(UserStore.getMessageError());
   },
@@ -33,8 +33,10 @@ var registrationBox = React.createClass({
 
   submitRegister: function(event) {
     event.preventDefault();
-    //TODO eventually, we will have to add a local check for valid username, email, pass match, etc
-    SiteActions.register(this.state.user, this.state.email, this.state.pass);
+    if(this.state.confirmPass !== this.state.pass)
+      this.setState({error:"'Password' and 'Confirm Password' fields do not match"});
+    else
+      SiteActions.register(this.state.user, this.state.email, this.state.pass);
   },
 
   render: function() {
