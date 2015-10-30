@@ -20,64 +20,67 @@ var CreateGameDialog = React.createClass({
   ],
 
   handleTCChange: function(event) {
-    this.setState({tcIdx: event.target.selectionIndex});
+    this.setState({tcIdx: event.target.selectedIndex});
   },
   handleSideToPlayChange: function(event) {
     this.setState({sideToPlay: event.target.value});
   },
   handleRatedChange: function(event) {
-    this.setState({rated: event.target.value});
+    this.setState({rated: event.target.checked});
   },
-  handleSubmit: function(){
-    var props;
-    if(sideToPlay === "Gold")
-      props = {
-        tc: timeControls[this.state.tcIdx].tc,
+  handleOkButton: function(){
+    var opts;
+    if(this.state.sideToPlay === "Gold")
+      opts = {
+        tc: this.timeControls[this.state.tcIdx].tc,
         gUser: UserStore.getUsername(),
         rated: this.state.rated,
         gameType: "standard",
         siteAuth: UserStore.siteAuthToken()
       };
-    else if(sideToPlayer === "Silver")
-      props = {
-        tc: timeControls[this.state.tcIdx].tc,
+    else if(this.state.sideToPlay === "Silver")
+      opts = {
+        tc: this.timeControls[this.state.tcIdx].tc,
         sUser: UserStore.getUsername(),
         rated: this.state.rated,
         gameType: "standard",
         siteAuth: UserStore.siteAuthToken()
       };
     else
-      props = {
-        tc: timeControls[this.state.tcIdx].tc,
+      opts = {
+        tc: this.timeControls[this.state.tcIdx].tc,
         rated: this.state.rated,
         gameType: "standard",
         siteAuth: UserStore.siteAuthToken()
       };
-    this.props.handleSubmitted(props);
+    this.props.handleSubmitted(opts);
   },
+
   render: function(){
     var timeControls = this.timeControls;
     var selections = [];
     for(var i = 0; i<timeControls.length; i++) {
-      var selection = React.createElement("option", {key: "tcOption_"+i, value: timeControls[i].label + " " + Utils.gameTCString(timeControls[i].tc)});
+      var label = timeControls[i].label + " " + Utils.gameTCString(timeControls[i].tc);
+      var selection = React.createElement("option", {key: "tcOption_"+i, value: label}, label);
       selections.push(selection);
     }
-    var tcInput = React.createElement("select", {key: "tcSelect", size: timeControls.length, onChange: this.handleTCChange, value: selections[this.state.tcIdx].value}, selections    );
+    var tcInput = React.createElement("select",
+                                      {key: "tcSelect", size: timeControls.length, onChange: this.handleTCChange, value: selections[this.state.tcIdx].props.value},
+                                      selections);
 
     return(
       <div>
-      <form onsubmit={function() {return false;}}>
       <h4>Time control:</h4>
       {tcInput}
       <h4>Side to play:</h4>
-      <select size='3' onChange={this.handleSideToPlayChange} value="Random">
-        <option value="Random"/>
-        <option value="Gold"/>
-        <option value="Silver"/>
+      <select size='3' onChange={this.handleSideToPlayChange} value={this.state.sideToPlay}>
+        <option value='Random'>Random</option>
+        <option value='Gold'>Gold</option>
+        <option value='Silver'>Silver</option>
       </select>
-      <input type="checkbox" checked={this.state.rated} onChange={this.handleRatedChange}>Rated</input>
-      <button onclick={this.handleSubmit}>Ok</button>
-      </form>
+      <h4>Rated:</h4>
+      Rated <input type='checkbox' checked={this.state.rated} onChange={this.handleRatedChange}/>
+      <div> <button onClick={this.handleOkButton}>Ok</button> </div>
       </div>
     );
   }

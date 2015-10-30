@@ -1,5 +1,7 @@
 var React = require('react');
+var ReactDOM = require('react-dom');
 var Modal = require('react-modal');
+// var Modal = require('react-bootstrap/lib/Modal');
 var SiteActions = require('../actions/SiteActions.js');
 var UserStore = require('../stores/UserStore.js');
 var Utils = require('../utils/Utils.js');
@@ -82,9 +84,9 @@ var component = React.createClass({
     //TODO ban "anyone" or super-short usernames as usernames??
     if(metadata.gUser !== undefined && metadata.sUser !== undefined)
       title = metadata.gUser.name + " (G) vs " + metadata.sUser.name + " (S)";
-    else if(metadata.gUser !== undefined && hasCreator && metadata.openGameData.creator != metadata.gUser)
+    else if(metadata.gUser !== undefined && hasCreator && metadata.openGameData.creator.name != metadata.gUser.name)
       title = metadata.gUser.name + " (G) vs " + metadata.openGameData.creator.name + " (S)";
-    else if(metadata.sUser !== undefined && hasCreator && metadata.openGameData.creator != metadata.sUser)
+    else if(metadata.sUser !== undefined && hasCreator && metadata.openGameData.creator.name != metadata.sUser.name)
       title = metadata.openGameData.creator.name + " (G) vs " + metadata.sUser.name + " (S)";
     else if(metadata.gUser !== undefined)
       title = metadata.gUser.name + " (G) vs " + "anyone" + " (S)";
@@ -129,7 +131,7 @@ var component = React.createClass({
       infos.push("Silver TC:"+sTC);
     }
     else
-      infos.push("Time control:"+gTC);
+      infos.push("Time control: "+gTC);
 
     if(metadata.numPly > 0)
       infos.push("Move " + (Math.floor((metadata.numPly+2)/2)) + (metadata.numPly % 2 == 0 ? "g" : "s"));
@@ -248,8 +250,16 @@ var component = React.createClass({
     var that = this;
     var username = UserStore.getUsername();
 
-    var createDialog = React.createElement(CreateGameDialog, {key: "createDialog", handleSubmitted: this.handleCreateGameSubmitted});
-    var createModal = React.createElement(Modal, {key: "createModal", isOpen:this.state.createGameDialogOpen, onRequestClose:this.closeCreateDialog}, createDialog);
+    // var createModal = (
+    //     <Modal show={this.state.createGameDialogOpen} onHide={this.closeCreateDialog}>
+    //     <CreateGameDialog handleSubmitted={this.handleCreateGameSubmittedonRequestClose}/>
+    //     </Modal>
+    // );
+    var createModal = (
+        <Modal isOpen={this.state.createGameDialogOpen} onRequestClose={this.closeCreateDialog}>
+        <CreateGameDialog handleSubmitted={this.handleCreateGameSubmitted}/>
+        </Modal>
+    );
 
     var errorDiv = "";
     if(this.state.error != "") {
