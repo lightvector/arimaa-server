@@ -89,22 +89,20 @@ var SiteActions = {
     });
   },
 
-  createGame: function(gameType) {
-    console.log("creating game with type: ", gameType);
+  createGame: function(opts) {
+    APIUtils.createGame(opts, SiteActions.createGameSuccess, SiteActions.createGameError);
+  },
+
+  createStandardGame: function(tc,rated) {
     var opts = {
-      tc: {
-        //TODO specify TC
-        initialTime: 3600 //1 hr
-      },
-      rated: false,
-      gameType: gameType,
+      tc: tc,
+      rated: rated,
+      gameType: "standard",
       siteAuth: UserStore.siteAuthToken()
     };
     APIUtils.createGame(opts, SiteActions.createGameSuccess, SiteActions.createGameError);
   },
   createGameSuccess: function(data) {
-    console.log("create game data ", data);
-
     ArimaaDispatcher.dispatch({
       actionType: SiteConstants.GAME_JOINED,
       gameID: data.gameID,
