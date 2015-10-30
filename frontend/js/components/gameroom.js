@@ -81,7 +81,6 @@ var component = React.createClass({
     var title = "";
     var hasCreator = metadata.openGameData !== undefined && metadata.openGameData.creator !== undefined;
 
-    //TODO ban "anyone" or super-short usernames as usernames??
     if(metadata.gUser !== undefined && metadata.sUser !== undefined)
       title = metadata.gUser.name + " (G) vs " + metadata.sUser.name + " (S)";
     else if(metadata.gUser !== undefined && hasCreator && metadata.openGameData.creator.name != metadata.gUser.name)
