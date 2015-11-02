@@ -12,6 +12,7 @@ var SiteConstants = keyMirror({
   OPEN_GAMES_LIST: null,
   ACTIVE_GAMES_LIST: null,
   GAME_METADATA_UPDATE: null,
+  GAME_REMOVED: null,
   PLAYER_JOINED: null,
   GAME_JOINED: null,
   HEARTBEAT_FAILED: null,

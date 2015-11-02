@@ -109,7 +109,7 @@ var SiteActions = {
       gameAuth: data.gameAuth
     });
 
-    SiteActions.beginOwnOpenGameMetadataLoop(data.gameID);
+    SiteActions.beginJoinedOpenGameMetadataLoop(data.gameID,data.gameAuth);
     SiteActions.startOpenJoinedHeartbeatLoop(data.gameID,data.gameAuth);
   },
   createGameError: function(data) {
@@ -127,7 +127,7 @@ var SiteActions = {
       gameAuth: data.gameAuth
     });
 
-    SiteActions.beginOwnOpenGameMetadataLoop(gameID);
+    SiteActions.beginJoinedOpenGameMetadataLoop(gameID,data.gameAuth);
     SiteActions.startOpenJoinedHeartbeatLoop(gameID,data.gameAuth);
   },
 
@@ -242,11 +242,12 @@ var SiteActions = {
         players: data.openGameData.joined, //note this includes the creator
         gameID: gameID
       });
-      ArimaaDispatcher.dispatch({
-        actionType: SiteConstants.GAME_METADATA_UPDATE,
-        metadata: data
-      });
     }
+
+    ArimaaDispatcher.dispatch({
+      actionType: SiteConstants.GAME_METADATA_UPDATE,
+      metadata: data
+    });
 
     //If we've since changed our auth or closed this game, terminate the loop
     var game = UserStore.getOpenGame(gameID);
@@ -268,6 +269,16 @@ var SiteActions = {
     var storedGameAuth = UserStore.getJoinedGameAuth(gameID);
     if(storedGameAuth === null || storedGameAuth != gameAuth || game === null)
       return;
+
+    //TODO should there be a way to detect if the site is down?
+
+    //TODO fragile
+    if(data.error == "No game found with the given id") {
+      ArimaaDispatcher.dispatch({
+        actionType: SiteConstants.GAME_REMOVED,
+        gameID: gameID
+      });
+    }
 
     //TODO
     console.log(data);
