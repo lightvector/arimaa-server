@@ -222,20 +222,21 @@ var SiteActions = {
 
 
   //Initiates a loop querying for the result of this game metadata so long as the game
-  //exists and is open and is a game we created OR that directly involves us, and so long as
+  //exists and is open and is a game we created OR that we joined, and so long as
   //the provided auth is latest one we joined with (auth not needed to perform the query, but we only
   //care about rapid updating of metadata if we're joined with the game, and this also gives
   //us deduplication of loops)
-  beginOwnOpenGameMetadataLoop: function(gameID, gameAuth) {
+  beginJoinedOpenGameMetadataLoop: function(gameID, gameAuth) {
     APIUtils.gameMetadata(gameID, 0,
-                          function(data) {return SiteActions.ownOpenGameMetadataSuccess(gameAuth,data);},
-                          function(data) {return SiteActions.ownOpenGameMetadataError(gameID,gameAuth,data);});
+                          function(data) {return SiteActions.joinedOpenGameMetadataSuccess(gameAuth,data);},
+                          function(data) {return SiteActions.joinedOpenGameMetadataError(gameID,gameAuth,data);});
   },
-  ownOpenGameMetadataSuccess: function(gameAuth,data) {
+  joinedOpenGameMetadataSuccess: function(gameAuth,data) {
     var seqNum = data.sequence;
     var gameID = data.gameID;
 
     if(data.openGameData && data.openGameData.joined.length > 1) {
+      //TODO only report when it actually differs from previous
       ArimaaDispatcher.dispatch({
         actionType: SiteConstants.PLAYER_JOINED,
         players: data.openGameData.joined, //note this includes the creator
@@ -247,25 +248,35 @@ var SiteActions = {
       });
     }
 
+    //If we've since changed our auth or closed this game, terminate the loop
+    var game = UserStore.getOpenGame(gameID);
+    var storedGameAuth = UserStore.getJoinedGameAuth(gameID);
+    if(storedGameAuth === null || storedGameAuth != gameAuth || game === null)
+      return;
+
+
     //TODO sleep 200ms
     setTimeout(function () {
       APIUtils.gameMetadata(gameID, seqNum+1,
-                            function(data) {return SiteActions.ownOpenGameMetadataSuccess(gameAuth,data);},
-                            function(data) {return SiteActions.ownOpenGameMetadataError(gameID,gameAuth,data);});
+                            function(data) {return SiteActions.joinedOpenGameMetadataSuccess(gameAuth,data);},
+                            function(data) {return SiteActions.joinedOpenGameMetadataError(gameID,gameAuth,data);});
     }, 200);
 
   },
-  ownOpenGameMetadataError: function(gameID,gameAuth,data) {
+  joinedOpenGameMetadataError: function(gameID,gameAuth,data) {
+    var game = UserStore.getOpenGame(gameID);
+    var storedGameAuth = UserStore.getJoinedGameAuth(gameID);
+    if(storedGameAuth === null || storedGameAuth != gameAuth || game === null)
+      return;
+
     //TODO
     console.log(data);
-    if(SiteActions.isOwnOpenGameInStore(gameID)) {
-      //TODO sleep 2000 ms
-      setTimeout(function () {
-        APIUtils.gameMetadata(gameID, 0,
-                              function(data) {return SiteActions.ownOpenGameMetadataSuccess(gameAuth,data);},
-                              function(data) {return SiteActions.ownOpenGameMetadataError(gameID,gameAuth,data);});
-      }, 2000);
-    }
+    //TODO sleep 2000 ms
+    setTimeout(function () {
+      APIUtils.gameMetadata(gameID, 0,
+                            function(data) {return SiteActions.joinedOpenGameMetadataSuccess(gameAuth,data);},
+                            function(data) {return SiteActions.joinedOpenGameMetadataError(gameID,gameAuth,data);});
+    }, 2000);
   },
   isOwnOpenGameInStore: function(gameID) {
     var games = UserStore.getOwnOpenGamesDict();
