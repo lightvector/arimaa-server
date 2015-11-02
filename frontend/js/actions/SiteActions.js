@@ -222,11 +222,16 @@ var SiteActions = {
 
 
   //Initiates a loop querying for the result of this game metadata so long as the game
-  //exists and is open and is a game we created OR that directly involves us
-  beginOwnOpenGameMetadataLoop: function(gameID) {
-    APIUtils.gameMetadata(gameID, 0, SiteActions.ownOpenGameMetadataSuccess, function(data) {return SiteActions.ownOpenGameMetadataError(gameID,data);});
+  //exists and is open and is a game we created OR that directly involves us, and so long as
+  //the provided auth is latest one we joined with (auth not needed to perform the query, but we only
+  //care about rapid updating of metadata if we're joined with the game, and this also gives
+  //us deduplication of loops)
+  beginOwnOpenGameMetadataLoop: function(gameID, gameAuth) {
+    APIUtils.gameMetadata(gameID, 0,
+                          function(data) {return SiteActions.ownOpenGameMetadataSuccess(gameAuth,data);},
+                          function(data) {return SiteActions.ownOpenGameMetadataError(gameID,gameAuth,data);});
   },
-  ownOpenGameMetadataSuccess: function(data) {
+  ownOpenGameMetadataSuccess: function(gameAuth,data) {
     var seqNum = data.sequence;
     var gameID = data.gameID;
 
@@ -245,18 +250,20 @@ var SiteActions = {
     //TODO sleep 200ms
     setTimeout(function () {
       APIUtils.gameMetadata(gameID, seqNum+1,
-                            SiteActions.ownOpenGameMetadataSuccess,
-                            function(data) {return SiteActions.ownOpenGameMetadataError(gameID,data);});
+                            function(data) {return SiteActions.ownOpenGameMetadataSuccess(gameAuth,data);},
+                            function(data) {return SiteActions.ownOpenGameMetadataError(gameID,gameAuth,data);});
     }, 200);
 
   },
-  ownOpenGameMetadataError: function(gameID,data) {
+  ownOpenGameMetadataError: function(gameID,gameAuth,data) {
     //TODO
     console.log(data);
     if(SiteActions.isOwnOpenGameInStore(gameID)) {
       //TODO sleep 2000 ms
       setTimeout(function () {
-        APIUtils.gameMetadata(gameID, 0, SiteActions.ownOpenGameMetadataSuccess, function(data) {return SiteActions.ownOpenGameMetadataError(gameID,data);});
+        APIUtils.gameMetadata(gameID, 0,
+                              function(data) {return SiteActions.ownOpenGameMetadataSuccess(gameAuth,data);},
+                              function(data) {return SiteActions.ownOpenGameMetadataError(gameID,gameAuth,data);});
       }, 2000);
     }
   },
