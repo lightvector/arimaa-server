@@ -6,6 +6,7 @@ var SiteActions = require('../actions/SiteActions.js');
 var UserStore = require('../stores/UserStore.js');
 var Utils = require('../utils/Utils.js');
 var CreateGameDialog = require('../components/createGameDialog.js');
+var Chat = require('../components/chat.js');
 
 var component = React.createClass({
   getInitialState: function() {
@@ -297,13 +298,19 @@ var component = React.createClass({
       watchableGamesDiv = React.createElement("div", {key: "watchableDiv"}, watchableGamesList);
     }
 
+    var chat = (
+        <Chat chatChannel="main"/>
+    );
+
+
     var contents = [
       React.createElement("h2", {}, "Arimaa Gameroom"),
       createModal,
       errorDiv,
       ownGamesDiv,
       joinableOpenGamesDiv,
-      watchableGamesDiv
+      watchableGamesDiv,
+      chat
     ];
 
     //TODO weird classname?
