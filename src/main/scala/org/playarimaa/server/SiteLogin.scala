@@ -18,7 +18,9 @@ object SiteLogin {
     val USERNAME_LENGTH_ERROR: String = "Username must be from 3-24 characters long."
 
     val USERNAME_CHARS: Set[Char] = (('a' to 'z') ++ ('A' to 'Z') ++ ('0' to '9') ++ List('_','-')).toSet
+    val USERNAME_FIRST_CHARS: Set[Char] = (('a' to 'z') ++ ('A' to 'Z') ++ ('0' to '9')).toSet
     val USERNAME_CHAR_ERROR: String = "Username must contain only characters in [a-zA-Z0-9_-]"
+    val USERNAME_FIRST_CHAR_ERROR: String = "Username must begin with a characters in [a-zA-Z0-9]"
 
     val EMAIL_MIN_LENGTH: Int = 3
     val EMAIL_MAX_LENGTH: Int = 128
@@ -28,7 +30,19 @@ object SiteLogin {
     val PASSWORD_MAX_LENGTH: Int = 256
     val PASSWORD_LENGTH_ERROR: String = "Password must be from 6-256 characters long."
 
-    val NO_LOGIN_MESSAGE = "Not logged in, or timed out due to inactivity"
+    val NO_LOGIN_MESSAGE: String = "Not logged in, or timed out due to inactivity"
+
+    val INVALID_USERNAME_ERROR: String = "Invalid username or username already in use"
+    val INVALID_USERNAMES = List(
+      "anyone",
+      "admin",
+      "root",
+      "guest",
+      "user",
+      "test",
+      "administrator",
+      "moderator"
+    )
   }
 }
 
@@ -62,16 +76,20 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
         throw new IllegalArgumentException(USERNAME_LENGTH_ERROR)
       if(!username.forall(USERNAME_CHARS.contains(_)))
         throw new IllegalArgumentException(USERNAME_CHAR_ERROR)
+      if(!USERNAME_FIRST_CHARS.contains(username(0)))
+        throw new IllegalArgumentException(USERNAME_FIRST_CHAR_ERROR)
       validateEmail(email)
       validatePassword(password)
 
       val lowercaseName = username.toLowerCase
+      if(INVALID_USERNAMES.exists(_ == lowercaseName))
+        throw new IllegalArgumentException(INVALID_USERNAME_ERROR)
 
       Future(BCrypt.hashpw(password, BCrypt.gensalt))(cryptEC).flatMap { passwordHash =>
         val now = Timestamp.get
         val createdTime = now
         val account = Account(lowercaseName,username,email,passwordHash,isBot,createdTime)
-        accounts.add(account).recover { case _ => throw new Exception("Username already in use") }.map { case () =>
+        accounts.add(account).recover { case _ => throw new Exception(INVALID_USERNAME_ERROR) }.map { case () =>
           logins.doTimeouts(now)
           val siteAuth = logins.login(account.username, now)
           (account.username,siteAuth)

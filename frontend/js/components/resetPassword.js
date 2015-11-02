@@ -17,7 +17,7 @@ var resetPasswordBox = React.createClass({
   onUserStoreChange: function() {
     this.setState(UserStore.getMessageError());
   },
-  
+
   handlePasswordChange: function(event) {
     this.setState({pass: event.target.value});
   },
@@ -26,17 +26,14 @@ var resetPasswordBox = React.createClass({
   },
   submitResetPassword: function(event) {
     event.preventDefault();
-    //TODO eventually, we will have to add a local check for pass match, etc
-    SiteActions.resetPassword(this.props.username, this.props.resetAuth, this.state.pass);
+    if(this.state.confirmPass !== this.state.pass)
+      this.setState({error:"'Password' and 'Confirm Password' fields do not match"});
+    else
+      SiteActions.resetPassword(this.props.username, this.props.resetAuth, this.state.pass);
   },
 
   render: function() {
-    //var value = this.state.value;
-    //return <input type="text" value={value} onChange={this.handleChange} />;
-
     var errorText = null;
-    var messageText = null;
-    //is empty string falsey?
     if(this.state.error != "") {
       errorText = (<div className="error">{this.state.error}</div>);
     }

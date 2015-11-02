@@ -213,6 +213,11 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
       UserStore.addGame(metadata);
       UserStore.emitChange();
       break;
+    case SiteConstants.GAME_REMOVED:
+      var gameID = action.gameID;
+      UserStore.removeGame(gameID);
+      UserStore.emitChange();
+      break;
     case SiteConstants.PLAYER_JOINED:
       var players = action.players; //TODO do something with this...
       UserStore.emitChange();

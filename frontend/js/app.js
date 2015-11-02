@@ -1,6 +1,7 @@
 
 
 var React = require('react');
+var ReactDOM = require('react-dom');
 var Arimaa = require('./lib/arimaa.js');
 
 
@@ -29,23 +30,23 @@ var chatMatch = url.match(chatRegex);
 //TODO rename board_container to something more general if it has all of this other stuff?
 //TODO definitely make a better router later lol
 if(url == "/login") {
-  React.render(<Login/>, document.getElementById('board_container'));
+  ReactDOM.render(<Login/>, document.getElementById('board_container'));
 } else if(url == "/register") {
-  React.render(<Register/>, document.getElementById('board_container'));
+  ReactDOM.render(<Register/>, document.getElementById('board_container'));
 } else if(url == "/forgotPassword") {
-  React.render(<ForgotPassword/>, document.getElementById('board_container'));
+  ReactDOM.render(<ForgotPassword/>, document.getElementById('board_container'));
 } else if(resetMatch) {
-  React.render(<ResetPassword username={resetMatch[1]} resetAuth={resetMatch[2]}/>, document.getElementById('board_container'));
+  ReactDOM.render(<ResetPassword username={resetMatch[1]} resetAuth={resetMatch[2]}/>, document.getElementById('board_container'));
 } else if(url == "/gameroom") {
-  React.render(<Gameroom/>, document.getElementById('board_container'));
+  ReactDOM.render(<Gameroom/>, document.getElementById('board_container'));
 } else if(gameMatch) {
   console.log("game id: " + gameMatch[1]);
-  React.render(<Game gameID={gameMatch[1]}/>, document.getElementById('board_container'));
+  ReactDOM.render(<Game gameID={gameMatch[1]}/>, document.getElementById('board_container'));
 } else if(chatMatch) {
-  React.render(<Chat chatChannel={chatMatch[1]}/>, document.getElementById('board_container'));
+  ReactDOM.render(<Chat chatChannel={chatMatch[1]}/>, document.getElementById('board_container'));
 } else {
   //TODO disable this when debugging over to avoid confusing behavior of mistyped urls and such
-  React.render(<DebugComp/>, document.getElementById('board_container'));
+  ReactDOM.render(<DebugComp/>, document.getElementById('board_container'));
 }
 
-//React.render(<Header/>, document.getElementById('board_container'));
+//ReactDOM.render(<Header/>, document.getElementById('board_container'));
