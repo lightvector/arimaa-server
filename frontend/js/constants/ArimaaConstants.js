@@ -2,9 +2,16 @@ var keyMirror = require('keymirror');
 
 
 var ACTION_CONSTANTS = keyMirror({
+  DEBUG_SEND_SETUP_SILVER: null,
+  DEBUG_SEND_SETUP_GOLD: null,
+
   GAME_CLICK_SQUARE: null,
+  GAME_CLICK_SQUARE_SETUP: null,
   GAME_SETUP_GOLD: null,
   GAME_SETUP_SILVER: null,
+  GAME_SETUP_OVER: null,
+  GAME_SEND_SETUP_GOLD: null,
+  GAME_SEND_SETUP_SILVER: null,
   GAME_ADD_STEP: null, //NO LONGER NEEDED, HANDLED IN CLICK_SQUARE
   GAME_UNDO_STEP: null,
   GAME_UNDO_MOVE: null,
@@ -18,12 +25,34 @@ var ACTION_CONSTANTS = keyMirror({
   GAME_OVER: null
 });
 
+const PIECES = {
+  EMPTY : 0,
+	COLOR : 8,
+  COUNT : 15,
+
+	GRABBIT : 1,
+	GCAT : 2,
+	GDOG : 3,
+	GHORSE : 4,
+	GCAMEL : 5,
+	GELEPHANT : 6,
+
+	SRABBIT : 9,
+ 	SCAT : 10,
+	SDOG : 11,
+	SHORSE : 12,
+	SCAMEL : 13,
+  SELEPHANT : 14
+}
+
 const GAME_CONSTANTS = {
   NULL_COLOR: -1,
   GOLD: 0,
   SILVER: 1,
   BOTH_COLOR: 2, //for moving both sides
   NULL_SQUARE_NUM: -1,
+  FILES: ['a','b','c','d','e','f','g','h'],
+  RANKS: [1,2,3,4,5,6,7,8],
   reverseColor: function(color) {
     return 1-color;
   },
@@ -57,5 +86,6 @@ const GAME_CONSTANTS = {
 
 module.exports = {
   ACTIONS: ACTION_CONSTANTS,
-  GAME: GAME_CONSTANTS
+  GAME: GAME_CONSTANTS,
+  PIECES: PIECES
 }

@@ -36,6 +36,20 @@ var ArimaaActions = {
         });
       }
     }
+    if(history.length === 0) {
+      ArimaaDispatcher.dispatch({
+        actionType: ArimaaConstants.ACTIONS.GAME_SETUP_GOLD
+      });
+    } else if(history.length === 1) {
+      ArimaaDispatcher.dispatch({
+        actionType: ArimaaConstants.ACTIONS.GAME_SETUP_SILVER
+      });
+    } else {
+      ArimaaDispatcher.dispatch({
+        actionType: ArimaaConstants.ACTIONS.GAME_SETUP_OVER
+      });
+    }
+
     if(data.result) {
       ArimaaDispatcher.dispatch({
         actionType: ArimaaConstants.ACTIONS.GAME_OVER,
@@ -47,6 +61,14 @@ var ArimaaActions = {
   clickSquare: function(sqNum, sqName) {
     ArimaaDispatcher.dispatch({
       actionType: ArimaaConstants.ACTIONS.GAME_CLICK_SQUARE,
+      squareNum: sqNum,
+      squareName: sqName
+    });
+  },
+
+  clickSquareSetup: function(sqNum, sqName) {
+    ArimaaDispatcher.dispatch({
+      actionType: ArimaaConstants.ACTIONS.GAME_CLICK_SQUARE_SETUP,
       squareNum: sqNum,
       squareName: sqName
     });
@@ -64,21 +86,36 @@ var ArimaaActions = {
     });
   },
 
-  setupGold: function(gameID, setupString) {
+  debugSendGoldSetup: function(gameID, setupString) {
     ArimaaDispatcher.dispatch({
-      actionType: ArimaaConstants.ACTIONS.GAME_SETUP_GOLD,
+      actionType: ArimaaConstants.ACTIONS.DEBUG_SEND_SETUP_GOLD,
       text: setupString,
       gameID: gameID
     });
   },
 
-  setupSilver: function(gameID, setupString) {
+  debugSendSilverSetup: function(gameID, setupString) {
     ArimaaDispatcher.dispatch({
-      actionType: ArimaaConstants.ACTIONS.GAME_SETUP_SILVER,
+      actionType: ArimaaConstants.ACTIONS.DEBUG_SEND_SETUP_SILVER,
       text: setupString,
       gameID: gameID
     });
   },
+
+  sendGoldSetup: function(gameID) {
+    ArimaaDispatcher.dispatch({
+      actionType: ArimaaConstants.ACTIONS.GAME_SEND_SETUP_GOLD,
+      gameID: gameID
+    });
+  },
+
+  sendSilverSetup: function(gameID) {
+    ArimaaDispatcher.dispatch({
+      actionType: ArimaaConstants.ACTIONS.GAME_SEND_SETUP_SILVER,
+      gameID: gameID
+    });
+  },
+
 
   addStep: function(stepString) {
     ArimaaDispatcher.dispatch({
