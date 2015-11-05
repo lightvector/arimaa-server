@@ -1,5 +1,3 @@
-
-
 var React = require('react');
 var Arimaa = require('./lib/arimaa.js');
 
@@ -14,38 +12,37 @@ var Gameroom = require('./components/gameroom.js');
 var Chat = require('./components/chat.js');
 var DebugComp = require('./components/generalDebugComponent.js');
 
-var url = window.location.pathname;
+var Router = require('react-router').Router
+var Route = require('react-router').Route
+var Link = require('react-router').Link
 
-//TODO remove this and other debug lines and generally clean up the js code?
-//console.log(url);
+const App = React.createClass({
+  render() {
+    return (
+      <div>
+        <h1>App</h1>
+        <ul>
+          <li><Link to="/login">Login</Link></li>
+          <li><Link to="/register">Register</Link></li>
+        </ul>
+        {this.props.children}
+      </div>
+    )
+  }
+})
 
-var resetRegex = /\/resetPassword\/([0-9a-zA-Z\-_]+)\/([0-9a-f]+)/;
-var resetMatch = url.match(resetRegex);
-var gameRegex = /\/game\/([0-9a-f]+)/;
-var gameMatch = url.match(gameRegex);
-var chatRegex = /\/chat\/([0-9a-zA-Z_]+)/;
-var chatMatch = url.match(chatRegex);
-
-//TODO rename board_container to something more general if it has all of this other stuff?
-//TODO definitely make a better router later lol
-if(url == "/login") {
-  React.render(<Login/>, document.getElementById('board_container'));
-} else if(url == "/register") {
-  React.render(<Register/>, document.getElementById('board_container'));
-} else if(url == "/forgotPassword") {
-  React.render(<ForgotPassword/>, document.getElementById('board_container'));
-} else if(resetMatch) {
-  React.render(<ResetPassword username={resetMatch[1]} resetAuth={resetMatch[2]}/>, document.getElementById('board_container'));
-} else if(url == "/gameroom") {
-  React.render(<Gameroom/>, document.getElementById('board_container'));
-} else if(gameMatch) {
-  console.log("game id: " + gameMatch[1]);
-  React.render(<Game gameID={gameMatch[1]}/>, document.getElementById('board_container'));
-} else if(chatMatch) {
-  React.render(<Chat chatChannel={chatMatch[1]}/>, document.getElementById('board_container'));
-} else {
-  //TODO disable this when debugging over to avoid confusing behavior of mistyped urls and such
-  React.render(<DebugComp/>, document.getElementById('board_container'));
+const routes = {
+  path: '/',
+  component: DebugComp, //replace this for actual release!!!
+  childRoutes: [
+    { path: 'login', component: Login },
+    { path: 'register', component: Register },
+    { path: 'resetPassword'}, //this one might need some work
+    { path: 'forgotPassword', component: ForgotPassword },
+    { path: 'gameroom', component: Gameroom },
+    { path: 'game/:gameID', component: Game },
+    { path: 'chat/:chatChannel', component: Chat}
+  ]
 }
 
-//React.render(<Header/>, document.getElementById('board_container'));
+React.render(<Router routes={routes} />, document.getElementById('board_container'));

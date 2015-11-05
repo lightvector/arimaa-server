@@ -28,7 +28,7 @@ var chatBox = React.createClass({
       var userInput = this.state.userInput.trim();
       this.setState({userInput:""});
       if(userInput.length > 0) {
-        APIUtils.chatPost(this.props.chatChannel, this.state.chatAuth, userInput, FUNC_NOP, this.onUserInputError);
+        APIUtils.chatPost(this.props.params.chatChannel, this.state.chatAuth, userInput, FUNC_NOP, this.onUserInputError);
       }
     }
   },
@@ -38,7 +38,7 @@ var chatBox = React.createClass({
   },
 
   doJoin: function() {
-    APIUtils.chatJoin(this.props.chatChannel, this.onJoinSuccess, this.onJoinError);
+    APIUtils.chatJoin(this.props.params.chatChannel, this.onJoinSuccess, this.onJoinError);
   },
   onJoinSuccess: function(data) {
     var chatAuth = data.chatAuth;
@@ -57,7 +57,7 @@ var chatBox = React.createClass({
 
   doLeave: function() {
     if(this.state.chatAuth !== null) {
-      APIUtils.chatLeave(this.props.chatChannel, this.state.chatAuth, this.onLeaveSuccess, this.onLeaveError);
+      APIUtils.chatLeave(this.props.params.chatChannel, this.state.chatAuth, this.onLeaveSuccess, this.onLeaveError);
     }
   },
   onLeaveSuccess: function(data) {
@@ -75,7 +75,7 @@ var chatBox = React.createClass({
 
   startHeartbeatLoop: function(chatAuth) {
     if(this.state.chatAuth !== null && this.state.chatAuth == chatAuth) {
-      APIUtils.chatHeartbeat(this.props.chatChannel, chatAuth, FUNC_NOP, this.onHeartbeatError);
+      APIUtils.chatHeartbeat(this.props.params.chatChannel, chatAuth, FUNC_NOP, this.onHeartbeatError);
       //TODO sleep 30s
       var that = this;
       setTimeout(function () {that.startHeartbeatLoop(chatAuth);}, 30000);
@@ -90,10 +90,10 @@ var chatBox = React.createClass({
     if(this.state.chatAuth !== null && this.state.chatAuth == chatAuth) {
       var that = this;
       if(this.state.nextMinId < 0)
-        APIUtils.chatGet(this.props.chatChannel,
+        APIUtils.chatGet(this.props.params.chatChannel,
                          function(data) {that.onLinesSuccess(data,chatAuth);}, function(data) {that.onLinesError(data,chatAuth);});
       else
-        APIUtils.chatPoll(this.props.chatChannel, this.state.nextMinId,
+        APIUtils.chatPoll(this.props.params.chatChannel, this.state.nextMinId,
                           function(data) {that.onLinesSuccess(data,chatAuth);}, function(data) {that.onLinesError(data,chatAuth);});
     }
   },

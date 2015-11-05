@@ -21,9 +21,9 @@ var Game = React.createClass({
   render: function() {
     return (
       <div>
-        <Board gameID={this.props.gameID}/>
-        <Movelist gameID={this.props.gameID}/>
-        <DebugComp gameID={this.props.gameID}/>
+        <Board gameID={this.props.params.gameID}/>
+        <Movelist gameID={this.props.params.gameID}/>
+        <DebugComp gameID={this.props.params.gameID}/>
       </div>
     );
   }

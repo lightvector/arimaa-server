@@ -39,8 +39,10 @@
   "dependencies": {
     "es6-shim": "^0.33.0",
     "flux": "^2.0.1",
+    "history": "^1.13.0",
     "keymirror": "~0.1.0",
     "object-assign": "^1.0.0",
-    "react": "^0.13.3"
+    "react": "^0.13.3",
+    "react-router": "^1.0.0-rc4"
   }
 }
