@@ -37,11 +37,11 @@ const routes = {
   childRoutes: [
     { path: 'login', component: Login },
     { path: 'register', component: Register },
-    { path: 'resetPassword'}, //this one might need some work
+    { path: 'resetPassword', component: ResetPassword },
     { path: 'forgotPassword', component: ForgotPassword },
     { path: 'gameroom', component: Gameroom },
     { path: 'game/:gameID', component: Game },
-    { path: 'chat/:chatChannel', component: Chat}
+    { path: 'chat/:chatChannel', component: Chat }
   ]
 }
 

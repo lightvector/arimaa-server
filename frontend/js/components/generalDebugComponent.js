@@ -1,6 +1,7 @@
 var React = require('react');
 var SiteActions = require('../actions/SiteActions.js');
 var UserStore = require('../stores/UserStore.js');
+var Link = require('react-router').Link
 
 var component = React.createClass({
   componentDidMount: function() {
@@ -91,7 +92,7 @@ var component = React.createClass({
         <li key={metadata.gameID}>
           {metadata.gameID}
           <button onClick={this.joinGameButtonClicked.bind(this, metadata.gameID)}>Join</button>
-          <button onClick={this.goToGameButtonClicked.bind(this, metadata.gameID)}>Go To Game</button>
+          <Link to={"/game/"+metadata.gameID}>Go To Game</Link>
         </li>
       );
     }, this);
