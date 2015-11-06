@@ -1,6 +1,6 @@
 var React = require('react');
+var ReactDOM = require('react-dom');
 var Arimaa = require('./lib/arimaa.js');
-
 
 var Game = require('./components/arimaa_game.js');
 var Header = require('./components/header.js');

@@ -42,7 +42,7 @@
     "history": "^1.13.0",
     "keymirror": "~0.1.0",
     "object-assign": "^1.0.0",
-    "react": "^0.13.3",
-    "react-router": "^1.0.0-rc4"
+    "react-router": "^1.0.0-rc4",
+    "react": "^0.14.0"
   }
 }

@@ -23,7 +23,7 @@ var SiteActions = {
     cookie.save('siteAuth',data.siteAuth, {path:'/'});
     cookie.save('username',data.username, {path:'/'});
 
-    window.location.pathname = "/"; //TODO we should track where the user was before and then redirect there instead
+    window.location.pathname = "/gameroom"; //TODO we should track where the user was before and then redirect there instead
     ArimaaDispatcher.dispatch({
       actionType: SiteConstants.LOGIN_SUCCESS
     });
@@ -39,7 +39,7 @@ var SiteActions = {
     ArimaaDispatcher.dispatch({
       actionType: SiteConstants.REGISTRATION_SUCCESS
     });
-    window.location.pathname = "/"; //TODO we should track where the user was before and then redirect there instead
+    window.location.pathname = "/gameroom"; //TODO we should track where the user was before and then redirect there instead
   },
   registerError: function(data) {
     ArimaaDispatcher.dispatch({
@@ -52,7 +52,7 @@ var SiteActions = {
     APIUtils.logout();
     cookie.remove('siteAuth','/');//TODO: create logout_success/error and remove cookie there
     cookie.remove('username','/');
-    window.location.pathname = "/login"; //make the login page nicer
+    window.location.pathname = "/login";
   },
 
   forgotPassword: function(username) {
@@ -89,29 +89,27 @@ var SiteActions = {
     });
   },
 
-  createGame: function(gameType) {
-    console.log("creating game with type: ", gameType);
+  createGame: function(opts) {
+    APIUtils.createGame(opts, SiteActions.createGameSuccess, SiteActions.createGameError);
+  },
+
+  createStandardGame: function(tc,rated) {
     var opts = {
-      tc: {
-        //TODO specify TC
-        initialTime: 3600 //1 hr
-      },
-      rated: false,
-      gameType: gameType,
+      tc: tc,
+      rated: rated,
+      gameType: "standard",
       siteAuth: UserStore.siteAuthToken()
     };
     APIUtils.createGame(opts, SiteActions.createGameSuccess, SiteActions.createGameError);
   },
   createGameSuccess: function(data) {
-    console.log("create game data ", data);
-
     ArimaaDispatcher.dispatch({
       actionType: SiteConstants.GAME_JOINED,
       gameID: data.gameID,
       gameAuth: data.gameAuth
     });
 
-    SiteActions.beginOwnOpenGameMetadataLoop(data.gameID);
+    SiteActions.beginJoinedOpenGameMetadataLoop(data.gameID,data.gameAuth);
     SiteActions.startOpenJoinedHeartbeatLoop(data.gameID,data.gameAuth);
   },
   createGameError: function(data) {
@@ -129,7 +127,7 @@ var SiteActions = {
       gameAuth: data.gameAuth
     });
 
-    SiteActions.beginOwnOpenGameMetadataLoop(gameID);
+    SiteActions.beginJoinedOpenGameMetadataLoop(gameID,data.gameAuth);
     SiteActions.startOpenJoinedHeartbeatLoop(gameID,data.gameAuth);
   },
 
@@ -224,43 +222,72 @@ var SiteActions = {
 
 
   //Initiates a loop querying for the result of this game metadata so long as the game
-  //exists and is open and is a game we created OR that directly involves us
-  beginOwnOpenGameMetadataLoop: function(gameID) {
-    APIUtils.gameMetadata(gameID, 0, SiteActions.ownOpenGameMetadataSuccess, function(data) {return SiteActions.ownOpenGameMetadataError(gameID,data);});
+  //exists and is open and is a game we created OR that we joined, and so long as
+  //the provided auth is latest one we joined with (auth not needed to perform the query, but we only
+  //care about rapid updating of metadata if we're joined with the game, and this also gives
+  //us deduplication of loops)
+  beginJoinedOpenGameMetadataLoop: function(gameID, gameAuth) {
+    APIUtils.gameMetadata(gameID, 0,
+                          function(data) {return SiteActions.joinedOpenGameMetadataSuccess(gameAuth,data);},
+                          function(data) {return SiteActions.joinedOpenGameMetadataError(gameID,gameAuth,data);});
   },
-  ownOpenGameMetadataSuccess: function(data) {
+  joinedOpenGameMetadataSuccess: function(gameAuth,data) {
     var seqNum = data.sequence;
     var gameID = data.gameID;
 
     if(data.openGameData && data.openGameData.joined.length > 1) {
+      //TODO only report when it actually differs from previous
       ArimaaDispatcher.dispatch({
         actionType: SiteConstants.PLAYER_JOINED,
         players: data.openGameData.joined, //note this includes the creator
         gameID: gameID
       });
-      ArimaaDispatcher.dispatch({
-        actionType: SiteConstants.GAME_METADATA_UPDATE,
-        metadata: data
-      });
     }
+
+    ArimaaDispatcher.dispatch({
+      actionType: SiteConstants.GAME_METADATA_UPDATE,
+      metadata: data
+    });
+
+    //If we've since changed our auth or closed this game, terminate the loop
+    var game = UserStore.getOpenGame(gameID);
+    var storedGameAuth = UserStore.getJoinedGameAuth(gameID);
+    if(storedGameAuth === null || storedGameAuth != gameAuth || game === null)
+      return;
+
 
     //TODO sleep 200ms
     setTimeout(function () {
       APIUtils.gameMetadata(gameID, seqNum+1,
-                            SiteActions.ownOpenGameMetadataSuccess,
-                            function(data) {return SiteActions.ownOpenGameMetadataError(gameID,data);});
+                            function(data) {return SiteActions.joinedOpenGameMetadataSuccess(gameAuth,data);},
+                            function(data) {return SiteActions.joinedOpenGameMetadataError(gameID,gameAuth,data);});
     }, 200);
 
   },
-  ownOpenGameMetadataError: function(gameID,data) {
+  joinedOpenGameMetadataError: function(gameID,gameAuth,data) {
+    var game = UserStore.getOpenGame(gameID);
+    var storedGameAuth = UserStore.getJoinedGameAuth(gameID);
+    if(storedGameAuth === null || storedGameAuth != gameAuth || game === null)
+      return;
+
+    //TODO should there be a way to detect if the site is down?
+
+    //TODO fragile
+    if(data.error == "No game found with the given id") {
+      ArimaaDispatcher.dispatch({
+        actionType: SiteConstants.GAME_REMOVED,
+        gameID: gameID
+      });
+    }
+
     //TODO
     console.log(data);
-    if(SiteActions.isOwnOpenGameInStore(gameID)) {
-      //TODO sleep 2000 ms
-      setTimeout(function () {
-        APIUtils.gameMetadata(gameID, 0, SiteActions.ownOpenGameMetadataSuccess, function(data) {return SiteActions.ownOpenGameMetadataError(gameID,data);});
-      }, 2000);
-    }
+    //TODO sleep 2000 ms
+    setTimeout(function () {
+      APIUtils.gameMetadata(gameID, 0,
+                            function(data) {return SiteActions.joinedOpenGameMetadataSuccess(gameAuth,data);},
+                            function(data) {return SiteActions.joinedOpenGameMetadataError(gameID,gameAuth,data);});
+    }, 2000);
   },
   isOwnOpenGameInStore: function(gameID) {
     var games = UserStore.getOwnOpenGamesDict();

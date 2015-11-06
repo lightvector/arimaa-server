@@ -1,10 +1,18 @@
 var React = require('react');
+var ReactDOM = require('react-dom');
+var Modal = require('react-modal');
+// var Modal = require('react-bootstrap/lib/Modal');
 var SiteActions = require('../actions/SiteActions.js');
 var UserStore = require('../stores/UserStore.js');
+var Utils = require('../utils/Utils.js');
+var CreateGameDialog = require('../components/createGameDialog.js');
+var Chat = require('../components/chat.js');
 
 var component = React.createClass({
   getInitialState: function() {
-    return {message: "", error:"", ownGames:[], joinableOpenGames:[], watchableGames:[], selectedPlayers:{}};
+    return {message: "", error:"",
+            ownGames:[], joinableOpenGames:[], watchableGames:[], selectedPlayers:{},
+            createGameDialogOpen:false};
   },
 
   componentDidMount: function() {
@@ -58,16 +66,27 @@ var component = React.createClass({
     window.open("/game/" + gameID);
   },
 
+  createButtonClicked: function() {
+    this.setState({createGameDialogOpen:true});
+  },
+  closeCreateDialog: function() {
+    this.setState({createGameDialogOpen:false});
+  },
+
+  handleCreateGameSubmitted: function(opts) {
+    this.setState({createGameDialogOpen:false});
+    SiteActions.createGame(opts);
+  },
+
   gameTitle: function(metadata) {
     var title = "";
     var hasCreator = metadata.openGameData !== undefined && metadata.openGameData.creator !== undefined;
 
-    //TODO ban "anyone" or super-short usernames as usernames??
     if(metadata.gUser !== undefined && metadata.sUser !== undefined)
       title = metadata.gUser.name + " (G) vs " + metadata.sUser.name + " (S)";
-    else if(metadata.gUser !== undefined && hasCreator && metadata.openGameData.creator != metadata.gUser)
+    else if(metadata.gUser !== undefined && hasCreator && metadata.openGameData.creator.name != metadata.gUser.name)
       title = metadata.gUser.name + " (G) vs " + metadata.openGameData.creator.name + " (S)";
-    else if(metadata.sUser !== undefined && hasCreator && metadata.openGameData.creator != metadata.sUser)
+    else if(metadata.sUser !== undefined && hasCreator && metadata.openGameData.creator.name != metadata.sUser.name)
       title = metadata.openGameData.creator.name + " (G) vs " + metadata.sUser.name + " (S)";
     else if(metadata.gUser !== undefined)
       title = metadata.gUser.name + " (G) vs " + "anyone" + " (S)";
@@ -81,26 +100,6 @@ var component = React.createClass({
     if(metadata.tags.length > 0)
       title = title + " (" + metadata.tags.join(", ") + ")";
     return title;
-  },
-
-  gameSpanString: function(seconds) {
-    var s = "";
-    if(seconds >= 86400) { s += Math.floor(seconds/86400) + "d"; seconds = seconds % 86400;}
-    if(seconds >= 3600)  { s += Math.floor(seconds/3600)  + "h"; seconds = seconds % 3600;}
-    if(seconds >= 60)    { s += Math.floor(seconds/60)    + "m"; seconds = seconds % 60;}
-    if(seconds >= 0.5)   { s += Math.round(seconds)       + "s"; seconds = 0;}
-    return s;
-  },
-
-  gameTCString: function(tc) {
-    var s = "";
-    s += this.gameSpanString(tc.initialTime);
-    if(tc.increment !== undefined && tc.increment > 0) s += "+" + this.gameSpanString(tc.increment);
-    if(tc.delay !== undefined && tc.delay > 0) s += "~" + this.gameSpanString(tc.delay);
-    if(tc.maxReserve !== undefined) s += "(" + this.gameSpanString(tc.maxReserve) + ")";
-    if(tc.maxMoveTime !== undefined) s += "(" + this.gameSpanString(tc.maxMaxMoveTime) + " max/mv)";
-    if(tc.overtimeAfter !== undefined) s += "(max " + tc.overtimeAfter + "t)";
-    return s;
   },
 
   gameInfoString: function(metadata) {
@@ -125,14 +124,14 @@ var component = React.createClass({
     if(metadata.result !== undefined)
       infos.push(metadata.result.winner + "+" + metadata.result.reason);
 
-    var gTC = this.gameTCString(metadata.gTC);
-    var sTC = this.gameTCString(metadata.sTC);
+    var gTC = Utils.gameTCString(metadata.gTC);
+    var sTC = Utils.gameTCString(metadata.sTC);
     if(gTC != sTC) {
       infos.push("Gold TC:"+gTC);
       infos.push("Silver TC:"+sTC);
     }
     else
-      infos.push("Time control:"+gTC);
+      infos.push("Time control: "+gTC);
 
     if(metadata.numPly > 0)
       infos.push("Move " + (Math.floor((metadata.numPly+2)/2)) + (metadata.numPly % 2 == 0 ? "g" : "s"));
@@ -251,18 +250,34 @@ var component = React.createClass({
     var that = this;
     var username = UserStore.getUsername();
 
+    // var createModal = (
+    //     <Modal show={this.state.createGameDialogOpen} onHide={this.closeCreateDialog}>
+    //     <CreateGameDialog handleSubmitted={this.handleCreateGameSubmittedonRequestClose}/>
+    //     </Modal>
+    // );
+    var createModal = (
+        <Modal isOpen={this.state.createGameDialogOpen} onRequestClose={this.closeCreateDialog}>
+        <CreateGameDialog handleSubmitted={this.handleCreateGameSubmitted}/>
+        </Modal>
+    );
+
+    var errorDiv = "";
+    if(this.state.error != "") {
+      errorDiv = React.createElement("div", {className:"error"}, this.state.error);
+    }
+
     var ownGamesDiv = "";
-    if(this.state.ownGames.length > 0) {
+    {
       var ownGamesList = this.state.ownGames.map(function(metadata) {
         return that.renderGame(metadata);
       });
 
+      ownGamesList.unshift(React.createElement("button", {key: "createGameButton", onClick: this.createButtonClicked}, "Create New Game"));
       ownGamesList.unshift(React.createElement("h3", {}, "My Current Games"));
       ownGamesDiv = React.createElement("div", {key: "ownDiv"}, ownGamesList);
     }
 
     joinableOpenGamesDiv = "";
-    // if(this.state.joinableOpenGames.length > 0) {
     {
       var joinableOpenGamesList = this.state.joinableOpenGames.map(function(metadata) {
         return that.renderGame(metadata);
@@ -274,7 +289,6 @@ var component = React.createClass({
 
 
     watchableGamesDiv = "";
-    // if(this.state.watchableGames.length > 0) {
     {
       var watchableGamesList = this.state.watchableGames.map(function(metadata) {
         return that.renderGame(metadata);
@@ -284,16 +298,22 @@ var component = React.createClass({
       watchableGamesDiv = React.createElement("div", {key: "watchableDiv"}, watchableGamesList);
     }
 
+    var chat = (
+        <Chat chatChannel="main"/>
+    );
+
+
     var contents = [
       React.createElement("h2", {}, "Arimaa Gameroom"),
+      createModal,
+      errorDiv,
       ownGamesDiv,
       joinableOpenGamesDiv,
-      watchableGamesDiv
+      watchableGamesDiv,
+      chat
     ];
-    // if(this.state.error != "") {
-    //   contents.push(React.createElement("div", {className:"error"}, this.state.error));
-    // }
 
+    //TODO weird classname?
     return React.createElement("div", {className: "commentBox"}, contents);
 
   }

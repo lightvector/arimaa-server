@@ -28,12 +28,7 @@ var forgotPasswordBox = React.createClass({
   },
 
   render: function() {
-    //var value = this.state.value;
-    //return <input type="text" value={value} onChange={this.handleChange} />;
-
     var errorText = null;
-    var messageText = null;
-    //is empty string falsey?
     if(this.state.error != "") {
       errorText = (<div className="error">{this.state.error}</div>);
     }
