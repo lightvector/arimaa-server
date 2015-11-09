@@ -12,37 +12,35 @@ var Gameroom = require('./components/gameroom.js');
 var Chat = require('./components/chat.js');
 var DebugComp = require('./components/generalDebugComponent.js');
 
-var Router = require('react-router').Router
-var Route = require('react-router').Route
-var Link = require('react-router').Link
+var Router = require('react-router').Router;
+var Route = require('react-router').Route;
+var Link = require('react-router').Link;
+
+const createBrowserHistory = require('history/lib/createBrowserHistory');
 
 const App = React.createClass({
   render() {
     return (
       <div>
-        <h1>App</h1>
-        <ul>
-          <li><Link to="/login">Login</Link></li>
-          <li><Link to="/register">Register</Link></li>
-        </ul>
         {this.props.children}
       </div>
-    )
+    );
   }
-})
+});
 
 const routes = {
   path: '/',
-  component: DebugComp, //replace this for actual release!!!
+  component: App,
+  indexRoute: { component:Login },
   childRoutes: [
-    { path: 'login', component: Login },
+    { path: 'debug', component: DebugComp }, //TODO remove this for actual release!!!
     { path: 'register', component: Register },
-    { path: 'resetPassword', component: ResetPassword },
+    { path: 'resetPassword/:username/:resetAuth', component: ResetPassword },
     { path: 'forgotPassword', component: ForgotPassword },
     { path: 'gameroom', component: Gameroom },
     { path: 'game/:gameID', component: Game },
     { path: 'chat/:chatChannel', component: Chat }
   ]
-}
+};
 
-React.render(<Router routes={routes} />, document.getElementById('board_container'));
+ReactDOM.render(<Router routes={routes} history={createBrowserHistory()} />, document.getElementById('board_container'));

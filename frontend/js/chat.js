@@ -119,7 +119,9 @@ var ChatApp = React.createClass({displayName: "ChatApp",
       React.createElement("div", {className: "commentBox"},
         React.createElement("h1", null, "Chat"),
         React.createElement("table", null,
-          lines
+          React.createElement("tbody", null,
+            lines
+          )
         ),
         React.createElement("form", {className: "commentForm", onSubmit: this.handleSubmit},
           React.createElement("input", {type: "text", ref: "text", value: this.state.userInput, onChange: this.handleChange, placeholder: "Say something..."}),
@@ -132,4 +134,4 @@ var ChatApp = React.createClass({displayName: "ChatApp",
   }
 });
 
-React.render(React.createElement(ChatApp, null), document.getElementById('chat_container'));
+ReactDOM.render(React.createElement(ChatApp, null), document.getElementById('chat_container'));

@@ -1,7 +1,7 @@
 var React = require('react');
 var SiteActions = require('../actions/SiteActions.js');
 var UserStore = require('../stores/UserStore.js');
-var Link = require('react-router').Link
+var Link = require('react-router').Link;
 
 var loginBox = React.createClass({
   getInitialState: function() {

@@ -1,7 +1,7 @@
 var React = require('react');
 var SiteActions = require('../actions/SiteActions.js');
 var UserStore = require('../stores/UserStore.js');
-var Link = require('react-router').Link
+var Link = require('react-router').Link;
 
 var registrationBox = React.createClass({
   getInitialState: function() {
@@ -59,7 +59,7 @@ var registrationBox = React.createClass({
             <input type="submit" className="submit" name="commit" value="Register" onClick={this.submitRegister}/>
           </form>
           {errorText}
-          <div className="forgotpass"><Link to="/login">Back to Login</Link></div>
+          <div className="forgotpass"><Link to="/">Back to Login</Link></div>
 
         </div>
       </div>

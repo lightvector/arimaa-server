@@ -125,7 +125,10 @@ var chatBox = React.createClass({
 
     var contents = [
       React.createElement("h1", null, "Chat"),
-      React.createElement("table", null, lines),
+      React.createElement(
+        "table", null,
+        React.createElement("tbody", null, lines)
+      ),
       React.createElement(
         "form", {className: "commentForm", onSubmit: this.submitUserInput},
         React.createElement("input", {type: "text", ref: "text", value: this.state.userInput, onChange: this.handleUserInputChange, placeholder: "Say something..."}),
