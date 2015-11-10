@@ -6,18 +6,27 @@ var ArimaaActions = require('../actions/ArimaaActions.js');
 var ArimaaConstants = require('../constants/ArimaaConstants.js');
 
 function getGameState() {
-  var boardState= {
+  var boardState = {
     fen: ArimaaStore.getArimaa().get_fen(),
     stepFrom: ArimaaStore.getSeletedSquare().num, //need to change this name
     steps: ArimaaStore.getValidSteps(),
-    viewSide: ArimaaStore.getViewSide()
+    viewSide: ArimaaStore.getViewSide(),
+    setupColor: ArimaaStore.getSetupColor(),
+    setup: ArimaaStore.getSetup()
   };
   return boardState;
 }
 
 var Board = React.createClass({
   getInitialState: function() {
-    return {fen: ArimaaStore.getArimaa().get_fen(), stepFrom: ArimaaConstants.GAME.NULL_SQUARE_NUM, steps: [], viewSide: ArimaaConstants.GAME.SILVER}; //move constants into store?
+    return {
+      fen: ArimaaStore.getArimaa().get_fen(),
+      stepFrom: ArimaaConstants.GAME.NULL_SQUARE_NUM,
+      steps: [],
+      viewSide: ArimaaStore.getViewSide(),
+      setupColor: ArimaaStore.getSetupColor(),
+      setup: ArimaaStore.getSetup()
+    };
   },
 
   componentDidMount: function() {
@@ -29,7 +38,12 @@ var Board = React.createClass({
    },
 
   squareClicked: function(i, sqName) {
-    ArimaaActions.clickSquare(i, sqName);
+    if(this.state.setupColor === ArimaaConstants.GAME.NULL_COLOR) {
+      ArimaaActions.clickSquare(i, sqName);
+    } else if(this.state.setupColor === ArimaaConstants.GAME.GOLD ||
+              this.state.setupColor === ArimaaConstants.GAME.SILVER) {
+      ArimaaActions.clickSquareSetup(i, sqName);
+    }
   },
 
   renderSquare: function(p, i) {
@@ -57,7 +71,7 @@ var Board = React.createClass({
 
     return (
       <div key={i} className="square" onClick={this.squareClicked.bind(this, i, squareName)}>
-        <Square black={black} trap={trap} selected={selected} stepTo={stepTo}>
+        <Square black={black} trap={trap} selected={selected} stepTo={stepTo} sqName={squareName}>
           {piece}
         </Square>
       </div>
@@ -68,10 +82,25 @@ var Board = React.createClass({
     var position = [];
     for(var i=0;i<this.state.fen.length;i++) {
       var c = this.state.fen.charAt(i);
-      if(c == '/') {continue;}
-      else if("12345678".indexOf(c) !== -1) {
-        for(var j=0;j<parseInt(c);j++) {position.push(' ');}
-      } else {position.push(c);}
+      if(c == '/') {
+        continue;
+      } else if("12345678".indexOf(c) !== -1) {
+        for(var j=0;j<parseInt(c);j++) {
+          position.push(' ');
+        }
+      } else {
+        position.push(c);
+      }
+    }
+
+    if(this.state.setupColor === ArimaaConstants.GAME.GOLD) {
+      for(var i=48;i<64;i++) {
+        position[i] = this.state.setup[i-48];
+      }
+    } else if(this.state.setupColor === ArimaaConstants.GAME.SILVER) {
+      for(var i=0;i<16;i++) {
+        position[i] = this.state.setup[i];
+      }
     }
 
     if(this.state.viewSide === ArimaaConstants.GAME.SILVER) {

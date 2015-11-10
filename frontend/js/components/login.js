@@ -1,6 +1,7 @@
 var React = require('react');
 var SiteActions = require('../actions/SiteActions.js');
 var UserStore = require('../stores/UserStore.js');
+var Link = require('react-router').Link;
 
 var loginBox = React.createClass({
   getInitialState: function() {
@@ -17,7 +18,7 @@ var loginBox = React.createClass({
   onUserStoreChange: function() {
     this.setState(UserStore.getMessageError());
   },
-  
+
   handleUsernameChange: function(event) {
     this.setState({user: event.target.value});
   },
@@ -46,8 +47,8 @@ var loginBox = React.createClass({
             <input type="submit" className="submit" name="commit" value="Login" onClick={this.submitLogin}/>
           </form>
           {errorText}
-          <div className="forgotpass"><a href="/forgotPassword">Forgot Password?</a></div>
-          <div><a href="/register">Register</a></div>
+          <div className="forgotpass"><Link to="/forgotPassword">Forgot Password?</Link></div>
+          <div><Link to="/register">Register</Link></div>
         </div>
       </div>
     );

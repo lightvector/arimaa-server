@@ -299,7 +299,7 @@ var component = React.createClass({
     }
 
     var chat = (
-        <Chat chatChannel="main"/>
+        <Chat params={{chatChannel:"main"}}/>
     );
 
 

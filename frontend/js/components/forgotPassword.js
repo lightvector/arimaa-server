@@ -1,6 +1,7 @@
 var React = require('react');
 var SiteActions = require('../actions/SiteActions.js');
 var UserStore = require('../stores/UserStore.js');
+var Link = require('react-router').Link;
 
 var forgotPasswordBox = React.createClass({
   getInitialState: function() {
@@ -47,7 +48,7 @@ var forgotPasswordBox = React.createClass({
           </form>
           {errorText}
           {messageText}
-          <div><a href="/login">Back to login</a></div>
+          <div><Link to="/">Back to Login</Link></div>
         </div>
       </div>
     );
