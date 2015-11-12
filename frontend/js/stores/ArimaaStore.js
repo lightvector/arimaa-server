@@ -1,10 +1,9 @@
-'use strict'
+'use strict';
 
-var ArimaaDispatcher = require('../dispatcher/ArimaaDispatcher.js');
-var EventEmitter = require('events').EventEmitter;
-var ArimaaConstants = require('../constants/ArimaaConstants.js');
-var SiteConstants = require('../constants/SiteConstants.js');
 var assign = require('object-assign');
+var EventEmitter = require('events').EventEmitter;
+var ArimaaDispatcher = require('../dispatcher/ArimaaDispatcher.js');
+var ArimaaConstants = require('../constants/ArimaaConstants.js');
 var Arimaa = require('../lib/arimaa.js');
 var APIUtils = require('../utils/WebAPIUtils.js');
 
@@ -13,8 +12,9 @@ const MOVE_EVENT = 'new-move';
 
 var debugMsg = "";
 
-var _gameID;
-var _gameAuth;
+var _gameID = null;
+var _gameAuth = null;
+var _gameState = null;
 
 var _setupGold   = ['C','D','H','E','M','H','D','C','R','R','R','R','R','R','R','R']; //a2-h2, a1-h1 //default gold setup
 var _setupSilver = ['r','r','r','r','r','r','r','r','c','d','h','m','e','h','d','c']; //a8-h8, a7-h7 //default silver setup
@@ -35,6 +35,10 @@ var _sequenceNum = 0;
 setInitialState();
 
 const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
+  getGameState: function() {
+    return _gameState;
+  },
+
   getSetupColor: function() {
     return _setupColor;
   },
@@ -111,8 +115,11 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
     }
 
     switch(action.actionType) {
-      //maybe we should put this in user store? or both???
-      case SiteConstants.GAME_CREATED:
+      case ArimaaConstants.ACTIONS.GAME_STATE:
+        _gameState = action.data;
+        ArimaaStore.emitChange();
+        break;
+      case ArimaaConstants.ACTIONS.GAME_JOINED:
         _gameID = action.gameID;
         _gameAuth = action.gameAuth;
         ArimaaStore.emitChange();
@@ -157,7 +164,7 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
           }
         }
         _arimaa.setup_gold(moveStr); //NO ERROR CHECKING YET
-        APIUtils.sendMove(action.gameID, moveStr, 0, function(){}, function(){});
+        APIUtils.sendMove(action.gameID, _gameAuth, moveStr, 0, function(){}, function(){});
         break;
       case ArimaaConstants.ACTIONS.GAME_SEND_SETUP_SILVER:
         var moveStr = "";
@@ -167,14 +174,14 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
           }
         }
         _arimaa.setup_silver(moveStr); //NO ERROR CHECKING YET
-        APIUtils.sendMove(action.gameID, moveStr, 1, function(){}, function(){});
+        APIUtils.sendMove(action.gameID, _gameAuth, moveStr, 1, function(){}, function(){});
         break;
 
       //debug methods to send setup as text
       //only used in debug component
       case ArimaaConstants.ACTIONS.DEBUG_SEND_SETUP_GOLD:
         _arimaa.setup_gold(action.text);
-        APIUtils.sendMove(action.gameID, action.text, 0, function(){}, function(){});
+        APIUtils.sendMove(action.gameID, _gameAuth, action.text, 0, function(){}, function(){});
         ArimaaStore.emitChange();
         //usually, this is done with the game_setup_silver action,
         //but for local games where we don't go through the network
@@ -184,7 +191,7 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
         break;
       case ArimaaConstants.ACTIONS.DEBUG_SEND_SETUP_SILVER:
         _arimaa.setup_silver(action.text);
-        APIUtils.sendMove(action.gameID, action.text, 1, function(){}, function(){});
+        APIUtils.sendMove(action.gameID, _gameAuth, action.text, 1, function(){}, function(){});
         ArimaaStore.emitChange();
         break;
       case ArimaaConstants.ACTIONS.GAME_CLICK_SQUARE_SETUP:
@@ -310,7 +317,7 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
           }
 
           //send move to server
-          APIUtils.sendMove(action.gameID, lastMoveStr, _arimaa.get_halfmove_number()+1, function(){}, function(){});
+          APIUtils.sendMove(action.gameID, _gameAuth, lastMoveStr, _arimaa.get_halfmove_number()+1, function(){}, function(){});
           _redoSquareStack = [];
           _selSquareStack = [];
           _setSelectedSquareToNull();
