@@ -134,7 +134,7 @@ var ArimaaActions = {
 
   completeMove: function(gameID) {
     //delete following line
-    //APIUtils.send_move(gameID, moveStr, plyNum, FUNC_NOP, FUNC_NOP);
+    //APIUtils.sendMove(gameID, moveStr, plyNum, FUNC_NOP, FUNC_NOP);
     ArimaaDispatcher.dispatch({
       actionType: ArimaaConstants.ACTIONS.GAME_COMPLETE_MOVE,
       gameID: gameID

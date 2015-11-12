@@ -157,7 +157,7 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
           }
         }
         _arimaa.setup_gold(moveStr); //NO ERROR CHECKING YET
-        APIUtils.send_move(action.gameID, moveStr, 0, function(){}, function(){});
+        APIUtils.sendMove(action.gameID, moveStr, 0, function(){}, function(){});
         break;
       case ArimaaConstants.ACTIONS.GAME_SEND_SETUP_SILVER:
         var moveStr = "";
@@ -167,14 +167,14 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
           }
         }
         _arimaa.setup_silver(moveStr); //NO ERROR CHECKING YET
-        APIUtils.send_move(action.gameID, moveStr, 1, function(){}, function(){});
+        APIUtils.sendMove(action.gameID, moveStr, 1, function(){}, function(){});
         break;
 
       //debug methods to send setup as text
       //only used in debug component
       case ArimaaConstants.ACTIONS.DEBUG_SEND_SETUP_GOLD:
         _arimaa.setup_gold(action.text);
-        APIUtils.send_move(action.gameID, action.text, 0, function(){}, function(){});
+        APIUtils.sendMove(action.gameID, action.text, 0, function(){}, function(){});
         ArimaaStore.emitChange();
         //usually, this is done with the game_setup_silver action,
         //but for local games where we don't go through the network
@@ -184,7 +184,7 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
         break;
       case ArimaaConstants.ACTIONS.DEBUG_SEND_SETUP_SILVER:
         _arimaa.setup_silver(action.text);
-        APIUtils.send_move(action.gameID, action.text, 1, function(){}, function(){});
+        APIUtils.sendMove(action.gameID, action.text, 1, function(){}, function(){});
         ArimaaStore.emitChange();
         break;
       case ArimaaConstants.ACTIONS.GAME_CLICK_SQUARE_SETUP:
@@ -310,7 +310,7 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
           }
 
           //send move to server
-          APIUtils.send_move(action.gameID, lastMoveStr, _arimaa.get_halfmove_number()+1, function(){}, function(){});
+          APIUtils.sendMove(action.gameID, lastMoveStr, _arimaa.get_halfmove_number()+1, function(){}, function(){});
           _redoSquareStack = [];
           _selSquareStack = [];
           _setSelectedSquareToNull();
