@@ -4,7 +4,7 @@ var APIUtils = require('../utils/WebAPIUtils.js');
 var ArimaaStore = require('../stores/ArimaaStore.js');
 var UserStore = require('../stores/UserStore.js');
 
-const FUNC_NOP = function(){}
+const FUNC_NOP = function(){};
 
 var ArimaaActions = {
 
@@ -144,7 +144,7 @@ var ArimaaActions = {
   flipBoard: function() {
     ArimaaDispatcher.dispatch({
       actionType: ArimaaConstants.ACTIONS.GAME_FLIP_BOARD
-    })
+    });
   },
 
 

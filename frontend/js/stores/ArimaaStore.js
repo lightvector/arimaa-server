@@ -77,7 +77,7 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
     return {
       num: _selSquareNum,
       name: _selSquareName
-    }
+    };
   },
 
   getValidSteps: function() {
