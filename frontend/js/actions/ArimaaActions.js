@@ -78,8 +78,6 @@ var ArimaaActions = {
      }, SiteConstants.VALUES.GAME_HEARTBEAT_PERIOD * 1000);
   },
   onHeartbeatError: function(gameID,data) {
-    //TODO
-    console.log(data);
     ArimaaDispatcher.dispatch({
       actionType: ArimaaConstants.ACTIONS.HEARTBEAT_FAILED,
       gameID: gameID
@@ -147,11 +145,12 @@ var ArimaaActions = {
     setTimeout(ArimaaActions.startGameStateLoop, SiteConstants.VALUES.GAME_STATE_LOOP_DELAY * 1000);
   },
   gameStateError: function(gameID,gameAuth,data) {
-    //TODO should there be a way to detect if the site is down?
-    console.log(data);
+    ArimaaDispatcher.dispatch({
+      actionType: ArimaaConstants.ACTIONS.GAME_STATE_FAILED,
+      data: data
+    });
     setTimeout(ArimaaActions.startGameStateLoop, SiteConstants.VALUES.GAME_STATE_LOOP_DELAY_ON_ERROR * 1000);
   },
-
 
   clickSquare: function(sqNum, sqName) {
     ArimaaDispatcher.dispatch({

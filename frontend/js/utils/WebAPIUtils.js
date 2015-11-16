@@ -78,8 +78,12 @@ var APIUtils = {
     POST('/api/accounts/register', {username:username, email:email, password:password, isBot:false}, success, error);
   },
 
-  logout: function() {
-    POST('/api/accounts/logout', {siteAuth:UserStore.siteAuthToken()}, function(){}, function(){});
+  logout: function(success, error) {
+    POST('/api/accounts/logout', {siteAuth:UserStore.siteAuthToken()}, success, error);
+  },
+
+  authLoggedIn: function(success, error) {
+    POST('/api/accounts/authLoggedIn', {siteAuth:UserStore.siteAuthToken()}, success, error);
   },
 
   forgotPassword: function(username, success, error) {

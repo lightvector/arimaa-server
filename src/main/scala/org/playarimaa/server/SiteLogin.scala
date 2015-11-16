@@ -134,6 +134,12 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
     }
   }
 
+  def isAuthLoggedIn(siteAuth: SiteAuth) : Boolean = {
+    val now = Timestamp.get
+    logins.doTimeouts(now)
+    logins.isAuthLoggedIn(siteAuth)
+  }
+
   def forgotPassword(usernameOrEmail: Username) : Unit = {
     //Spawn off a job to find the user's account if it exists and send the email and don't wait for it
     accounts.getByNameOrEmail(usernameOrEmail).onComplete { result =>

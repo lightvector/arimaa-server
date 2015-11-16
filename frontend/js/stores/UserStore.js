@@ -18,7 +18,7 @@ var joinableOpenGames = {};    //Games the user can join from other users
 var watchableOpenGames = {};   //Games that the user cannot join but can watch
 var watchableActiveGames = {}; //Games that the user cannot join but can watch
 
-var joinedGameAuths = {};      //GameAuths for games that we've joined
+var joinedGameAuths = {};    //GameAuths for games that we've joined
 var leftCreatedGameIDs = {}; //GameIDs for games that we've left that we created
 
 var messageText = "";
@@ -136,8 +136,11 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
     switch (action.actionType) {
     case SiteConstants.ACTIONS.REGISTRATION_FAILED:
     case SiteConstants.ACTIONS.LOGIN_FAILED:
+    case SiteConstants.ACTIONS.LOGOUT_FAILED:
     case SiteConstants.ACTIONS.FORGOT_PASSWORD_FAILED:
     case SiteConstants.ACTIONS.RESET_PASSWORD_FAILED:
+    case SiteConstants.ACTIONS.GAMES_LIST_FAILED:
+    case SiteConstants.ACTIONS.CREATE_GAME_FAILED:
       messageText = "";
       errorText = action.reason;
       UserStore.emitChange();
@@ -155,6 +158,7 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
       UserStore.emitChange();
       break;
     case SiteConstants.ACTIONS.OPEN_GAMES_LIST:
+      errorText = "";
       var oldOpenGames = openGames;
       var username = UserStore.getUsername();
       openGames = {};
@@ -188,6 +192,7 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
       }
       break;
     case SiteConstants.ACTIONS.ACTIVE_GAMES_LIST:
+      errorText = "";
       var oldActiveGames = activeGames;
       activeGames = {};
       ownActiveGames = {};

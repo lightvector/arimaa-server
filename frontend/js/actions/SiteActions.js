@@ -19,8 +19,6 @@ var SiteActions = {
     });
   },
   loginSuccess: function(data) {
-    console.log('login success');
-
     cookie.save('siteAuth',data.siteAuth, {path:'/'});
     cookie.save('username',data.username, {path:'/'});
 
@@ -31,7 +29,6 @@ var SiteActions = {
   },
 
   register: function(username, email, password) {
-    console.log("do some registering");
     APIUtils.register(username, email, password, SiteActions.registerSuccess, SiteActions.registerError);
   },
   registerSuccess: function(data) {
@@ -50,10 +47,18 @@ var SiteActions = {
   },
 
   logout: function() {
-    APIUtils.logout();
-    cookie.remove('siteAuth','/');//TODO: create logout_success/error and remove cookie there
+    APIUtils.logout(SiteActions.logoutSuccess, SiteActions.logoutError);
+  },
+  logoutSuccess: function(data) {
+    cookie.remove('siteAuth','/');
     cookie.remove('username','/');
     window.location.pathname = "/login";
+  },
+  logoutError: function(data) {
+    ArimaaDispatcher.dispatch({
+      actionType: SiteConstants.ACTIONS.LOGOUT_FAILED,
+      reason: data.error
+    });
   },
 
   forgotPassword: function(username) {
@@ -66,7 +71,6 @@ var SiteActions = {
     });
   },
   forgotPasswordSuccess: function(data) {
-    console.log('forgot password success');
     ArimaaDispatcher.dispatch({
       actionType: SiteConstants.ACTIONS.FORGOT_PASSWORD_SUCCESS,
       reason: data.message
@@ -83,7 +87,6 @@ var SiteActions = {
     });
   },
   resetPasswordSuccess: function(data) {
-    console.log('reset password success');
     ArimaaDispatcher.dispatch({
       actionType: SiteConstants.ACTIONS.RESET_PASSWORD_SUCCESS,
       reason: data.message
@@ -114,8 +117,10 @@ var SiteActions = {
     SiteActions.startOpenJoinedHeartbeatLoop(data.gameID,data.gameAuth);
   },
   createGameError: function(data) {
-    //TODO
-    console.log(data);
+    ArimaaDispatcher.dispatch({
+      actionType: SiteConstants.ACTIONS.CREATE_GAME_FAILED,
+      reason: data.error
+    });
   },
 
   joinGame: function(gameID) {
@@ -160,7 +165,10 @@ var SiteActions = {
     });
   },
   getOpenGamesError: function(data) {
-    //TODO
+    ArimaaDispatcher.dispatch({
+      actionType: SiteConstants.ACTIONS.GAMES_LIST_FAILED,
+      reason: "Error getting open/active games, possible network or other connection issues, consider refreshing the page."
+    });
     console.log(data);
   },
 
@@ -179,7 +187,10 @@ var SiteActions = {
     }, SiteConstants.VALUES.GAME_LIST_LOOP_DELAY * 1000);
   },
   openGamesLoopError: function(data) {
-    //TODO
+    ArimaaDispatcher.dispatch({
+      actionType: SiteConstants.ACTIONS.GAMES_LIST_FAILED,
+      reason: "Error getting open/active games, possible network or other connection issues, consider refreshing the page."
+    });
     console.log(data);
     setTimeout(function () {
       APIUtils.getOpenGames(SiteActions.openGamesLoopSuccess, SiteActions.openGamesLoopError);
@@ -208,7 +219,10 @@ var SiteActions = {
     }, SiteConstants.VALUES.GAME_LIST_LOOP_DELAY * 1000);
   },
   activeGamesLoopError: function(data) {
-    //TODO
+    ArimaaDispatcher.dispatch({
+      actionType: SiteConstants.ACTIONS.GAMES_LIST_FAILED,
+      reason: "Error getting open/active games, possible network or other connection issues, consider refreshing the page."
+    });
     console.log(data);
     setTimeout(function () {
       APIUtils.getActiveGames(SiteActions.activeGamesLoopSuccess, SiteActions.activeGamesLoopError);
@@ -262,8 +276,6 @@ var SiteActions = {
     if(storedGameAuth === null || storedGameAuth != gameAuth || game === null)
       return;
 
-    //TODO should there be a way to detect if the site is down?
-
     //TODO fragile
     if(data.error == "No game found with the given id") {
       ArimaaDispatcher.dispatch({
@@ -272,7 +284,6 @@ var SiteActions = {
       });
     }
 
-    //TODO
     console.log(data);
     setTimeout(function () {
       APIUtils.gameMetadata(gameID, 0,
@@ -315,8 +326,6 @@ var SiteActions = {
      }, SiteConstants.VALUES.GAME_HEARTBEAT_PERIOD * 1000);
   },
   onHeartbeatError: function(gameID,data) {
-    //TODO
-    console.log(data);
     ArimaaDispatcher.dispatch({
       actionType: SiteConstants.ACTIONS.HEARTBEAT_FAILED,
       gameID: gameID
