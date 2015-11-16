@@ -1,4 +1,5 @@
 var ArimaaDispatcher = require('../dispatcher/ArimaaDispatcher.js');
+var SiteConstants = require('../constants/SiteConstants.js');
 var ArimaaConstants = require('../constants/ArimaaConstants.js');
 var APIUtils = require('../utils/WebAPIUtils.js');
 var ArimaaStore = require('../stores/ArimaaStore.js');
@@ -71,9 +72,10 @@ var ArimaaActions = {
        (game.meta.sUser.name == username && !game.meta.activeGameData.sPresent))
       return;
 
-    //TODO timeout
     APIUtils.gameHeartbeat(gameID, gameAuth, FUNC_NOP, function (data) {ArimaaActions.onHeartbeatError(gameID,data);});
-     setTimeout(function () {ArimaaActions.startHeartbeatLoop(gameID, gameAuth);}, 5000);
+     setTimeout(function () {
+       ArimaaActions.startHeartbeatLoop(gameID, gameAuth);
+     }, SiteConstants.VALUES.GAME_HEARTBEAT_PERIOD * 1000);
   },
   onHeartbeatError: function(gameID,data) {
     //TODO
@@ -94,7 +96,6 @@ var ArimaaActions = {
   },
   gameStateSuccess: function(data) {
     //TODO delete all the other stuff and just leave this action
-    //TODO why do we even need a dispatcher? Why not call methods directly on the ArimaaStore?
     ArimaaDispatcher.dispatch({
       actionType: ArimaaConstants.ACTIONS.GAME_STATE,
       data:data
@@ -143,14 +144,12 @@ var ArimaaActions = {
       });
     }
 
-    //TODO sleep 200ms
-    setTimeout(ArimaaActions.startGameStateLoop, 200);
+    setTimeout(ArimaaActions.startGameStateLoop, SiteConstants.VALUES.GAME_STATE_LOOP_DELAY * 1000);
   },
   gameStateError: function(gameID,gameAuth,data) {
     //TODO should there be a way to detect if the site is down?
     console.log(data);
-    //TODO sleep 2000 ms
-    setTimeout(ArimaaActions.startGameStateLoop, 2000);
+    setTimeout(ArimaaActions.startGameStateLoop, SiteConstants.VALUES.GAME_STATE_LOOP_DELAY_ON_ERROR * 1000);
   },
 
 

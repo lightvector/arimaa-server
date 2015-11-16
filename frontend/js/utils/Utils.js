@@ -23,6 +23,6 @@ var Utils = {
     if(tc.overtimeAfter !== undefined) s += "(max " + tc.overtimeAfter + "t)";
     return s;
   }
-}
+};
 
 module.exports = Utils;
