@@ -2,6 +2,12 @@ var keyMirror = require('keymirror');
 
 
 var ACTION_CONSTANTS = keyMirror({
+  GAME_STATE: null,
+  INITIAL_STATE_FAILED: null,
+  GAME_JOINED: null,
+  GAME_JOIN_FAILED: null,
+  HEARTBEAT_FAILED: null,
+
   DEBUG_SEND_SETUP_SILVER: null,
   DEBUG_SEND_SETUP_GOLD: null,
 

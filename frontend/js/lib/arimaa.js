@@ -19,7 +19,7 @@ var Arimaa = function(options) {
 		c6: 34,
 		f3: 85,
 		f6: 37
-	}
+	};
 
 	const EMPTY = 0;
 	const GRABBIT = 1;
@@ -36,7 +36,7 @@ var Arimaa = function(options) {
 	const SCAMEL = 13;
 	const SELEPHANT = 14;
 	const COUNT = 15;
-	const PIECES = " RCDHME  rcdhme"
+	const PIECES = " RCDHME  rcdhme";
 
 	const DIRECTIONS = {
 		NORTH:-16,
@@ -72,7 +72,7 @@ var Arimaa = function(options) {
 	  SELEPHANT: 14,
 	  COUNT: 15,
 	  PCHARS: " RCDHMExxrcdhme",
-	  DECOLOR: ~0x8, // ~COLOR
+	  DECOLOR: ~0x8 // ~COLOR
 	};
 
 	var options = options || {
@@ -129,7 +129,7 @@ var Arimaa = function(options) {
 				special : specialOptions, //do something else later...
 				string : PIECES.charAt(piece)+square_name(fromSqNumber)+direction
 		};
-	}
+	};
 
 	//need to undo 2 steps if one is a capture
 	function undo_step() {
@@ -344,8 +344,8 @@ var Arimaa = function(options) {
 				if(!a) {  //We should remove this later since this should never happen
 					console.log("/???");
 					console.log(ascii());
-					console.log(s)
-					console.log('=========')
+					console.log(s);
+					console.log('=========');
 				}
 				if(can_complete_move()) {
 					moves.push(ongoingMove.slice());
@@ -920,7 +920,7 @@ var Arimaa = function(options) {
 			if(piece == " ") return false;
 			if(PIECES.indexOf(piece) == -1) return false;
 			if(board[SQUARES[square]]) return false;
-			place_piece(piece, SQUARES[square]);
+			return place_piece(piece, SQUARES[square]);
 		},
 
 		square_name: function(squareNum) {

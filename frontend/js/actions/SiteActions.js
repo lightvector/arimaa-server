@@ -6,6 +6,7 @@ var cookie = require('react-cookie');
 
 const FUNC_NOP = function(){};
 
+//Actions for the main site and gameroom
 var SiteActions = {
 
   login: function(username, password) {
@@ -318,6 +319,7 @@ var SiteActions = {
     if(!joined)
       return;
 
+    //TODO timeout
     APIUtils.gameHeartbeat(gameID, gameAuth, FUNC_NOP, function (data) {SiteActions.onHeartbeatError(gameID,data);});
      setTimeout(function () {SiteActions.startOpenJoinedHeartbeatLoop(gameID, gameAuth);}, 5000);
   },

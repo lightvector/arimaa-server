@@ -1,22 +1,14 @@
 var React = require('react');
 var Board = require('./board.js');
 var Movelist = require('./movelist.js');
-var DebugComp = require('./boardDebugComponent');
+var ArimaaActions = require('../actions/ArimaaActions.js');
+var DebugComp = require('./boardDebugComponent.js');
 
 var Game = React.createClass({
 
-  heartbeat: function() {
-
-  },
-
   componentDidMount: function() {
-    this.interval = setInterval(this.heartbeat, 10000);
+    ArimaaActions.startAllLoops(this.props.params.gameID);
   },
-
-  componentWillUnmount: function() {
-    clearInterval(this.interval);
-  },
-
 
   render: function() {
     return (

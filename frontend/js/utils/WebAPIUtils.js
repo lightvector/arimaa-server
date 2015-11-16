@@ -124,9 +124,7 @@ var APIUtils = {
     POST('/api/games/'+gameID+'/actions/decline', {gameAuth:gameAuth, opponent:username}, success, error);
   },
 
-  //TODO: camelcase this function
-  send_move: function(gameID, gameAuth, moveStr, plyNum, success, error) {
-    console.log(gameID, moveStr, plyNum);
+  sendMove: function(gameID, gameAuth, moveStr, plyNum, success, error) {
     POST('/api/games/'+gameID+'/actions/move', {gameAuth:gameAuth, move:moveStr, plyNum:plyNum}, success, error);
   },
 
