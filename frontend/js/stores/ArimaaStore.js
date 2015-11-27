@@ -6,6 +6,7 @@ var ArimaaDispatcher = require('../dispatcher/ArimaaDispatcher.js');
 var ArimaaConstants = require('../constants/ArimaaConstants.js');
 var Arimaa = require('../lib/arimaa.js');
 var APIUtils = require('../utils/WebAPIUtils.js');
+var Utils = require('../utils/Utils.js');
 
 const CHANGE_EVENT = 'change';
 const MOVE_EVENT = 'new-move';
@@ -15,6 +16,9 @@ var debugMsg = "";
 var _gameID = null;
 var _gameAuth = null;
 var _gameState = null;
+
+var _localTimeOffsetFromServer = null;
+var _lastStateReceivedTime = null;
 
 var _setupGold   = ['C','D','H','E','M','H','D','C','R','R','R','R','R','R','R','R']; //a2-h2, a1-h1 //default gold setup
 var _setupSilver = ['r','r','r','r','r','r','r','r','c','d','h','m','e','h','d','c']; //a8-h8, a7-h7 //default silver setup
@@ -75,6 +79,33 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
   getMoveList: function() {
     var moves = _arimaa.get_move_list();
     return moves;
+  },
+
+  //player should be "g" or "s"
+  //wholeGame specifies whether it should be the time left for just this move or it should be the time on the clock for the whole game
+  getClockRemaining: function(player,wholeGame) {
+    if(_gameState === null)
+      return null;
+    if(_gameState.meta.activeGameData === undefined)
+      //Doesn't quite work right for the time for the last move
+      //return (player == "g") ? Utils.gClockForEndedGame(_gameState) : Utils.sClockForEndedGame(_gameState);
+      return null;
+    var baseClock = (player == "g") ? _gameState.meta.activeGameData.gClockBeforeTurn : _gameState.meta.activeGameData.sClockBeforeTurn;
+    if(_gameState.toMove != player)
+      return baseClock;
+
+    var now = Utils.currentTimeSeconds();
+    var timeSpent = 0;
+    if(_localTimeOffsetFromServer !== null)
+      timeSpent = now - _gameState.meta.activeGameData.moveStartTime - _localTimeOffsetFromServer;
+    else if(_lastStateReceivedTime !== null)
+      timeSpent = now - _lastStateReceivedTime - _gameState.meta.activeGameData.timeSpent;
+
+    var tc = (player == "g") ? _gameState.meta.gTC : _gameState.meta.sTC;
+    var clock = Utils.clockAfterTurn(baseClock,timeSpent,Math.floor(_gameState.plyNum / 2),tc);
+    if(!wholeGame && tc.maxMoveTime !== undefined)
+      clock = Math.min(clock, tc.maxMoveTime - timeSpent);
+    return clock;
   },
 
   getSeletedSquare: function() {
@@ -160,6 +191,15 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
     case ArimaaConstants.ACTIONS.GAME_STATE:
       debugMsg = "";
       _gameState = action.data;
+
+      _lastStateReceivedTime = Utils.currentTimeSeconds();
+      var crazyTimeSpan = 1200; //20 minutes
+      var estimatedTimeOffset = _lastStateReceivedTime - _gameState.meta.now;
+      if(_localTimeOffsetFromServer === null
+         || _localTimeOffsetFromServer > estimatedTimeOffset
+         || _localTimeOffsetFromServer < estimatedTimeOffset - crazyTimeSpan)
+        _localTimeOffsetFromServer = estimatedTimeOffset;
+
       ArimaaStore.emitChange();
       break;
     case ArimaaConstants.ACTIONS.GAME_JOINED:

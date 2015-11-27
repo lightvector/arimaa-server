@@ -25,10 +25,10 @@ var Movelist = React.createClass({
     var cells = this.state.moves.map(function(m, i) {
       var plyNum = Math.floor(i/2)+1;
       var color = (i%2===0) ? "g" : "s";
-      var moveStr = m.map(function(s) {return s.string}).join(" ");
+      var moveStr = m.map(function(s) {return s.string;}).join(" ");
       //console.log(m);
       //var moveStr = m;
-      return (<tr className={color} key={i}><td>{plyNum+color+":"}</td><td>{moveStr}</td></tr>)
+      return (<tr className={color} key={i}><td>{plyNum+color+":"}</td><td>{moveStr}</td></tr>);
     });
 
     return (
