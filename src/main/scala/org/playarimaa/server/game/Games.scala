@@ -348,7 +348,7 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker, val serverInst
     //A flag indicating that this game has been started and will imminently be removed
     var starting: Boolean,
 
-    //Fulfilled and replaced on each update - this is the mechanism by which queries can block and wait for chat activity
+    //Fulfilled and replaced on each update - this is the mechanism by which queries can block and wait for state updates
     var sequencePromise: Promise[Unit],
     var sequence: Long
   ) {
@@ -806,7 +806,7 @@ class ActiveGames(val db: Database, val scheduler: Scheduler, val serverInstance
     val initMeta: GameMetadata, //initial metadata as of game start
     val game: ActiveGame,
 
-    //Fulfilled and replaced on each update - this is the mechanism by which queries can block and wait for chat activity
+    //Fulfilled and replaced on each update - this is the mechanism by which queries can block and wait for state updates
     var sequencePromise: Promise[Unit],
     var sequence: Long
   ) {
@@ -856,9 +856,9 @@ class ActiveGames(val db: Database, val scheduler: Scheduler, val serverInstance
           )
         )
 
-        //On a game won by timeout, schedule applyLoginTimeouts to happen asynchronously
+        //On a game won by time, schedule applyLoginTimeouts to happen asynchronously
         //to report the change in the game back to users and clean up the game
-        val onTimeout = { () =>
+        val onTimeLoss = { () =>
           scheduler.scheduleOnce(0 seconds) {
             applyLoginTimeouts()
           }
@@ -869,7 +869,7 @@ class ActiveGames(val db: Database, val scheduler: Scheduler, val serverInstance
           users = data.users,
           initMeta = meta,
           //Note that this could raise an exception if the moves aren't legal somehow
-          game = new ActiveGame(meta,data.moves,now,db,scheduler,onTimeout,logger),
+          game = new ActiveGame(meta,data.moves,now,db,scheduler,onTimeLoss,logger),
           sequencePromise = Promise(),
           sequence = data.sequence
         )
@@ -1087,7 +1087,7 @@ class ActiveGame(
   val initNow: Timestamp,
   val db: Database,
   val scheduler: Scheduler,
-  val onTimeout: (() => Unit),
+  val onTimeLoss: (() => Unit),
   val logger: Logger //borrows a logger so that we don't create a new one on every game
 )(implicit ec: ExecutionContext) {
   val notation: Notation = StandardNotation
@@ -1104,13 +1104,13 @@ class ActiveGame(
 
   //The number of moves we've sent to be written to the database
   private var movesWritten: Int = moves.length
-  //The last timeout event we've scheduled to happen
-  private var timeoutEvent: Option[Cancellable] = None
+  //The last timeLossCheck event we've scheduled to happen
+  private var timeLossCheckEvent: Option[Cancellable] = None
   //Future that represent the finishing of writing metadata and moves to the DB
   private var metaSaveFinished: Future[Unit] = Future.successful(())
   private var moveSaveFinished: Future[Unit] = Future.successful(())
 
-  scheduleNextTimeout(initNow)
+  scheduleNextTimeLossCheck(initNow)
 
   def getActiveGetData(present: PlayerArray[Boolean]): (GameMetadata,Vector[MoveInfo],Option[ActiveGames.GetData]) = this.synchronized {
     val activeGetData =
@@ -1175,37 +1175,37 @@ class ActiveGame(
 
   private def declareWinner(player: Player, reason: EndingReason, now: Timestamp): Unit = this.synchronized {
     meta = meta.copy(result = GameResult(winner = Some(player), reason = reason, endTime = now))
-    timeoutEvent.foreach(_.cancel)
+    timeLossCheckEvent.foreach(_.cancel)
     saveMetaToDB()
   }
 
-  private def scheduleNextTimeout(now: Timestamp): Unit = this.synchronized {
-    timeoutEvent.foreach(_.cancel)
+  private def scheduleNextTimeLossCheck(now: Timestamp): Unit = this.synchronized {
+    timeLossCheckEvent.foreach(_.cancel)
     val player = getNextPlayer
     val tc = meta.tcs(player)
     val timeSpent = now - moveStartTime
-    val secondsUntilTimeout = tc.timeLeftUntilTimeout(clockBeforeTurn(player), timeSpent, meta.numPly)
+    val timeLeftUntilLoss = tc.timeLeftUntilLoss(clockBeforeTurn(player), timeSpent, meta.numPly)
     val plyNum = meta.numPly
-    timeoutEvent = Some(scheduler.scheduleOnce(secondsUntilTimeout seconds) {
-      if(meta.numPly == plyNum)
-        doLoseByTimeout(Timestamp.get)
+    timeLossCheckEvent = Some(scheduler.scheduleOnce(timeLeftUntilLoss seconds) {
+      if(meta.numPly == plyNum && player == getNextPlayer)
+        doLoseByTime(Timestamp.get)
     })
   }
 
-  /* Directly set the game result for a timeout, unless the game is already ended for another reason. */
-  private def doLoseByTimeout(now: Timestamp): Unit = this.synchronized {
+  /* Directly set the game result for a loss by time, unless the game is already ended for another reason. */
+  private def doLoseByTime(now: Timestamp): Unit = this.synchronized {
     if(!gameOver) {
       declareWinner(getNextPlayer.flip, EndingReason.TIME, now)
-      onTimeout()
+      onTimeLoss()
     }
   }
 
-  /* Returns true if a timeout occured and sets the game result */
-  private def tryLoseByTimeout(clock: Double, timeSpent: Double, now: Timestamp): Boolean = this.synchronized {
+  /* Returns true if a loss by time occured and sets the game result */
+  private def tryLoseByTime(clock: Double, timeSpent: Double, now: Timestamp): Boolean = this.synchronized {
     val player = getNextPlayer
     val tc = meta.tcs(player)
     if(tc.isOutOfTime(clock, timeSpent)) {
-      doLoseByTimeout(now)
+      doLoseByTime(now)
       true
     }
     else
@@ -1227,7 +1227,7 @@ class ActiveGame(
     else {
       val now = Timestamp.get
       val (clock,timeSpent) = clockAndSpent(now)
-      if(tryLoseByTimeout(clock,timeSpent,now))
+      if(tryLoseByTime(clock,timeSpent,now))
         Failure(new Exception("Game is over"))
       else {
         declareWinner(player.flip, EndingReason.RESIGNATION, now)
@@ -1247,7 +1247,7 @@ class ActiveGame(
       game.parseAndMakeMove(moveStr, notation).flatMap { newGame =>
         val now = Timestamp.get
         val (clock,timeSpent) = clockAndSpent(now)
-        if(tryLoseByTimeout(clock,timeSpent,now))
+        if(tryLoseByTime(clock,timeSpent,now))
           Failure(new Exception("Game is over"))
         else {
           meta = meta.copy(
@@ -1279,6 +1279,8 @@ class ActiveGame(
               }
               declareWinner(winner, reason, now)
           }
+
+          scheduleNextTimeLossCheck(now)
           Success(())
         }
       }

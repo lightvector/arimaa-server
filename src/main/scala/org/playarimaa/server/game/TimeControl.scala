@@ -42,8 +42,8 @@ case class TimeControl(
     clock
   }
 
-  /* Compute the remaining amount of time a player can use this turn before timing out */
-  def timeLeftUntilTimeout(clockBeforeTurn: Double, timeSpent: Double, turn: Int): Double = {
+  /* Compute the remaining amount of time a player can use this turn before losing due to time */
+  def timeLeftUntilLoss(clockBeforeTurn: Double, timeSpent: Double, turn: Int): Double = {
     var clock = clockAfterTurn(clockBeforeTurn, timeSpent, turn)
     maxMoveTime match {
       case None => clock
