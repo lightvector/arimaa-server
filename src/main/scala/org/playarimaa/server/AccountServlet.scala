@@ -29,6 +29,7 @@ object AccountServlet {
       Register,
       Login,
       Logout,
+      AuthLoggedIn,
       ForgotPassword,
       ResetPassword
     )
@@ -48,6 +49,11 @@ object AccountServlet {
     val name = "logout"
     case class Query(siteAuth: String)
     case class Reply(message: String)
+  }
+  case object AuthLoggedIn extends Action {
+    val name = "authLoggedIn"
+    case class Query(siteAuth: String)
+    case class Reply(value: Boolean)
   }
   case object ForgotPassword extends Action {
     val name = "forgotPassword"
@@ -97,6 +103,10 @@ class AccountServlet(val siteLogin: SiteLogin, val ec: ExecutionContext)
         siteLogin.logout(query.siteAuth).map { case () =>
           Json.write(Logout.Reply("Ok"))
         }.get
+      case Some(AuthLoggedIn) =>
+        val query = Json.read[AuthLoggedIn.Query](request.body)
+        val isLoggedIn = siteLogin.isAuthLoggedIn(query.siteAuth)
+        Json.write(AuthLoggedIn.Reply(isLoggedIn))
       case Some(ForgotPassword) =>
         val query = Json.read[ForgotPassword.Query](request.body)
         siteLogin.forgotPassword(query.username): Unit

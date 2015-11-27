@@ -18,7 +18,7 @@ var joinableOpenGames = {};    //Games the user can join from other users
 var watchableOpenGames = {};   //Games that the user cannot join but can watch
 var watchableActiveGames = {}; //Games that the user cannot join but can watch
 
-var joinedGameAuths = {};      //GameAuths for games that we've joined
+var joinedGameAuths = {};    //GameAuths for games that we've joined
 var leftCreatedGameIDs = {}; //GameIDs for games that we've left that we created
 
 var messageText = "";
@@ -134,27 +134,31 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
 
   dispatcherIndex: ArimaaDispatcher.register(function(action) {
     switch (action.actionType) {
-    case SiteConstants.REGISTRATION_FAILED:
-    case SiteConstants.LOGIN_FAILED:
-    case SiteConstants.FORGOT_PASSWORD_FAILED:
-    case SiteConstants.RESET_PASSWORD_FAILED:
+    case SiteConstants.ACTIONS.REGISTRATION_FAILED:
+    case SiteConstants.ACTIONS.LOGIN_FAILED:
+    case SiteConstants.ACTIONS.LOGOUT_FAILED:
+    case SiteConstants.ACTIONS.FORGOT_PASSWORD_FAILED:
+    case SiteConstants.ACTIONS.RESET_PASSWORD_FAILED:
+    case SiteConstants.ACTIONS.GAMES_LIST_FAILED:
+    case SiteConstants.ACTIONS.CREATE_GAME_FAILED:
       messageText = "";
       errorText = action.reason;
       UserStore.emitChange();
       break;
-    case SiteConstants.REGISTRATION_SUCCESS:
-    case SiteConstants.LOGIN_SUCCESS:
+    case SiteConstants.ACTIONS.REGISTRATION_SUCCESS:
+    case SiteConstants.ACTIONS.LOGIN_SUCCESS:
       messageText = "";
       errorText = "";
       UserStore.emitChange();
       break;
-    case SiteConstants.FORGOT_PASSWORD_SUCCESS:
-    case SiteConstants.RESET_PASSWORD_SUCCESS:
+    case SiteConstants.ACTIONS.FORGOT_PASSWORD_SUCCESS:
+    case SiteConstants.ACTIONS.RESET_PASSWORD_SUCCESS:
       messageText = action.reason;
       errorText = "";
       UserStore.emitChange();
       break;
-    case SiteConstants.OPEN_GAMES_LIST:
+    case SiteConstants.ACTIONS.OPEN_GAMES_LIST:
+      errorText = "";
       var oldOpenGames = openGames;
       var username = UserStore.getUsername();
       openGames = {};
@@ -187,7 +191,8 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
         UserStore.emitNewOpenJoinedGame(newOpenJoinedGames[i].gameID);
       }
       break;
-    case SiteConstants.ACTIVE_GAMES_LIST:
+    case SiteConstants.ACTIONS.ACTIVE_GAMES_LIST:
+      errorText = "";
       var oldActiveGames = activeGames;
       activeGames = {};
       ownActiveGames = {};
@@ -201,7 +206,7 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
       });
       UserStore.emitChange();
       break;
-    case SiteConstants.GAME_METADATA_UPDATE:
+    case SiteConstants.ACTIONS.GAME_METADATA_UPDATE:
       var metadata = action.metadata;
       //Keep the highest sequence number
       if(metadata.gameID in openGames && openGames[metadata.gameID].sequence > metadata.sequence)
@@ -213,24 +218,24 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
       UserStore.addGame(metadata);
       UserStore.emitChange();
       break;
-    case SiteConstants.GAME_REMOVED:
+    case SiteConstants.ACTIONS.GAME_REMOVED:
       var gameID = action.gameID;
       UserStore.removeGame(gameID);
       UserStore.emitChange();
       break;
-    case SiteConstants.PLAYER_JOINED:
+    case SiteConstants.ACTIONS.PLAYER_JOINED:
       var players = action.players; //TODO do something with this...
       UserStore.emitChange();
       break;
-    case SiteConstants.GAME_JOINED:
+    case SiteConstants.ACTIONS.GAME_JOINED:
       joinedGameAuths[action.gameID] = action.gameAuth;
       UserStore.emitChange();
       break;
-    case SiteConstants.HEARTBEAT_FAILED:
+    case SiteConstants.ACTIONS.HEARTBEAT_FAILED:
       delete joinedGameAuths[action.gameID];
       UserStore.emitChange();
       break;
-    case SiteConstants.LEAVE_GAME_SUCCESS:
+    case SiteConstants.ACTIONS.LEAVE_GAME_SUCCESS:
       //If we created the game and it was an open game, record so and eliminate the game from our store
       if(action.gameID in openGames &&
          openGames[action.gameID].openGameData !== undefined &&

@@ -1,12 +1,14 @@
 var keyMirror = require('keymirror');
 
-
-var ACTION_CONSTANTS = keyMirror({
+var ACTIONS = keyMirror({
   GAME_STATE: null,
+  GAME_STATE_FAILED: null,
   INITIAL_STATE_FAILED: null,
   GAME_JOINED: null,
   GAME_JOIN_FAILED: null,
   HEARTBEAT_FAILED: null,
+  SENT_MOVE_TO_SERVER: null,
+  SENT_MOVE_TO_SERVER_FAILED: null,
 
   DEBUG_SEND_SETUP_SILVER: null,
   DEBUG_SEND_SETUP_GOLD: null,
@@ -33,25 +35,25 @@ var ACTION_CONSTANTS = keyMirror({
 
 const PIECES = {
   EMPTY : 0,
-	COLOR : 8,
+  COLOR : 8,
   COUNT : 15,
 
-	GRABBIT : 1,
-	GCAT : 2,
-	GDOG : 3,
-	GHORSE : 4,
-	GCAMEL : 5,
-	GELEPHANT : 6,
+  GRABBIT : 1,
+  GCAT : 2,
+  GDOG : 3,
+  GHORSE : 4,
+  GCAMEL : 5,
+  GELEPHANT : 6,
 
-	SRABBIT : 9,
- 	SCAT : 10,
-	SDOG : 11,
-	SHORSE : 12,
-	SCAMEL : 13,
+  SRABBIT : 9,
+  SCAT : 10,
+  SDOG : 11,
+  SHORSE : 12,
+  SCAMEL : 13,
   SELEPHANT : 14
-}
+};
 
-const GAME_CONSTANTS = {
+const GAME = {
   NULL_COLOR: -1,
   GOLD: 0,
   SILVER: 1,
@@ -63,7 +65,7 @@ const GAME_CONSTANTS = {
     return 1-color;
   },
 
-  //are the following even needed???
+  //TODO are the following even needed???
   pieceSymbol: function(num) {
     return " RCDHMExxrcdhme".charAt(num);
   },
@@ -88,10 +90,10 @@ const GAME_CONSTANTS = {
            this.squareName(frNum) +
            this.directionTo(frNum, toNum);
   }
-}
+};
 
 module.exports = {
-  ACTIONS: ACTION_CONSTANTS,
-  GAME: GAME_CONSTANTS,
+  ACTIONS: ACTIONS,
+  GAME: GAME,
   PIECES: PIECES
-}
+};

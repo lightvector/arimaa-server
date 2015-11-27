@@ -14,46 +14,51 @@ var SiteActions = {
   },
   loginError: function(data) {
     ArimaaDispatcher.dispatch({
-      actionType: SiteConstants.LOGIN_FAILED,
+      actionType: SiteConstants.ACTIONS.LOGIN_FAILED,
       reason: data.error
     });
   },
   loginSuccess: function(data) {
-    console.log('login success');
-
     cookie.save('siteAuth',data.siteAuth, {path:'/'});
     cookie.save('username',data.username, {path:'/'});
 
     window.location.pathname = "/gameroom"; //TODO we should track where the user was before and then redirect there instead
     ArimaaDispatcher.dispatch({
-      actionType: SiteConstants.LOGIN_SUCCESS
+      actionType: SiteConstants.ACTIONS.LOGIN_SUCCESS
     });
   },
 
   register: function(username, email, password) {
-    console.log("do some registering");
     APIUtils.register(username, email, password, SiteActions.registerSuccess, SiteActions.registerError);
   },
   registerSuccess: function(data) {
     cookie.save('siteAuth',data.siteAuth, {path:'/'});
     cookie.save('username',data.username, {path:'/'});
     ArimaaDispatcher.dispatch({
-      actionType: SiteConstants.REGISTRATION_SUCCESS
+      actionType: SiteConstants.ACTIONS.REGISTRATION_SUCCESS
     });
     window.location.pathname = "/gameroom"; //TODO we should track where the user was before and then redirect there instead
   },
   registerError: function(data) {
     ArimaaDispatcher.dispatch({
-      actionType: SiteConstants.REGISTRATION_FAILED,
+      actionType: SiteConstants.ACTIONS.REGISTRATION_FAILED,
       reason: data.error
     });
   },
 
   logout: function() {
-    APIUtils.logout();
-    cookie.remove('siteAuth','/');//TODO: create logout_success/error and remove cookie there
+    APIUtils.logout(SiteActions.logoutSuccess, SiteActions.logoutError);
+  },
+  logoutSuccess: function(data) {
+    cookie.remove('siteAuth','/');
     cookie.remove('username','/');
     window.location.pathname = "/login";
+  },
+  logoutError: function(data) {
+    ArimaaDispatcher.dispatch({
+      actionType: SiteConstants.ACTIONS.LOGOUT_FAILED,
+      reason: data.error
+    });
   },
 
   forgotPassword: function(username) {
@@ -61,14 +66,13 @@ var SiteActions = {
   },
   forgotPasswordError: function(data) {
     ArimaaDispatcher.dispatch({
-      actionType: SiteConstants.FORGOT_PASSWORD_FAILED,
+      actionType: SiteConstants.ACTIONS.FORGOT_PASSWORD_FAILED,
       reason: data.error
     });
   },
   forgotPasswordSuccess: function(data) {
-    console.log('forgot password success');
     ArimaaDispatcher.dispatch({
-      actionType: SiteConstants.FORGOT_PASSWORD_SUCCESS,
+      actionType: SiteConstants.ACTIONS.FORGOT_PASSWORD_SUCCESS,
       reason: data.message
     });
   },
@@ -78,14 +82,13 @@ var SiteActions = {
   },
   resetPasswordError: function(data) {
     ArimaaDispatcher.dispatch({
-      actionType: SiteConstants.RESET_PASSWORD_FAILED,
+      actionType: SiteConstants.ACTIONS.RESET_PASSWORD_FAILED,
       reason: data.error
     });
   },
   resetPasswordSuccess: function(data) {
-    console.log('reset password success');
     ArimaaDispatcher.dispatch({
-      actionType: SiteConstants.RESET_PASSWORD_SUCCESS,
+      actionType: SiteConstants.ACTIONS.RESET_PASSWORD_SUCCESS,
       reason: data.message
     });
   },
@@ -105,7 +108,7 @@ var SiteActions = {
   },
   createGameSuccess: function(data) {
     ArimaaDispatcher.dispatch({
-      actionType: SiteConstants.GAME_JOINED,
+      actionType: SiteConstants.ACTIONS.GAME_JOINED,
       gameID: data.gameID,
       gameAuth: data.gameAuth
     });
@@ -114,8 +117,10 @@ var SiteActions = {
     SiteActions.startOpenJoinedHeartbeatLoop(data.gameID,data.gameAuth);
   },
   createGameError: function(data) {
-    //TODO
-    console.log(data);
+    ArimaaDispatcher.dispatch({
+      actionType: SiteConstants.ACTIONS.CREATE_GAME_FAILED,
+      reason: data.error
+    });
   },
 
   joinGame: function(gameID) {
@@ -123,7 +128,7 @@ var SiteActions = {
   },
   joinGameSuccess: function(gameID, data) {
     ArimaaDispatcher.dispatch({
-      actionType: SiteConstants.GAME_JOINED,
+      actionType: SiteConstants.ACTIONS.GAME_JOINED,
       gameID: gameID,
       gameAuth: data.gameAuth
     });
@@ -143,7 +148,7 @@ var SiteActions = {
   },
   leaveGameSuccess: function(gameID,data) {
     ArimaaDispatcher.dispatch({
-      actionType: SiteConstants.LEAVE_GAME_SUCCESS,
+      actionType: SiteConstants.ACTIONS.LEAVE_GAME_SUCCESS,
       gameID: gameID
     });
   },
@@ -155,12 +160,15 @@ var SiteActions = {
   },
   getOpenGamesSuccess: function(data) {
     ArimaaDispatcher.dispatch({
-      actionType: SiteConstants.OPEN_GAMES_LIST,
+      actionType: SiteConstants.ACTIONS.OPEN_GAMES_LIST,
       metadatas: data
     });
   },
   getOpenGamesError: function(data) {
-    //TODO
+    ArimaaDispatcher.dispatch({
+      actionType: SiteConstants.ACTIONS.GAMES_LIST_FAILED,
+      reason: "Error getting open/active games, possible network or other connection issues, consider refreshing the page."
+    });
     console.log(data);
   },
 
@@ -171,22 +179,22 @@ var SiteActions = {
   },
   openGamesLoopSuccess: function(data) {
     ArimaaDispatcher.dispatch({
-      actionType: SiteConstants.OPEN_GAMES_LIST,
+      actionType: SiteConstants.ACTIONS.OPEN_GAMES_LIST,
       metadatas: data
     });
-
-    //TODO sleep 6s
     setTimeout(function () {
       APIUtils.getOpenGames(SiteActions.openGamesLoopSuccess, SiteActions.openGamesLoopError);
-    }, 6000);
+    }, SiteConstants.VALUES.GAME_LIST_LOOP_DELAY * 1000);
   },
   openGamesLoopError: function(data) {
-    //TODO
+    ArimaaDispatcher.dispatch({
+      actionType: SiteConstants.ACTIONS.GAMES_LIST_FAILED,
+      reason: "Error getting open/active games, possible network or other connection issues, consider refreshing the page."
+    });
     console.log(data);
-    //TODO sleep 30s
     setTimeout(function () {
       APIUtils.getOpenGames(SiteActions.openGamesLoopSuccess, SiteActions.openGamesLoopError);
-    }, 30000);
+    }, SiteConstants.VALUES.GAME_LIST_LOOP_DELAY_ON_ERROR * 1000);
   },
 
   newOpenJoinedGame: function(gameID) {
@@ -203,22 +211,22 @@ var SiteActions = {
   },
   activeGamesLoopSuccess: function(data) {
     ArimaaDispatcher.dispatch({
-      actionType: SiteConstants.ACTIVE_GAMES_LIST,
+      actionType: SiteConstants.ACTIONS.ACTIVE_GAMES_LIST,
       metadatas: data
     });
-
-    //TODO sleep 6s
     setTimeout(function () {
       APIUtils.getActiveGames(SiteActions.activeGamesLoopSuccess, SiteActions.activeGamesLoopError);
-    }, 6000);
+    }, SiteConstants.VALUES.GAME_LIST_LOOP_DELAY * 1000);
   },
   activeGamesLoopError: function(data) {
-    //TODO
+    ArimaaDispatcher.dispatch({
+      actionType: SiteConstants.ACTIONS.GAMES_LIST_FAILED,
+      reason: "Error getting open/active games, possible network or other connection issues, consider refreshing the page."
+    });
     console.log(data);
-    //TODO sleep 30s
     setTimeout(function () {
       APIUtils.getActiveGames(SiteActions.activeGamesLoopSuccess, SiteActions.activeGamesLoopError);
-    }, 30000);
+    }, SiteConstants.VALUES.GAME_LIST_LOOP_DELAY_ON_ERROR * 1000);
   },
 
 
@@ -239,14 +247,14 @@ var SiteActions = {
     if(data.openGameData && data.openGameData.joined.length > 1) {
       //TODO only report when it actually differs from previous
       ArimaaDispatcher.dispatch({
-        actionType: SiteConstants.PLAYER_JOINED,
+        actionType: SiteConstants.ACTIONS.PLAYER_JOINED,
         players: data.openGameData.joined, //note this includes the creator
         gameID: gameID
       });
     }
 
     ArimaaDispatcher.dispatch({
-      actionType: SiteConstants.GAME_METADATA_UPDATE,
+      actionType: SiteConstants.ACTIONS.GAME_METADATA_UPDATE,
       metadata: data
     });
 
@@ -256,14 +264,11 @@ var SiteActions = {
     if(storedGameAuth === null || storedGameAuth != gameAuth || game === null)
       return;
 
-
-    //TODO sleep 200ms
     setTimeout(function () {
       APIUtils.gameMetadata(gameID, seqNum+1,
                             function(data) {return SiteActions.joinedOpenGameMetadataSuccess(gameAuth,data);},
                             function(data) {return SiteActions.joinedOpenGameMetadataError(gameID,gameAuth,data);});
-    }, 200);
-
+    }, SiteConstants.VALUES.JOINED_GAME_META_LOOP_DELAY * 1000);
   },
   joinedOpenGameMetadataError: function(gameID,gameAuth,data) {
     var game = UserStore.getOpenGame(gameID);
@@ -271,24 +276,20 @@ var SiteActions = {
     if(storedGameAuth === null || storedGameAuth != gameAuth || game === null)
       return;
 
-    //TODO should there be a way to detect if the site is down?
-
     //TODO fragile
     if(data.error == "No game found with the given id") {
       ArimaaDispatcher.dispatch({
-        actionType: SiteConstants.GAME_REMOVED,
+        actionType: SiteConstants.ACTIONS.GAME_REMOVED,
         gameID: gameID
       });
     }
 
-    //TODO
     console.log(data);
-    //TODO sleep 2000 ms
     setTimeout(function () {
       APIUtils.gameMetadata(gameID, 0,
                             function(data) {return SiteActions.joinedOpenGameMetadataSuccess(gameAuth,data);},
                             function(data) {return SiteActions.joinedOpenGameMetadataError(gameID,gameAuth,data);});
-    }, 2000);
+    }, SiteConstants.VALUES.JOINED_GAME_META_LOOP_DELAY_ON_ERROR * 1000);
   },
   isOwnOpenGameInStore: function(gameID) {
     var games = UserStore.getOwnOpenGamesDict();
@@ -319,15 +320,14 @@ var SiteActions = {
     if(!joined)
       return;
 
-    //TODO timeout
     APIUtils.gameHeartbeat(gameID, gameAuth, FUNC_NOP, function (data) {SiteActions.onHeartbeatError(gameID,data);});
-     setTimeout(function () {SiteActions.startOpenJoinedHeartbeatLoop(gameID, gameAuth);}, 5000);
+    setTimeout(function () {
+       SiteActions.startOpenJoinedHeartbeatLoop(gameID, gameAuth);
+     }, SiteConstants.VALUES.GAME_HEARTBEAT_PERIOD * 1000);
   },
   onHeartbeatError: function(gameID,data) {
-    //TODO
-    console.log(data);
     ArimaaDispatcher.dispatch({
-      actionType: SiteConstants.HEARTBEAT_FAILED,
+      actionType: SiteConstants.ACTIONS.HEARTBEAT_FAILED,
       gameID: gameID
     });
   }
