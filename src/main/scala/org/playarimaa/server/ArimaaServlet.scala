@@ -1,10 +1,9 @@
 package org.playarimaa.server
-import org.scalatra._
-import scalate.ScalateSupport
+import org.scalatra.{Accepted, ScalatraServlet}
+import org.scalatra.scalate.ScalateSupport
 
 import org.json4s.{DefaultFormats, Formats}
-import org.scalatra.json._
-
+import org.scalatra.json.JacksonJsonSupport
 
 case class Response(message: String, message2: Option[String], timestamp: Long)
 object Response {
@@ -18,19 +17,18 @@ object Response {
   }
 }
 
-case class Request(a: Int, b:Int)
-
-//TODO: add error handling for malformed input
-/*
-val errorHandling: PartialFunction[Throwable, Unit] = {
-  case e:java.util.NoSuchElementException => send_error("DB malformed", InternalError)
-  case e => send_error("Internal Error", InternalError)
-}*/
-
-class ArimaaServlet extends WebAppStack with JacksonJsonSupport with ScalateSupport {
+class ArimaaServlet(val siteLogin: SiteLogin)
+    extends WebAppStack with JacksonJsonSupport with ScalateSupport {
   // Sets up automatic case class to JSON output serialization, required by
   // the JValueResult trait.
   protected implicit lazy val jsonFormats: Formats = DefaultFormats
+
+  def notLoggedIn(cookies: scala.collection.Map[String,String]): Boolean = {
+    cookies.get("siteAuth") match {
+      case None => true
+      case Some(auth) => !siteLogin.isAuthLoggedIn(auth)
+    }
+  }
 
   // Before every action runs, set the content type to be in JSON format.
   before() {
@@ -46,9 +44,7 @@ class ArimaaServlet extends WebAppStack with JacksonJsonSupport with ScalateSupp
   }
 
   get("/login/?") {
-    contentType="text/html"
-    val path = "/board.html"
-    new java.io.File( getServletContext().getResource(path).getFile )
+    redirect("/");
   }
 
   get("/register/?") {
@@ -64,9 +60,13 @@ class ArimaaServlet extends WebAppStack with JacksonJsonSupport with ScalateSupp
   }
 
   get("/gameroom/?") {
-    contentType="text/html"
-    val path = "/board.html"
-    new java.io.File( getServletContext().getResource(path).getFile )
+    if(notLoggedIn(request.cookies))
+      redirect("/")
+    else {
+      contentType="text/html"
+      val path = "/board.html"
+      new java.io.File( getServletContext().getResource(path).getFile )
+    }
   }
 
   get("/resetPassword/:username/:resetAuth/?") {

@@ -56,7 +56,7 @@ var SiteActions = {
   logoutSuccess: function(data) {
     cookie.remove('siteAuth','/');
     cookie.remove('username','/');
-    window.location.pathname = "/login";
+    window.location.pathname = "/";
   },
   logoutError: function(data) {
     ArimaaDispatcher.dispatch({
@@ -97,6 +97,15 @@ var SiteActions = {
     });
   },
 
+  goLoginPageIfNotLoggedIn: function() {
+    APIUtils.authLoggedIn(SiteActions.goLoginPageIfNotLoggedInSuccess, FUNC_NOP);
+  },
+
+  goLoginPageIfNotLoggedInSuccess: function(data) {
+    if(!data.value)
+      window.location.pathname = "/";
+  },
+  
   createGame: function(opts) {
     APIUtils.createGame(opts, SiteActions.createGameSuccess, SiteActions.createGameError);
   },
@@ -121,6 +130,7 @@ var SiteActions = {
     SiteActions.startOpenJoinedHeartbeatLoop(data.gameID,data.gameAuth);
   },
   createGameError: function(data) {
+    SiteActions.goLoginPageIfNotLoggedIn();
     ArimaaDispatcher.dispatch({
       actionType: SiteConstants.ACTIONS.CREATE_GAME_FAILED,
       reason: data.error
@@ -128,7 +138,7 @@ var SiteActions = {
   },
 
   joinGame: function(gameID) {
-    APIUtils.joinGame(gameID, function(data) {SiteActions.joinGameSuccess(gameID,data);}, FUNC_NOP);
+    APIUtils.joinGame(gameID, function(data) {SiteActions.joinGameSuccess(gameID,data);}, SiteActions.goLoginPageIfNotLoggedIn);
   },
   joinGameSuccess: function(gameID, data) {
     ArimaaDispatcher.dispatch({
@@ -142,17 +152,17 @@ var SiteActions = {
   },
 
   acceptUserForGame: function(gameID, gameAuth, username) {
-    APIUtils.acceptUserForGame(gameID, gameAuth, username, FUNC_NOP, FUNC_NOP);
+    APIUtils.acceptUserForGame(gameID, gameAuth, username, FUNC_NOP, SiteActions.goLoginPageIfNotLoggedIn);
   },
   declineUserForGame: function(gameID, gameAuth, username) {
-    APIUtils.declineUserForGame(gameID, gameAuth, username, FUNC_NOP, FUNC_NOP);
+    APIUtils.declineUserForGame(gameID, gameAuth, username, FUNC_NOP, SiteActions.goLoginPageIfNotLoggedIn);
   },
   leaveGame: function(gameID, gameAuth) {
     ArimaaDispatcher.dispatch({
       actionType: SiteConstants.ACTIONS.LEAVING_GAME,
       gameID: gameID
     });
-    APIUtils.leaveGame(gameID, gameAuth, function(data) {SiteActions.leaveGameSuccess(gameID,data);}, FUNC_NOP);
+    APIUtils.leaveGame(gameID, gameAuth, function(data) {SiteActions.leaveGameSuccess(gameID,data);}, SiteActions.goLoginPageIfNotLoggedIn);
   },
   leaveGameSuccess: function(gameID,data) {
     ArimaaDispatcher.dispatch({
@@ -180,6 +190,12 @@ var SiteActions = {
     console.log(data);
   },
 
+  //Initiates a loop querying for the list of users logged in every few seconds, continuing forever.
+  beginLoginCheckLoop: function() {
+    SiteActions.goLoginPageIfNotLoggedIn();
+    setTimeout(SiteActions.beginLoginCheckLoop, SiteConstants.VALUES.LOGIN_CHECK_LOOP_DELAY * 1000);
+  },
+  
   updateErrorMessage :
   "Error getting gameroom updates, possible network or other connection issues, consider refreshing the page.",
 

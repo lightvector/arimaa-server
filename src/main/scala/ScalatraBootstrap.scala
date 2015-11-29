@@ -59,7 +59,6 @@ class ScalatraBootstrap extends LifeCycle {
 
   override def init(context: ServletContext): Unit = {
     ArimaaServerInit.initialize()
-    context.mount(new ArimaaServlet(), "/*")
 
     val numProcessors = Runtime.getRuntime.availableProcessors
 
@@ -89,6 +88,7 @@ class ScalatraBootstrap extends LifeCycle {
     val games = new Games(db,siteLogin.logins,scheduler,serverInstanceID)(mainEC)
     val chat = new ChatSystem(db,siteLogin.logins,actorSystem)(actorEC)
 
+    context.mount(new ArimaaServlet(siteLogin), "/*")
     context.mount(new ChatServlet(accounts,siteLogin,chat,games,scheduler,actorEC), "/api/chat/*")
     context.mount(new AccountServlet(siteLogin,mainEC), "/api/accounts/*")
     context.mount(new GameServlet(accounts,siteLogin,games,mainEC), "/api/games/*")

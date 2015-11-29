@@ -23,6 +23,7 @@ var component = React.createClass({
   componentDidMount: function() {
     UserStore.addChangeListener(this.onUserStoreChange);
     UserStore.addPopupMessageListener(this.onPopupMessage);
+    SiteActions.beginLoginCheckLoop();
     SiteActions.beginUsersLoggedInLoop();
     SiteActions.beginOpenGamesLoop();
     SiteActions.beginActiveGamesLoop();
