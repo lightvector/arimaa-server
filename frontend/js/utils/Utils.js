@@ -98,6 +98,15 @@ var Utils = {
     return prefix + mstr + ":" + sstr;
   },
 
+  timeToHHMMSS: function(time) {
+    var date = new Date(time*1000);
+    var hours = date.getHours();
+    var minutes = "0" + date.getMinutes();
+    var seconds = "0" + date.getSeconds();
+    var formattedTime = hours + ':' + minutes.substr(-2) + ':' + seconds.substr(-2);
+    return formattedTime;
+  },
+
   //Given a game metadata, check if the specified user has joined that game
   isUserJoined: function(metadata, username) {
     if(metadata.openGameData !== undefined) {

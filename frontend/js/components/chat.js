@@ -3,6 +3,7 @@ var APIUtils = require('../utils/WebAPIUtils.js');
 var SiteActions = require('../actions/SiteActions.js');
 var UserStore = require('../stores/UserStore.js');
 var SiteConstants = require('../constants/SiteConstants.js');
+var Utils = require('../utils/Utils.js');
 
 const FUNC_NOP = function(){};
 
@@ -120,7 +121,12 @@ var chatBox = React.createClass({
 
   render: function() {
     var lines = this.state.lines.map(function(line) {
-      return React.createElement("tr", {key: line.id}, React.createElement("td", {key: line.id + "td"}, React.createElement("b", null, line.username + ": "), line.text));
+      var lineContents = [
+        Utils.timeToHHMMSS(line.timestamp) + " ",
+        React.createElement("b", null, line.username + ": "),
+        line.text
+      ];
+      return React.createElement("tr", {key: line.id}, React.createElement("td", {key: line.id + "td"}, lineContents));
     });
 
     var contents = [
