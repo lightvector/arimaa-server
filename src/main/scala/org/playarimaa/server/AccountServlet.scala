@@ -28,8 +28,10 @@ object AccountServlet {
     val all: List[Action] = List(
       Register,
       Login,
+      LoginGuest,
       Logout,
       AuthLoggedIn,
+      UsersLoggedIn,
       ForgotPassword,
       ResetPassword
     )
@@ -45,6 +47,11 @@ object AccountServlet {
     case class Query(username: String, password: String)
     case class Reply(username: String, siteAuth: String)
   }
+  case object LoginGuest extends Action {
+    val name = "loginGuest"
+    case class Query(username: String)
+    case class Reply(username: String, siteAuth: String)
+  }
   case object Logout extends Action {
     val name = "logout"
     case class Query(siteAuth: String)
@@ -54,6 +61,11 @@ object AccountServlet {
     val name = "authLoggedIn"
     case class Query(siteAuth: String)
     case class Reply(value: Boolean)
+  }
+  case object UsersLoggedIn extends Action {
+    val name = "usersLoggedIn"
+    case class Query()
+    case class Reply(users: List[String])
   }
   case object ForgotPassword extends Action {
     val name = "forgotPassword"
@@ -98,6 +110,11 @@ class AccountServlet(val siteLogin: SiteLogin, val ec: ExecutionContext)
         siteLogin.login(query.username, query.password).map { case (username,siteAuth) =>
           Json.write(Login.Reply(username, siteAuth))
         }
+      case Some(LoginGuest) =>
+        val query = Json.read[LoginGuest.Query](request.body)
+        siteLogin.loginGuest(query.username).map { case (username,siteAuth) =>
+          Json.write(LoginGuest.Reply(username, siteAuth))
+        }
       case Some(Logout) =>
         val query = Json.read[Logout.Query](request.body)
         siteLogin.logout(query.siteAuth).map { case () =>
@@ -107,6 +124,9 @@ class AccountServlet(val siteLogin: SiteLogin, val ec: ExecutionContext)
         val query = Json.read[AuthLoggedIn.Query](request.body)
         val isLoggedIn = siteLogin.isAuthLoggedIn(query.siteAuth)
         Json.write(AuthLoggedIn.Reply(isLoggedIn))
+      case Some(UsersLoggedIn) =>
+        val usersLoggedIn = siteLogin.usersLoggedIn.toList
+        Json.write(UsersLoggedIn.Reply(usersLoggedIn))
       case Some(ForgotPassword) =>
         val query = Json.read[ForgotPassword.Query](request.body)
         siteLogin.forgotPassword(query.username): Unit

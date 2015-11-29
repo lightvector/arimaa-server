@@ -73,6 +73,10 @@ class LoginTracker(val parent: Option[LoginTracker], val inactivityTimeout: Doub
     loginData.nonEmpty
   }
 
+  def userOfAuth(auth: Auth): Option[Username] = synchronized {
+    userAndParentAuth.get(auth).map { case (username,_) => username }
+  }
+
   /* Returns the last time that any activity occurred */
   def lastActiveTime: Timestamp = synchronized {
     lastActive
