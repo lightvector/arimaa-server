@@ -22,6 +22,9 @@ case class PlayerArray[T](val gold: T, val silv: T) {
   def forAll(f: T => Boolean): Boolean =
     f(gold) && f(silv)
 
+  def values: List[T] =
+    List(gold,silv)
+
   def contains(x: T): Boolean =
     gold == x || silv == x
 

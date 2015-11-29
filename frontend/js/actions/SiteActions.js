@@ -2,6 +2,7 @@ var ArimaaDispatcher = require('../dispatcher/ArimaaDispatcher.js');
 var APIUtils = require('../utils/WebAPIUtils.js');
 var SiteConstants = require('../constants/SiteConstants.js');
 var UserStore = require('../stores/UserStore.js');
+var Utils = require('../utils/Utils.js');
 var cookie = require('react-cookie');
 
 const FUNC_NOP = function(){};
@@ -144,6 +145,10 @@ var SiteActions = {
     APIUtils.declineUserForGame(gameID, gameAuth, username, FUNC_NOP, FUNC_NOP);
   },
   leaveGame: function(gameID, gameAuth) {
+    ArimaaDispatcher.dispatch({
+      actionType: SiteConstants.ACTIONS.LEAVING_GAME,
+      gameID: gameID
+    });
     APIUtils.leaveGame(gameID, gameAuth, function(data) {SiteActions.leaveGameSuccess(gameID,data);}, FUNC_NOP);
   },
   leaveGameSuccess: function(gameID,data) {
@@ -243,25 +248,16 @@ var SiteActions = {
   joinedOpenGameMetadataSuccess: function(gameAuth,data) {
     var seqNum = data.sequence;
     var gameID = data.gameID;
-
-    if(data.openGameData && data.openGameData.joined.length > 1) {
-      //TODO only report when it actually differs from previous
-      ArimaaDispatcher.dispatch({
-        actionType: SiteConstants.ACTIONS.PLAYER_JOINED,
-        players: data.openGameData.joined, //note this includes the creator
-        gameID: gameID
-      });
-    }
-
+    var username = UserStore.getUsername();
+    var storedGameAuth = UserStore.getJoinedGameAuth(gameID);
+    
     ArimaaDispatcher.dispatch({
       actionType: SiteConstants.ACTIONS.GAME_METADATA_UPDATE,
       metadata: data
     });
-
+    
     //If we've since changed our auth or closed this game, terminate the loop
-    var game = UserStore.getOpenGame(gameID);
-    var storedGameAuth = UserStore.getJoinedGameAuth(gameID);
-    if(storedGameAuth === null || storedGameAuth != gameAuth || game === null)
+    if(storedGameAuth === null || storedGameAuth != gameAuth || data.openGameData === undefined)
       return;
 
     setTimeout(function () {

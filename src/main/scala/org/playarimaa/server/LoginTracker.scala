@@ -123,6 +123,14 @@ class LoginTracker(val parent: Option[LoginTracker], val inactivityTimeout: Doub
     loginData = loginData - username
   }
 
+  /* Log out all users except the list specified */
+  def logoutAllExcept(users: List[Username]): Unit = synchronized {
+    loginData = loginData.filter { case (username,_) =>
+      val shouldKeep = users.contains(username)
+      shouldKeep
+    }
+  }
+
   /* Log out all auths that have not been active recently enough or whose parents were logged out.
    * Returns all users all of whose auths were logged out. */
   def doTimeouts(now: Timestamp): List[Username] = synchronized {
