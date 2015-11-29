@@ -274,8 +274,12 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
               if(uname != account.username)
                 throw new Exception("Username does not match login.")
 
-              Future(BCrypt.hashpw(password, BCrypt.gensalt))(cryptEC).flatMap { passwordHash =>
-                accounts.setPasswordHash(account.username,passwordHash)
+              Future(BCrypt.checkpw(password, account.passwordHash))(cryptEC).flatMap { success =>
+                if(!success)
+                  throw new Exception("Old password did not match.")
+                Future(BCrypt.hashpw(newPassword, BCrypt.gensalt))(cryptEC).flatMap { passwordHash =>
+                  accounts.setPasswordHash(account.username,passwordHash)
+                }
               }
           }
         }
@@ -296,19 +300,23 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
               if(newEmail == account.email)
                 throw new Exception("New email is the same as the old email.")
 
-              val auth = RandGen.genAuth
-              emailChangeLock.synchronized {
-                val now = Timestamp.get
-                //Filter all reset tokens that are too old
-                emailChanges = emailChanges.filter { case (user,(authTime,_)) =>
+              Future(BCrypt.checkpw(password, account.passwordHash))(cryptEC).flatMap { success =>
+                if(!success)
+                  throw new Exception("Password did not match.")
+                val auth = RandGen.genAuth
+                emailChangeLock.synchronized {
+                  val now = Timestamp.get
+                  //Filter all reset tokens that are too old
+                  emailChanges = emailChanges.filter { case (user,(authTime,_)) =>
                     now - authTime.time < EMAIL_CHANGE_TIMEOUT
+                  }
+                  //Add the new reset key
+                  val value = (AuthTime(auth, Timestamp.get),newEmail)
+                  emailChanges = emailChanges + (account.username -> value)
                 }
-                //Add the new reset key
-                val value = (AuthTime(auth, Timestamp.get),newEmail)
-                emailChanges = emailChanges + (account.username -> value)
+                //Send email to user advising about change
+                emailer.sendEmailChangeRequest(newEmail,account.username,auth,account.email)
               }
-              //Send email to user advising about change
-              emailer.sendEmailChangeRequest(newEmail,account.username,auth)
           }
         }
       }.get

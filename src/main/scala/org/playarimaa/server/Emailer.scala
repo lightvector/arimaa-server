@@ -49,19 +49,21 @@ class Emailer(siteName: String, siteAddress: String, smtpHost: String, smtpPort:
     send(to,subject,body)
   }
 
-  def sendEmailChangeRequest(to: Email, username: Username, auth: Auth): Future[Unit] = {
+  def sendEmailChangeRequest(to: Email, username: Username, auth: Auth, oldEmail: Email): Future[Unit] = {
     val resetUrl = siteAddress + "confirmChangeEmail/" + username + "/" + auth
     val resetLink = "<a href=\"" + resetUrl + "\">" + resetUrl + "</a>"
     val subject = "Email change requested"
     //TODO make this more user-friendly in conjunction with an appropriate UI page
     val body = List(
-      "A email address change to this email address was requested for your account \"",
+      "A email address change to this email address from \"",
+      oldEmail,
+      "\" was requested for your account \"",
       username,
       "\" at ",
       siteName,
-      ". You may confirm by visiting the following link: ",
+      ". You may confirm this change by visiting the following link: ",
       resetLink,
-      ". If you did not make this request or did not intend to request this change, please ignore this email."
+      ", otherwise the old address will be retained. If you did not make this request or did not intend to request this change, please ignore this email."
     ).mkString("")
 
     send(to,subject,body)

@@ -17,6 +17,10 @@ object AccountServlet {
 
   object IOTypes {
     case class SimpleError(error: String)
+
+    case class ShortUserInfo(
+      name: String
+    )
   }
 
   sealed trait Action {
@@ -68,7 +72,7 @@ object AccountServlet {
   case object UsersLoggedIn extends Action {
     val name = "usersLoggedIn"
     case class Query()
-    case class Reply(users: List[String])
+    case class Reply(users: List[IOTypes.ShortUserInfo])
   }
   case object ForgotPassword extends Action {
     val name = "forgotPassword"
@@ -143,7 +147,7 @@ class AccountServlet(val siteLogin: SiteLogin, val ec: ExecutionContext)
         val isLoggedIn = siteLogin.isAuthLoggedIn(query.siteAuth)
         Json.write(AuthLoggedIn.Reply(isLoggedIn))
       case Some(UsersLoggedIn) =>
-        val usersLoggedIn = siteLogin.usersLoggedIn.toList
+        val usersLoggedIn = siteLogin.usersLoggedIn.toList.map { user => IOTypes.ShortUserInfo(user) }
         Json.write(UsersLoggedIn.Reply(usersLoggedIn))
       case Some(ForgotPassword) =>
         val query = Json.read[ForgotPassword.Query](request.body)
@@ -162,7 +166,7 @@ class AccountServlet(val siteLogin: SiteLogin, val ec: ExecutionContext)
       case Some(ChangeEmail) =>
         val query = Json.read[ChangeEmail.Query](request.body)
         siteLogin.changeEmail(query.username, query.password, query.siteAuth, query.newEmail).map { case () =>
-          Json.write(ChangeEmail.Reply("Email sent to new address, please confirm to complete the change."))
+          Json.write(ChangeEmail.Reply("Email sent to new address, please confirm from there to complete this change."))
         }
       case Some(ConfirmChangeEmail) =>
         val query = Json.read[ConfirmChangeEmail.Query](request.body)
