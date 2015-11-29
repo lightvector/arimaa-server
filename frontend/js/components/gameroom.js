@@ -97,6 +97,10 @@ var component = React.createClass({
     this.setState({createGameDialogOpen:false});
     SiteActions.createGame(opts);
   },
+  handleCreateGameCancelled: function(opts) {
+    this.setState({createGameDialogOpen:false});
+    SiteActions.createGame(opts);
+  },
 
   handlePopupOk: function(opts) {
     this.setState({popupMessageOpen:false});
@@ -285,7 +289,7 @@ var component = React.createClass({
 
     var createModal = (
         <Modal isOpen={this.state.createGameDialogOpen} onRequestClose={this.closeCreateDialog}>
-        <CreateGameDialog handleSubmitted={this.handleCreateGameSubmitted}/>
+        <CreateGameDialog handleSubmitted={this.handleCreateGameSubmitted} handleCancelled={this.handleCreateGameCancelled}/>
         </Modal>
     );
 

@@ -55,6 +55,9 @@ var CreateGameDialog = React.createClass({
       };
     this.props.handleSubmitted(opts);
   },
+  handleCancelButton: function(){
+    this.props.handleCancelled();
+  },
 
   render: function(){
     var timeControls = this.timeControls;
@@ -80,7 +83,10 @@ var CreateGameDialog = React.createClass({
       </select>
       <h4>Rated:</h4>
       Rated <input type='checkbox' checked={this.state.rated} onChange={this.handleRatedChange}/>
-      <div> <button onClick={this.handleOkButton}>Ok</button> </div>
+      <div>
+        <button onClick={this.handleOkButton}>Ok</button>
+        <button onClick={this.handleCancelButton}>Cancel</button>
+      </div>
       </div>
     );
   }
