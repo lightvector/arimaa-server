@@ -37,6 +37,12 @@ class Accounts(val db: Database)(implicit ec: ExecutionContext) {
     }
   }
 
+  def getNonGuestByName(username: Username): Future[Option[Account]] = {
+    val lowercaseName = username.toLowerCase
+    val query = Accounts.table.filter(_.lowercaseName === lowercaseName)
+    db.run(query.result).map(_.headOption)
+  }
+
   //Returns all non-guest accounts with this name or email
   def getNonGuestByNameOrEmail(usernameOrEmail: String): Future[List[Account]] = {
     val lowercaseName = usernameOrEmail.toLowerCase

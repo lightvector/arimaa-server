@@ -72,6 +72,7 @@ class ScalatraBootstrap extends LifeCycle {
     val smtpPort = config.getString("smtpPort")
     val smtpAuth = config.getBoolean("smtpAuth")
     val noReplyAddress = config.getString("noReplyAddress")
+    val helpAddress = config.getString("helpAddress")
 
     val actorEC: ExecutionContext = actorSystem.dispatcher
     val mainEC: ExecutionContext = createPool(math.ceil(numProcessors * mainThreadPoolSizeFactor).toInt)
@@ -81,7 +82,7 @@ class ScalatraBootstrap extends LifeCycle {
     val serverInstanceID: Long = System.currentTimeMillis
 
     val db = ArimaaServerInit.createDB("h2mem1")
-    val emailer = new Emailer(siteName,siteAddress,smtpHost,smtpPort,smtpAuth,noReplyAddress)(mainEC)
+    val emailer = new Emailer(siteName,siteAddress,smtpHost,smtpPort,smtpAuth,noReplyAddress,helpAddress)(mainEC)
     val accounts = new Accounts(db)(mainEC)
     val siteLogin = new SiteLogin(accounts,emailer,cryptEC)(mainEC)
     val scheduler = actorSystem.scheduler

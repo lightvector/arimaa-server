@@ -6,7 +6,7 @@ import javax.mail.internet.{InternetAddress,MimeMessage}
 
 import org.playarimaa.server.CommonTypes._
 
-class Emailer(siteName: String, siteAddress: String, smtpHost: String, smtpPort: String, smtpAuth: Boolean, noReplyAddress: String)(implicit ec: ExecutionContext) {
+class Emailer(siteName: String, siteAddress: String, smtpHost: String, smtpPort: String, smtpAuth: Boolean, noReplyAddress: String, helpAddress: String)(implicit ec: ExecutionContext) {
 
   val siteLink : String =
     List("<a href=\"",siteAddress,"\">",siteName,"</a>").mkString("")
@@ -48,6 +48,43 @@ class Emailer(siteName: String, siteAddress: String, smtpHost: String, smtpPort:
 
     send(to,subject,body)
   }
+
+  def sendEmailChangeRequest(to: Email, username: Username, auth: Auth): Future[Unit] = {
+    val resetUrl = siteAddress + "confirmChangeEmail/" + username + "/" + auth
+    val resetLink = "<a href=\"" + resetUrl + "\">" + resetUrl + "</a>"
+    val subject = "Email change requested"
+    //TODO make this more user-friendly in conjunction with an appropriate UI page
+    val body = List(
+      "A email address change to this email address was requested for your account \"",
+      username,
+      "\" at ",
+      siteName,
+      ". You may confirm by visiting the following link: ",
+      resetLink,
+      ". If you did not make this request or did not intend to request this change, please ignore this email."
+    ).mkString("")
+
+    send(to,subject,body)
+  }
+
+  def sendOldEmailChangeNotification(to: Email, username: Username, newEmail: Email): Future[Unit] = {
+    val subject = "Email change requested"
+    //TODO make this more user-friendly in conjunction with an appropriate UI page
+    val body = List(
+      "The email address for your account \"",
+      username,
+      "\" at ",
+      siteName,
+      " was changed from this address to \"",
+      newEmail,
+      "\". If you did not make this change, please contact ",
+      helpAddress,
+      "."
+    ).mkString("")
+
+    send(to,subject,body)
+  }
+
 
   //TODO use this
   def sendPasswordResetNoAccount(to: Email): Future[Unit] = {
