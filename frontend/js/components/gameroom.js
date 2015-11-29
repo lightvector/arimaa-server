@@ -304,7 +304,7 @@ var component = React.createClass({
 
     var errorDiv = "";
     if(this.state.error != "") {
-      errorDiv = React.createElement("div", {className:"error"}, this.state.error);
+      errorDiv = React.createElement("div", {key: "errorDiv", className:"error"}, this.state.error);
     }
 
     var usersDiv = "";
@@ -312,7 +312,7 @@ var component = React.createClass({
       var usersList = this.state.usersLoggedIn.map(function(user) {
         return that.renderUser(user);
       });
-      usersList.unshift(React.createElement("h4", {}, "Users Logged In:"));
+      usersList.unshift(React.createElement("h4", {key: "usersLoggedInLabel"}, "Users Logged In:"));
       usersDiv = React.createElement("div", {key: "usersDiv", className:"gameroomUsersDiv"}, usersList);
     }
 
@@ -323,7 +323,7 @@ var component = React.createClass({
       });
 
       ownGamesList.unshift(React.createElement("button", {key: "createGameButton", onClick: this.createButtonClicked}, "Create New Game"));
-      ownGamesList.unshift(React.createElement("h3", {}, "My Current Games"));
+      ownGamesList.unshift(React.createElement("h3", {key: "myCurrentGamesLabel"}, "My Current Games"));
       ownGamesDiv = React.createElement("div", {key: "ownDiv"}, ownGamesList);
     }
 
@@ -333,7 +333,7 @@ var component = React.createClass({
         return that.renderGame(metadata);
       });
 
-      joinableOpenGamesList.unshift(React.createElement("h3", {}, "Open Games"));
+      joinableOpenGamesList.unshift(React.createElement("h3", {key: "openGamesLabel"}, "Open Games"));
       joinableOpenGamesDiv = React.createElement("div", {key: "joinableOpenDiv"}, joinableOpenGamesList);
     }
 
@@ -344,7 +344,7 @@ var component = React.createClass({
         return that.renderGame(metadata);
       });
 
-      watchableGamesList.unshift(React.createElement("h3", {}, "Active Games"));
+      watchableGamesList.unshift(React.createElement("h3", {key: "activeGamesLabel"}, "Active Games"));
       watchableGamesDiv = React.createElement("div", {key: "watchableDiv"}, watchableGamesList);
     }
 
@@ -354,7 +354,7 @@ var component = React.createClass({
 
 
     var contents = [
-      React.createElement("h1", {}, "Arimaa Gameroom"),
+      React.createElement("h1", {key:"gameroomTitle"}, "Arimaa Gameroom"),
       createModal,
       popupModal,
       errorDiv,
@@ -365,7 +365,7 @@ var component = React.createClass({
       chat
     ];
 
-    return React.createElement("div", {className: "gameroom"}, contents);
+    return React.createElement("div", {key:"gameroomContents", className: "gameroom"}, contents);
 
   }
 
