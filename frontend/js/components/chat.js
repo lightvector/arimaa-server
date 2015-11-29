@@ -2,6 +2,7 @@ var React = require('react');
 var APIUtils = require('../utils/WebAPIUtils.js');
 var SiteActions = require('../actions/SiteActions.js');
 var UserStore = require('../stores/UserStore.js');
+var SiteConstants = require('../constants/SiteConstants.js');
 
 const FUNC_NOP = function(){};
 
@@ -76,9 +77,8 @@ var chatBox = React.createClass({
   startHeartbeatLoop: function(chatAuth) {
     if(this.state.chatAuth !== null && this.state.chatAuth == chatAuth) {
       APIUtils.chatHeartbeat(this.props.params.chatChannel, chatAuth, FUNC_NOP, this.onHeartbeatError);
-      //TODO sleep 30s
       var that = this;
-      setTimeout(function () {that.startHeartbeatLoop(chatAuth);}, 30000);
+      setTimeout(function () {that.startHeartbeatLoop(chatAuth);}, SiteConstants.VALUES.CHAT_HEARTBEAT_PERIOD * 1000);
     }
   },
   onHeartbeatError: function(data) {
@@ -98,24 +98,24 @@ var chatBox = React.createClass({
     }
   },
   onLinesSuccess: function(data, chatAuth) {
-    var nextMinId = this.state.nextMinId;
-    for(var i = 0; i<data.lines.length; i++) {
-      if(data.lines[i].id >= nextMinId)
-        nextMinId = data.lines[i].id + 1;
-    }
-    if(nextMinId < 0)
-      nextMinId = 0;
+    if(this.state.chatAuth !== null && this.state.chatAuth == chatAuth) {
+      var nextMinId = this.state.nextMinId;
+      for(var i = 0; i<data.lines.length; i++) {
+        if(data.lines[i].id >= nextMinId)
+          nextMinId = data.lines[i].id + 1;
+      }
+      if(nextMinId < 0)
+        nextMinId = 0;
 
-    //TODO max 10000 lines in chat history
-    this.setState({lines:this.state.lines.concat(data.lines).slice(-10000), nextMinId:nextMinId});
-    //TODO sleep 300 ms
-    var that = this;
-    setTimeout(function () {that.startPollLoop(chatAuth);}, 300);
+      this.setState({lines:this.state.lines.concat(data.lines).slice(-SiteConstants.VALUES.CHAT_MAX_HISTORY_LINES), nextMinId:nextMinId});
+      var that = this;
+      setTimeout(function () {that.startPollLoop(chatAuth);}, SiteConstants.VALUES.CHAT_LOOP_DELAY * 1000);
+    }
   },
   onLinesError: function(data, chatAuth) {
     this.setState({error:data.error});
     var that = this;
-    setTimeout(function () {that.startPollLoop(chatAuth);}, 5000); //TODO 5 second wait on error
+    setTimeout(function () {that.startPollLoop(chatAuth);}, SiteConstants.VALUES.CHAT_LOOP_DELAY_ON_ERROR * 1000);
   },
 
   render: function() {

@@ -36,6 +36,14 @@ const VALUES = {
   GAME_STATE_LOOP_DELAY: 0.2,
   GAME_STATE_LOOP_DELAY_ON_ERROR: 5.0,
 
+  //Seconds to wait between heartbeats for chatroom
+  CHAT_HEARTBEAT_PERIOD: 30.0,
+  //Max chat lines to keep in history
+  CHAT_MAX_HISTORY_LINES: 10000,
+  //Seconds to wait between another polling query for chat lines
+  CHAT_LOOP_DELAY: 0.3,
+  CHAT_LOOP_DELAY_ON_ERROR: 5.0,
+
   //Seconds to add a class to trigger highlight css animation
   HIGHLIGHT_FLASH_TIMEOUT: 0.2
 };
