@@ -10,7 +10,7 @@ import org.playarimaa.server.Timestamp.Timestamp
 object SiteLogin {
 
   object Constants {
-    val INACTIVITY_TIMEOUT: Double = 3600 * 24 * 2 //2 days
+    val INACTIVITY_TIMEOUT: Double = 300 //5 minutes
     val PASSWORD_RESET_TIMEOUT: Double = 1800 //30 minutes
     val EMAIL_CHANGE_TIMEOUT: Double = 84600 //1 day
 
@@ -93,6 +93,8 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
   }
 
   def usersLoggedIn: Set[Username] = {
+    val now = Timestamp.get
+    doTimeouts(now)
     logins.usersLoggedIn
   }
 
