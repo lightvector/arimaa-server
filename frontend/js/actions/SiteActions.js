@@ -13,6 +13,9 @@ var SiteActions = {
   login: function(username, password) {
     APIUtils.login(username, password, SiteActions.loginSuccess, SiteActions.loginError);
   },
+  loginGuest: function(username) {
+    APIUtils.loginGuest(username, SiteActions.loginSuccess, SiteActions.loginError);
+  },
   loginError: function(data) {
     ArimaaDispatcher.dispatch({
       actionType: SiteConstants.ACTIONS.LOGIN_FAILED,
@@ -38,7 +41,7 @@ var SiteActions = {
     ArimaaDispatcher.dispatch({
       actionType: SiteConstants.ACTIONS.REGISTRATION_SUCCESS
     });
-    window.location.pathname = "/gameroom"; //TODO we should track where the user was before and then redirect there instead
+    window.location.pathname = "/gameroom";
   },
   registerError: function(data) {
     ArimaaDispatcher.dispatch({
@@ -177,6 +180,33 @@ var SiteActions = {
     console.log(data);
   },
 
+  updateErrorMessage :
+  "Error getting gameroom updates, possible network or other connection issues, consider refreshing the page.",
+
+  //Initiates a loop querying for the list of users logged in every few seconds, continuing forever.
+  beginUsersLoggedInLoop: function() {
+    APIUtils.usersLoggedIn(SiteActions.usersLoggedInLoopSuccess, SiteActions.usersLoggedInLoopError);
+  },
+  usersLoggedInLoopSuccess: function(data) {
+    ArimaaDispatcher.dispatch({
+      actionType: SiteConstants.ACTIONS.USERS_LOGGED_IN_LIST,
+      data: data
+    });
+    setTimeout(function () {
+      APIUtils.usersLoggedIn(SiteActions.usersLoggedInLoopSuccess, SiteActions.usersLoggedInLoopError);
+    }, SiteConstants.VALUES.GAME_LIST_LOOP_DELAY * 1000);
+  },
+  usersLoggedInLoopError: function(data) {
+    ArimaaDispatcher.dispatch({
+      actionType: SiteConstants.ACTIONS.GAMEROOM_UPDATE_FAILED,
+      reason: SiteActions.updateErrorMessage
+    });
+    console.log(data);
+    setTimeout(function () {
+      APIUtils.usersLoggedIn(SiteActions.usersLoggedInLoopSuccess, SiteActions.usersLoggedInLoopError);
+    }, SiteConstants.VALUES.GAME_LIST_LOOP_DELAY_ON_ERROR * 1000);
+  },
+
   //Initiates a loop querying for the list of open games every few seconds, continuing forever.
   beginOpenGamesLoop: function() {
     APIUtils.getOpenGames(SiteActions.openGamesLoopSuccess, SiteActions.openGamesLoopError);
@@ -193,8 +223,8 @@ var SiteActions = {
   },
   openGamesLoopError: function(data) {
     ArimaaDispatcher.dispatch({
-      actionType: SiteConstants.ACTIONS.GAMES_LIST_FAILED,
-      reason: "Error getting open/active games, possible network or other connection issues, consider refreshing the page."
+      actionType: SiteConstants.ACTIONS.GAMEROOM_UPDATE_FAILED,
+      reason: SiteActions.updateErrorMessage
     });
     console.log(data);
     setTimeout(function () {
@@ -225,8 +255,8 @@ var SiteActions = {
   },
   activeGamesLoopError: function(data) {
     ArimaaDispatcher.dispatch({
-      actionType: SiteConstants.ACTIONS.GAMES_LIST_FAILED,
-      reason: "Error getting open/active games, possible network or other connection issues, consider refreshing the page."
+      actionType: SiteConstants.ACTIONS.GAMEROOM_UPDATE_FAILED,
+      reason: SiteActions.updateErrorMessage
     });
     console.log(data);
     setTimeout(function () {
@@ -250,12 +280,12 @@ var SiteActions = {
     var gameID = data.gameID;
     var username = UserStore.getUsername();
     var storedGameAuth = UserStore.getJoinedGameAuth(gameID);
-    
+
     ArimaaDispatcher.dispatch({
       actionType: SiteConstants.ACTIONS.GAME_METADATA_UPDATE,
       metadata: data
     });
-    
+
     //If we've since changed our auth or closed this game, terminate the loop
     if(storedGameAuth === null || storedGameAuth != gameAuth || data.openGameData === undefined)
       return;

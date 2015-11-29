@@ -27,6 +27,8 @@ var gamesWeAreLeaving = {};  //Games that we initiated the leaving from
 
 var recentHighlightGameIDs = {}; //Games for which something recently changed that should cause them to flash a highlight
 
+var usersLoggedIn = []; //List of users logged in
+
 var messageText = "";
 var errorText = "";
 
@@ -53,8 +55,8 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
   emitPopupMessage: function(message) {
     //Make asynchronous
     setTimeout(function () {UserStore.emit(NEW_POPUP_MESSAGE, message);}, 1);
-  },  
-  
+  },
+
   getMessageError: function() {
     return {message: messageText, error: errorText};
   },
@@ -65,6 +67,10 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
 
   siteAuthToken: function() {
     return cookie.load('siteAuth');
+  },
+
+  getUsersLoggedIn: function() {
+    return usersLoggedIn;
   },
 
   getOwnOpenGamesDict: function() {
@@ -115,7 +121,7 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
     if(gameID in activeGames) return activeGames[gameID];
     return null;
   },
-  
+
   removeGame: function(gameID) {
     if(gameID in openGames) delete openGames[gameID];
     if(gameID in activeGames) delete activeGames[gameID];
@@ -202,7 +208,7 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
         }
       }
     }
-    
+
     //Game we joined became an active game
     if(prevGameIfOpen !== null && metadata.activeGameData !== undefined && Utils.isUserJoined(metadata,username)) {
       //TODO this doesn't quite work, it gets blocked a lot, maybe we just let the user click on the button...?
@@ -210,7 +216,7 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
       newWindow.focus();
     }
 
-    
+
     //If this is the first time we've seen this game, and we're joined to the game, record it so
     //that we can report the event
     if(prevGame === null) {
@@ -225,7 +231,7 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
     //Give it 30 seconds, if after then we haven't seen us leave the game but then we see a leave afterwards, assume we didn't initiate the leave
     setTimeout(function () {if(gamesWeAreLeaving[gameID] == now) delete gamesWeAreLeaving[gameID];}, 30000);
   },
-  
+
   dispatcherIndex: ArimaaDispatcher.register(function(action) {
     switch (action.actionType) {
     case SiteConstants.ACTIONS.REGISTRATION_FAILED:
@@ -233,7 +239,7 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
     case SiteConstants.ACTIONS.LOGOUT_FAILED:
     case SiteConstants.ACTIONS.FORGOT_PASSWORD_FAILED:
     case SiteConstants.ACTIONS.RESET_PASSWORD_FAILED:
-    case SiteConstants.ACTIONS.GAMES_LIST_FAILED:
+    case SiteConstants.ACTIONS.GAMEROOM_UPDATE_FAILED:
     case SiteConstants.ACTIONS.CREATE_GAME_FAILED:
       messageText = "";
       errorText = action.reason;
@@ -251,12 +257,17 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
       errorText = "";
       UserStore.emitChange();
       break;
+    case SiteConstants.ACTIONS.USERS_LOGGED_IN_LIST:
+      errorText = "";
+      usersLoggedIn = action.data.users;
+      UserStore.emitChange();
+      break;
     case SiteConstants.ACTIONS.OPEN_GAMES_LIST:
       errorText = "";
       var newListIDs = {};
       action.metadatas.forEach(function(metadata){
         //Keep the highest sequence number
-        if(!(metadata.gameID in openGames && openGames[metadata.gameID].sequence > metadata.sequence)) 
+        if(!(metadata.gameID in openGames && openGames[metadata.gameID].sequence > metadata.sequence))
           UserStore.addGame(metadata);
         newListIDs[metadata.gameID] = true;
       });

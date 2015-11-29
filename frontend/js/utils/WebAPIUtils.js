@@ -74,6 +74,10 @@ var APIUtils = {
     POST('/api/accounts/login', {username:username, password:password}, success, error);
   },
 
+  loginGuest: function(username, success, error) {
+    POST('/api/accounts/loginGuest', {username:username}, success, error);
+  },
+
   register: function(username, email, password, success, error) {
     POST('/api/accounts/register', {username:username, email:email, password:password, isBot:false}, success, error);
   },
@@ -86,12 +90,31 @@ var APIUtils = {
     POST('/api/accounts/authLoggedIn', {siteAuth:UserStore.siteAuthToken()}, success, error);
   },
 
+  usersLoggedIn: function(success, error) {
+    POST('/api/accounts/usersLoggedIn', {}, success, error);
+  },
+
   forgotPassword: function(username, success, error) {
     POST('/api/accounts/forgotPassword', {username:username}, success, error);
   },
 
   resetPassword: function(username, resetAuth, password, success, error) {
     POST('/api/accounts/resetPassword', {username:username, resetAuth:resetAuth, password:password}, success, error);
+  },
+
+  //TODO use this
+  changePassword: function(username, password, siteAuth, newPassword, success, error) {
+    POST('/api/accounts/changePassword', {username:username, password:password, siteAuth:UserStore.siteAuthToken(), newPassword:newPassword}, success, error);
+  },
+
+  //TODO use this
+  changeEmail: function(username, password, siteAuth, newEmail, success, error) {
+    POST('/api/accounts/changeEmail', {username:username, password:password, siteAuth:UserStore.siteAuthToken(), newEmail:newEmail}, success, error);
+  },
+
+  //TODO use this
+  confirmChangeEmail: function(username, changeAuth, success, error) {
+    POST('/api/accounts/changeEmail', {username:username, changeAuth:changeAuth}, success, error);
   },
 
   createGame: function(options, success, error) {
@@ -167,7 +190,7 @@ var APIUtils = {
   chatPoll: function(chatChannel, minId, success, error) {
     GET('/api/chat/'+chatChannel, {minId:minId, doWait:true}, success, error);
   }
-  
+
 };
 
 

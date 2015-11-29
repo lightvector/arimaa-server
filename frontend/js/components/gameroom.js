@@ -13,6 +13,7 @@ var component = React.createClass({
   getInitialState: function() {
     return {message: "", error:"",
             ownGames:[], joinableOpenGames:[], watchableGames:[], selectedPlayers:{},
+            usersLoggedIn:[],
             recentHighlightGameIDs:{},
             createGameDialogOpen:false,
             popupMessage:"",
@@ -22,6 +23,7 @@ var component = React.createClass({
   componentDidMount: function() {
     UserStore.addChangeListener(this.onUserStoreChange);
     UserStore.addPopupMessageListener(this.onPopupMessage);
+    SiteActions.beginUsersLoggedInLoop();
     SiteActions.beginOpenGamesLoop();
     SiteActions.beginActiveGamesLoop();
   },
@@ -36,7 +38,8 @@ var component = React.createClass({
       ownGames:UserStore.getOwnGames(),
       joinableOpenGames:UserStore.getJoinableOpenGames(),
       watchableGames:UserStore.getWatchableGames(),
-      recentHighlightGameIDs:UserStore.getRecentHighlightGames()
+      recentHighlightGameIDs:UserStore.getRecentHighlightGames(),
+      usersLoggedIn:UserStore.getUsersLoggedIn()
     });
   },
 
@@ -268,8 +271,12 @@ var component = React.createClass({
       "gameroomGameElt": true,
       "quickHighlight": metadata.gameID in this.state.recentHighlightGameIDs
     });
-    
+
     return React.createElement("div", {key: "main_"+metadata.gameID, className:classes}, elts);
+  },
+
+  renderUser: function(userInfo) {
+    return React.createElement("div", {key: "users_"+userInfo.name}, userInfo.name);
   },
 
   render: function() {
@@ -283,7 +290,7 @@ var component = React.createClass({
     );
 
     var popupModalStyle = {
-      content: { width: "400px", height:"200px"}
+      content: { width: "500px", height:"120px"}
     };
     var popupModal = (
         <Modal isOpen={this.state.popupMessageOpen} onRequestClose={this.closePopupMessage} style={popupModalStyle}>
@@ -294,6 +301,15 @@ var component = React.createClass({
     var errorDiv = "";
     if(this.state.error != "") {
       errorDiv = React.createElement("div", {className:"error"}, this.state.error);
+    }
+
+    var usersDiv = "";
+    {
+      var usersList = this.state.usersLoggedIn.map(function(user) {
+        return that.renderUser(user);
+      });
+      usersList.unshift(React.createElement("h4", {}, "Users Logged In:"));
+      usersDiv = React.createElement("div", {key: "usersDiv", className:"gameroomUsersDiv"}, usersList);
     }
 
     var ownGamesDiv = "";
@@ -338,6 +354,7 @@ var component = React.createClass({
       createModal,
       popupModal,
       errorDiv,
+      usersDiv,
       ownGamesDiv,
       joinableOpenGamesDiv,
       watchableGamesDiv,

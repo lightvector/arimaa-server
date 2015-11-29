@@ -31,6 +31,11 @@ var loginBox = React.createClass({
     SiteActions.login(this.state.user, this.state.pass);
   },
 
+  submitLoginAsGuest: function(event) {
+    event.preventDefault();
+    SiteActions.loginGuest(this.state.user);
+  },
+
   render: function() {
     var errorText = null;
     if(this.state.error != "") {
@@ -45,6 +50,7 @@ var loginBox = React.createClass({
             <input type="text" name="login" value={this.state.user} onChange={this.handleUsernameChange} placeholder="Username/Email"/>
             <input type="password" name="password" value={this.state.pass} onChange={this.handlePasswordChange} placeholder="Password"/>
             <input type="submit" className="submit" name="commit" value="Login" onClick={this.submitLogin}/>
+            <input type="submit" className="submit" name="commitGuest" value="Login As Guest" onClick={this.submitLoginAsGuest}/>
           </form>
           {errorText}
           <div className="forgotpass"><Link to="/forgotPassword">Forgot Password?</Link></div>
