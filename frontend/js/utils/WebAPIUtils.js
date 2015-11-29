@@ -166,12 +166,9 @@ var APIUtils = {
 
   chatPoll: function(chatChannel, minId, success, error) {
     GET('/api/chat/'+chatChannel, {minId:minId, doWait:true}, success, error);
-  },
-
-
-  //TODO: What is this for?
-  do_something_else: 0
-}
+  }
+  
+};
 
 
 module.exports = APIUtils;

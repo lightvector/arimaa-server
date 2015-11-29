@@ -8,7 +8,7 @@ var ArimaaConstants = require('../constants/ArimaaConstants.js');
 function getGameState() {
   var boardState = {
     fen: ArimaaStore.getArimaa().get_fen(),
-    stepFrom: ArimaaStore.getSeletedSquare().num, //need to change this name
+    stepFrom: ArimaaStore.getSeletedSquare().num, //TODO need to change this name
     steps: ArimaaStore.getValidSteps(),
     viewSide: ArimaaStore.getViewSide(),
     setupColor: ArimaaStore.getSetupColor(),
