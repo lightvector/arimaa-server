@@ -17,6 +17,10 @@ object AccountServlet {
 
   object IOTypes {
     case class SimpleError(error: String)
+
+    case class ShortUserInfo(
+      name: String
+    )
   }
 
   sealed trait Action {
@@ -28,10 +32,15 @@ object AccountServlet {
     val all: List[Action] = List(
       Register,
       Login,
+      LoginGuest,
       Logout,
       AuthLoggedIn,
+      UsersLoggedIn,
       ForgotPassword,
-      ResetPassword
+      ResetPassword,
+      ChangePassword,
+      ChangeEmail,
+      ConfirmChangeEmail
     )
   }
 
@@ -45,6 +54,11 @@ object AccountServlet {
     case class Query(username: String, password: String)
     case class Reply(username: String, siteAuth: String)
   }
+  case object LoginGuest extends Action {
+    val name = "loginGuest"
+    case class Query(username: String)
+    case class Reply(username: String, siteAuth: String)
+  }
   case object Logout extends Action {
     val name = "logout"
     case class Query(siteAuth: String)
@@ -55,6 +69,11 @@ object AccountServlet {
     case class Query(siteAuth: String)
     case class Reply(value: Boolean)
   }
+  case object UsersLoggedIn extends Action {
+    val name = "usersLoggedIn"
+    case class Query()
+    case class Reply(users: List[IOTypes.ShortUserInfo])
+  }
   case object ForgotPassword extends Action {
     val name = "forgotPassword"
     case class Query(username: String)
@@ -63,6 +82,21 @@ object AccountServlet {
   case object ResetPassword extends Action {
     val name = "resetPassword"
     case class Query(username: String, resetAuth: String, password: String)
+    case class Reply(message: String)
+  }
+  case object ChangePassword extends Action {
+    val name = "changePassword"
+    case class Query(username: String, password: String, siteAuth: String, newPassword: String)
+    case class Reply(message: String)
+  }
+  case object ChangeEmail extends Action {
+    val name = "changeEmail"
+    case class Query(username: String, password: String, siteAuth: String, newEmail: String)
+    case class Reply(message: String)
+  }
+  case object ConfirmChangeEmail extends Action {
+    val name = "confirmChangeEmail"
+    case class Query(username: String, changeAuth: String)
     case class Reply(message: String)
   }
 }
@@ -98,6 +132,11 @@ class AccountServlet(val siteLogin: SiteLogin, val ec: ExecutionContext)
         siteLogin.login(query.username, query.password).map { case (username,siteAuth) =>
           Json.write(Login.Reply(username, siteAuth))
         }
+      case Some(LoginGuest) =>
+        val query = Json.read[LoginGuest.Query](request.body)
+        siteLogin.loginGuest(query.username).map { case (username,siteAuth) =>
+          Json.write(LoginGuest.Reply(username, siteAuth))
+        }
       case Some(Logout) =>
         val query = Json.read[Logout.Query](request.body)
         siteLogin.logout(query.siteAuth).map { case () =>
@@ -107,6 +146,9 @@ class AccountServlet(val siteLogin: SiteLogin, val ec: ExecutionContext)
         val query = Json.read[AuthLoggedIn.Query](request.body)
         val isLoggedIn = siteLogin.isAuthLoggedIn(query.siteAuth)
         Json.write(AuthLoggedIn.Reply(isLoggedIn))
+      case Some(UsersLoggedIn) =>
+        val usersLoggedIn = siteLogin.usersLoggedIn.toList.map { user => IOTypes.ShortUserInfo(user) }
+        Json.write(UsersLoggedIn.Reply(usersLoggedIn))
       case Some(ForgotPassword) =>
         val query = Json.read[ForgotPassword.Query](request.body)
         siteLogin.forgotPassword(query.username): Unit
@@ -115,6 +157,21 @@ class AccountServlet(val siteLogin: SiteLogin, val ec: ExecutionContext)
         val query = Json.read[ResetPassword.Query](request.body)
         siteLogin.resetPassword(query.username, query.resetAuth, query.password).map { case () =>
           Json.write(ResetPassword.Reply("New password set."))
+        }
+      case Some(ChangePassword) =>
+        val query = Json.read[ChangePassword.Query](request.body)
+        siteLogin.changePassword(query.username, query.password, query.siteAuth, query.newPassword).map { case () =>
+          Json.write(ChangePassword.Reply("New password set."))
+        }
+      case Some(ChangeEmail) =>
+        val query = Json.read[ChangeEmail.Query](request.body)
+        siteLogin.changeEmail(query.username, query.password, query.siteAuth, query.newEmail).map { case () =>
+          Json.write(ChangeEmail.Reply("Email sent to new address, please confirm from there to complete this change."))
+        }
+      case Some(ConfirmChangeEmail) =>
+        val query = Json.read[ConfirmChangeEmail.Query](request.body)
+        siteLogin.confirmChangeEmail(query.username, query.changeAuth).map { case () =>
+          Json.write(ConfirmChangeEmail.Reply("New email set."))
         }
     }
   }

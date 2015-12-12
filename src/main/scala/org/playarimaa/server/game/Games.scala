@@ -20,8 +20,7 @@ import akka.pattern.{after}
 
 object Games {
   //Time out users from games if they don't heartbeat at least this often
-  //TODO revert back to 15s after developing js heartbeats
-  val INACTIVITY_TIMEOUT = 3600.0
+  val INACTIVITY_TIMEOUT = 15.0
   //How often to check all timeouts
   val TIMEOUT_CHECK_PERIOD = 3.0
   val TIMEOUT_CHECK_PERIOD_IF_ERROR = 60.0
@@ -864,6 +863,10 @@ class ActiveGames(val db: Database, val scheduler: Scheduler, val serverInstance
           }
           ()
         }
+        //Log out everyone except the two users chosen
+        data.logins.logoutAllExcept(data.users.values)
+
+        //And initialize the new state
         val game = ActiveGameData(
           logins = data.logins,
           users = data.users,
@@ -871,7 +874,7 @@ class ActiveGames(val db: Database, val scheduler: Scheduler, val serverInstance
           //Note that this could raise an exception if the moves aren't legal somehow
           game = new ActiveGame(meta,data.moves,now,db,scheduler,onTimeLoss,logger),
           sequencePromise = Promise(),
-          sequence = data.sequence
+          sequence = data.sequence+1 //Add one because the transition from open -> active is a state change
         )
         activeGames = activeGames + (id -> game)
       }

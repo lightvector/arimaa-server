@@ -73,6 +73,10 @@ class LoginTracker(val parent: Option[LoginTracker], val inactivityTimeout: Doub
     loginData.nonEmpty
   }
 
+  def userOfAuth(auth: Auth): Option[Username] = synchronized {
+    userAndParentAuth.get(auth).map { case (username,_) => username }
+  }
+
   /* Returns the last time that any activity occurred */
   def lastActiveTime: Timestamp = synchronized {
     lastActive
@@ -121,6 +125,14 @@ class LoginTracker(val parent: Option[LoginTracker], val inactivityTimeout: Doub
   def logoutUser(username: Username, now: Timestamp): Unit = synchronized {
     lastActive = now
     loginData = loginData - username
+  }
+
+  /* Log out all users except the list specified */
+  def logoutAllExcept(users: List[Username]): Unit = synchronized {
+    loginData = loginData.filter { case (username,_) =>
+      val shouldKeep = users.contains(username)
+      shouldKeep
+    }
   }
 
   /* Log out all auths that have not been active recently enough or whose parents were logged out.

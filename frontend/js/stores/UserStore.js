@@ -1,10 +1,13 @@
 var ArimaaDispatcher = require('../dispatcher/ArimaaDispatcher.js');
 var SiteConstants = require('../constants/SiteConstants.js');
 var EventEmitter = require('events').EventEmitter;
+var Utils = require('../utils/Utils.js');
+
 var cookie = require('react-cookie');
 
 var CHANGE_EVENT = 'USERSTORE-CHANGE';
 var NEW_OPEN_JOINED_GAME = 'USERSTORE-NEW-OPEN-JOINED-GAME';
+var NEW_POPUP_MESSAGE = 'USERSTORE-NEW-POPUP-MESSAGE';
 
 //STATE/MODEL-----------------------------------------------------------------
 //All of the state associated with being logged into the Arimaa gameroom
@@ -20,6 +23,11 @@ var watchableActiveGames = {}; //Games that the user cannot join but can watch
 
 var joinedGameAuths = {};    //GameAuths for games that we've joined
 var leftCreatedGameIDs = {}; //GameIDs for games that we've left that we created
+var gamesWeAreLeaving = {};  //Games that we initiated the leaving from
+
+var recentHighlightGameIDs = {}; //Games for which something recently changed that should cause them to flash a highlight
+
+var usersLoggedIn = []; //List of users logged in
 
 var messageText = "";
 var errorText = "";
@@ -36,7 +44,18 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
   //Subscribe to the detection of new open joined games
   addNewOpenJoinedGameListener: function(callback) {this.on(NEW_OPEN_JOINED_GAME, callback);},
   removeNewOpenJoinedGameListener: function(callback) {this.removeListener(NEW_OPEN_JOINED_GAME, callback);},
-  emitNewOpenJoinedGame: function(gameID) {this.emit(NEW_OPEN_JOINED_GAME, gameID);},
+  emitNewOpenJoinedGame: function(gameID) {
+    //Make asynchronous
+    setTimeout(function () {UserStore.emit(NEW_OPEN_JOINED_GAME, gameID);}, 1);
+  },
+
+  //Subscribe to the popup-worthy messages
+  addPopupMessageListener: function(callback) {this.on(NEW_POPUP_MESSAGE, callback);},
+  removePopupMessageListener: function(callback) {this.removeListener(NEW_POPUP_MESSAGE, callback);},
+  emitPopupMessage: function(message) {
+    //Make asynchronous
+    setTimeout(function () {UserStore.emit(NEW_POPUP_MESSAGE, message);}, 1);
+  },
 
   getMessageError: function() {
     return {message: messageText, error: errorText};
@@ -48,6 +67,10 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
 
   siteAuthToken: function() {
     return cookie.load('siteAuth');
+  },
+
+  getUsersLoggedIn: function() {
+    return usersLoggedIn;
   },
 
   getOwnOpenGamesDict: function() {
@@ -89,6 +112,16 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
     return null;
   },
 
+  getRecentHighlightGames: function() {
+    return recentHighlightGameIDs;
+  },
+
+  getGame: function(gameID) {
+    if(gameID in openGames) return openGames[gameID];
+    if(gameID in activeGames) return activeGames[gameID];
+    return null;
+  },
+
   removeGame: function(gameID) {
     if(gameID in openGames) delete openGames[gameID];
     if(gameID in activeGames) delete activeGames[gameID];
@@ -102,6 +135,13 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
   addGame: function(metadata) {
     var username = UserStore.getUsername();
     var gameID = metadata.gameID;
+    var prevGame = UserStore.getGame(gameID);
+    var prevGameIfOpen = UserStore.getOpenGame(gameID);
+
+    //Remove from any existing lists so we can re-add
+    UserStore.removeGame(gameID);
+
+    //First, update all lists
     if(metadata.openGameData !== undefined) {
       //Prevent races where we try to add a metadata back for something we successfully left and closed
       if(metadata.gameID in leftCreatedGameIDs)
@@ -130,6 +170,66 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
         watchableActiveGames[gameID] = metadata;
       }
     }
+
+    //Next, check if we need to do special things regarding changes in join status
+    var newJoined = [];
+
+    //Game is open
+    if(metadata.openGameData !== undefined) {
+      for(var i = 0; i<metadata.openGameData.joined.length; i++) {
+        newJoined.push(metadata.openGameData.joined[i].name);
+      }
+
+      //If we created this game and someone new joined, alert
+      if(metadata.openGameData.creator.name == username) {
+        for(var i = 0; i<newJoined.length; i++) {
+          if(newJoined[i] !== username && (prevGameIfOpen === null || !Utils.isUserJoined(prevGameIfOpen,newJoined[i]))) {
+            recentHighlightGameIDs[gameID] = true;
+            setTimeout(function() {
+              if(gameID in recentHighlightGameIDs) {
+                delete recentHighlightGameIDs[gameID];
+                Utils.flashWindowIfNotFocused("User Joined Game");
+                UserStore.emitChange();
+              }
+            }, SiteConstants.VALUES.HIGHLIGHT_FLASH_TIMEOUT * 1000);
+          }
+        }
+      }
+      else {
+        //If we joined someone else's game and are not joined any longer but the game is still open, alert
+        if(prevGameIfOpen !== null && Utils.isUserJoined(prevGameIfOpen,username) && !Utils.isUserJoined(metadata,username)) {
+          //Unless we initiated the leave, in which case clear the fact that we did
+          if(gameID in gamesWeAreLeaving)
+            delete gamesWeAreLeaving[gameID];
+          else {
+            UserStore.emitPopupMessage("Request to play was declined by other player, or timed out.");
+            Utils.flashWindowIfNotFocused("Play Game Declined");
+          }
+        }
+      }
+    }
+
+    //Game we joined became an active game
+    if(prevGameIfOpen !== null && metadata.activeGameData !== undefined && Utils.isUserJoined(metadata,username)) {
+      //TODO this doesn't quite work, it gets blocked a lot, maybe we just let the user click on the button...?
+      var newWindow = window.open("/game/" + gameID);
+      newWindow.focus();
+    }
+
+
+    //If this is the first time we've seen this game, and we're joined to the game, record it so
+    //that we can report the event
+    if(prevGame === null) {
+      if(Utils.isUserJoined(metadata,username))
+        UserStore.emitNewOpenJoinedGame(gameID);
+    }
+  },
+
+  leavingGame: function(gameID) {
+    var now = Utils.currentTimeSeconds();
+    gamesWeAreLeaving[gameID] = now;
+    //Give it 30 seconds, if after then we haven't seen us leave the game but then we see a leave afterwards, assume we didn't initiate the leave
+    setTimeout(function () {if(gamesWeAreLeaving[gameID] == now) delete gamesWeAreLeaving[gameID];}, 30000);
   },
 
   dispatcherIndex: ArimaaDispatcher.register(function(action) {
@@ -139,7 +239,7 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
     case SiteConstants.ACTIONS.LOGOUT_FAILED:
     case SiteConstants.ACTIONS.FORGOT_PASSWORD_FAILED:
     case SiteConstants.ACTIONS.RESET_PASSWORD_FAILED:
-    case SiteConstants.ACTIONS.GAMES_LIST_FAILED:
+    case SiteConstants.ACTIONS.GAMEROOM_UPDATE_FAILED:
     case SiteConstants.ACTIONS.CREATE_GAME_FAILED:
       messageText = "";
       errorText = action.reason;
@@ -157,53 +257,43 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
       errorText = "";
       UserStore.emitChange();
       break;
+    case SiteConstants.ACTIONS.USERS_LOGGED_IN_LIST:
+      errorText = "";
+      usersLoggedIn = action.data.users;
+      UserStore.emitChange();
+      break;
     case SiteConstants.ACTIONS.OPEN_GAMES_LIST:
       errorText = "";
-      var oldOpenGames = openGames;
-      var username = UserStore.getUsername();
-      openGames = {};
-      ownOpenGames = {};
-      joinableOpenGames = {};
-      watchableOpenGames = {};
-      var newOpenJoinedGames = [];
+      var newListIDs = {};
       action.metadatas.forEach(function(metadata){
         //Keep the highest sequence number
-        if(metadata.gameID in oldOpenGames && oldOpenGames[metadata.gameID].sequence > metadata.sequence)
-          metadata = oldOpenGames[metadata.gameID];
-
-        UserStore.addGame(metadata);
-
-        //If this is the first time we've seen this game, and we're joined to the game, record it so
-        //that we can report the event
-        if(!(metadata.gameID in oldOpenGames)) {
-          var joined = false;
-          for(var j = 0; j<metadata.openGameData.joined.length; j++) {
-            if(metadata.openGameData.joined[j].name == username) {
-              joined = true; break;
-            }
-          }
-          if(joined)
-            newOpenJoinedGames.push(metadata);
-        }
+        if(!(metadata.gameID in openGames && openGames[metadata.gameID].sequence > metadata.sequence))
+          UserStore.addGame(metadata);
+        newListIDs[metadata.gameID] = true;
       });
-      UserStore.emitChange();
-      for(var i = 0; i < newOpenJoinedGames.length; i++) {
-        UserStore.emitNewOpenJoinedGame(newOpenJoinedGames[i].gameID);
+
+      //Filter out any stale open games
+      for(var gameID in openGames) {
+        if(!(gameID in newListIDs))
+          UserStore.removeGame(gameID);
       }
+      UserStore.emitChange();
       break;
     case SiteConstants.ACTIONS.ACTIVE_GAMES_LIST:
       errorText = "";
-      var oldActiveGames = activeGames;
-      activeGames = {};
-      ownActiveGames = {};
-      watchableActiveGames = {};
+      var newListIDs = {};
       action.metadatas.forEach(function(metadata){
         //Keep the highest sequence number
-        if(metadata.gameID in oldActiveGames && oldActiveGames[metadata.gameID].sequence > metadata.sequence)
-          metadata = oldActiveGames[metadata.gameID];
-
-        UserStore.addGame(metadata);
+        if(!(metadata.gameID in activeGames && activeGames[metadata.gameID].sequence > metadata.sequence))
+          UserStore.addGame(metadata);
+        newListIDs[metadata.gameID] = true;
       });
+
+      //Filter out any stale active games
+      for(var gameID in activeGames) {
+        if(!(gameID in newListIDs))
+          UserStore.removeGame(gameID);
+      }
       UserStore.emitChange();
       break;
     case SiteConstants.ACTIONS.GAME_METADATA_UPDATE:
@@ -214,7 +304,6 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
       else if(metadata.gameID in activeGames && activeGames[metadata.gameID].sequence > metadata.sequence)
         break;
 
-      UserStore.removeGame(metadata.gameID);
       UserStore.addGame(metadata);
       UserStore.emitChange();
       break;
@@ -223,16 +312,16 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
       UserStore.removeGame(gameID);
       UserStore.emitChange();
       break;
-    case SiteConstants.ACTIONS.PLAYER_JOINED:
-      var players = action.players; //TODO do something with this...
-      UserStore.emitChange();
-      break;
     case SiteConstants.ACTIONS.GAME_JOINED:
       joinedGameAuths[action.gameID] = action.gameAuth;
       UserStore.emitChange();
       break;
     case SiteConstants.ACTIONS.HEARTBEAT_FAILED:
       delete joinedGameAuths[action.gameID];
+      UserStore.emitChange();
+      break;
+    case SiteConstants.ACTIONS.LEAVING_GAME:
+      UserStore.leavingGame(action.gameID);
       UserStore.emitChange();
       break;
     case SiteConstants.ACTIONS.LEAVE_GAME_SUCCESS:

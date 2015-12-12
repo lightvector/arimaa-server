@@ -1,27 +1,36 @@
 var React = require('react');
 var ReactDOM = require('react-dom');
 var Modal = require('react-modal');
-// var Modal = require('react-bootstrap/lib/Modal');
+var ClassNames = require('classnames');
 var SiteActions = require('../actions/SiteActions.js');
 var UserStore = require('../stores/UserStore.js');
 var Utils = require('../utils/Utils.js');
 var CreateGameDialog = require('../components/createGameDialog.js');
+var InfoDialog = require('../components/infoDialog.js');
 var Chat = require('../components/chat.js');
 
 var component = React.createClass({
   getInitialState: function() {
     return {message: "", error:"",
             ownGames:[], joinableOpenGames:[], watchableGames:[], selectedPlayers:{},
-            createGameDialogOpen:false};
+            usersLoggedIn:[],
+            recentHighlightGameIDs:{},
+            createGameDialogOpen:false,
+            popupMessage:"",
+            popupMessageOpen:false};
   },
 
   componentDidMount: function() {
     UserStore.addChangeListener(this.onUserStoreChange);
+    UserStore.addPopupMessageListener(this.onPopupMessage);
+    SiteActions.beginLoginCheckLoop();
+    SiteActions.beginUsersLoggedInLoop();
     SiteActions.beginOpenGamesLoop();
     SiteActions.beginActiveGamesLoop();
   },
   componentWillUnmount: function() {
     UserStore.removeChangeListener(this.onUserStoreChange);
+    UserStore.removePopupMessageListener(this.onPopupMessage);
   },
 
   onUserStoreChange: function() {
@@ -29,7 +38,16 @@ var component = React.createClass({
     this.setState({
       ownGames:UserStore.getOwnGames(),
       joinableOpenGames:UserStore.getJoinableOpenGames(),
-      watchableGames:UserStore.getWatchableGames()
+      watchableGames:UserStore.getWatchableGames(),
+      recentHighlightGameIDs:UserStore.getRecentHighlightGames(),
+      usersLoggedIn:UserStore.getUsersLoggedIn()
+    });
+  },
+
+  onPopupMessage: function(message) {
+    this.setState({
+      popupMessage:message,
+      popupMessageOpen:true
     });
   },
 
@@ -72,10 +90,21 @@ var component = React.createClass({
   closeCreateDialog: function() {
     this.setState({createGameDialogOpen:false});
   },
+  closePopupMessage: function() {
+    this.setState({popupMessageOpen:false});
+  },
 
   handleCreateGameSubmitted: function(opts) {
     this.setState({createGameDialogOpen:false});
     SiteActions.createGame(opts);
+  },
+  handleCreateGameCancelled: function(opts) {
+    this.setState({createGameDialogOpen:false});
+    SiteActions.createGame(opts);
+  },
+
+  handlePopupOk: function(opts) {
+    this.setState({popupMessageOpen:false});
   },
 
   gameTitle: function(metadata) {
@@ -228,7 +257,7 @@ var component = React.createClass({
     }
     if(metadata.activeGameData !== undefined) {
       if(metadata.gUser.name == username || metadata.sUser.name == username)
-        gameButton.push(React.createElement("button", {key: "gameButton_"+metadata.gameID, onClick: this.gameButtonClicked.bind(this,metadata.gameID)}, "Rejoin Game"));
+        gameButton.push(React.createElement("button", {key: "gameButton_"+metadata.gameID, onClick: this.gameButtonClicked.bind(this,metadata.gameID)}, "Go to Game"));
       else
         gameButton.push(React.createElement("button", {key: "gameButton_"+metadata.gameID, onClick: this.gameButtonClicked.bind(this,metadata.gameID)}, "Watch Game"));
     }
@@ -243,27 +272,49 @@ var component = React.createClass({
     if(gameButton.length > 0)
       elts.push(React.createElement("div", {key: "gameButtonDiv_"+metadata.gameID},gameButton));
 
-    return React.createElement("div", {key: "main_"+metadata.gameID}, elts);
+    var classes = ClassNames({
+      "gameroomGameElt": true,
+      "quickHighlight": metadata.gameID in this.state.recentHighlightGameIDs
+    });
+
+    return React.createElement("div", {key: "main_"+metadata.gameID, className:classes}, elts);
+  },
+
+  renderUser: function(userInfo) {
+    return React.createElement("div", {key: "users_"+userInfo.name}, userInfo.name);
   },
 
   render: function() {
     var that = this;
     var username = UserStore.getUsername();
 
-    // var createModal = (
-    //     <Modal show={this.state.createGameDialogOpen} onHide={this.closeCreateDialog}>
-    //     <CreateGameDialog handleSubmitted={this.handleCreateGameSubmittedonRequestClose}/>
-    //     </Modal>
-    // );
     var createModal = (
         <Modal isOpen={this.state.createGameDialogOpen} onRequestClose={this.closeCreateDialog}>
-        <CreateGameDialog handleSubmitted={this.handleCreateGameSubmitted}/>
+        <CreateGameDialog handleSubmitted={this.handleCreateGameSubmitted} handleCancelled={this.handleCreateGameCancelled}/>
+        </Modal>
+    );
+
+    var popupModalStyle = {
+      content: { width: "500px", height:"120px"}
+    };
+    var popupModal = (
+        <Modal isOpen={this.state.popupMessageOpen} onRequestClose={this.closePopupMessage} style={popupModalStyle}>
+        <InfoDialog message={this.state.popupMessage} handleOk={this.handlePopupOk}/>
         </Modal>
     );
 
     var errorDiv = "";
     if(this.state.error != "") {
-      errorDiv = React.createElement("div", {className:"error"}, this.state.error);
+      errorDiv = React.createElement("div", {key: "errorDiv", className:"error"}, this.state.error);
+    }
+
+    var usersDiv = "";
+    {
+      var usersList = this.state.usersLoggedIn.map(function(user) {
+        return that.renderUser(user);
+      });
+      usersList.unshift(React.createElement("h4", {key: "usersLoggedInLabel"}, "Users Logged In:"));
+      usersDiv = React.createElement("div", {key: "usersDiv", className:"gameroomUsersDiv"}, usersList);
     }
 
     var ownGamesDiv = "";
@@ -273,28 +324,28 @@ var component = React.createClass({
       });
 
       ownGamesList.unshift(React.createElement("button", {key: "createGameButton", onClick: this.createButtonClicked}, "Create New Game"));
-      ownGamesList.unshift(React.createElement("h3", {}, "My Current Games"));
+      ownGamesList.unshift(React.createElement("h3", {key: "myCurrentGamesLabel"}, "My Current Games"));
       ownGamesDiv = React.createElement("div", {key: "ownDiv"}, ownGamesList);
     }
 
-    joinableOpenGamesDiv = "";
+    var joinableOpenGamesDiv = "";
     {
       var joinableOpenGamesList = this.state.joinableOpenGames.map(function(metadata) {
         return that.renderGame(metadata);
       });
 
-      joinableOpenGamesList.unshift(React.createElement("h3", {}, "Open Games"));
+      joinableOpenGamesList.unshift(React.createElement("h3", {key: "openGamesLabel"}, "Open Games"));
       joinableOpenGamesDiv = React.createElement("div", {key: "joinableOpenDiv"}, joinableOpenGamesList);
     }
 
 
-    watchableGamesDiv = "";
+    var watchableGamesDiv = "";
     {
       var watchableGamesList = this.state.watchableGames.map(function(metadata) {
         return that.renderGame(metadata);
       });
 
-      watchableGamesList.unshift(React.createElement("h3", {}, "Active Games"));
+      watchableGamesList.unshift(React.createElement("h3", {key: "activeGamesLabel"}, "Active Games"));
       watchableGamesDiv = React.createElement("div", {key: "watchableDiv"}, watchableGamesList);
     }
 
@@ -304,17 +355,18 @@ var component = React.createClass({
 
 
     var contents = [
-      React.createElement("h2", {}, "Arimaa Gameroom"),
+      React.createElement("h1", {key:"gameroomTitle"}, "Arimaa Gameroom"),
       createModal,
+      popupModal,
       errorDiv,
+      usersDiv,
       ownGamesDiv,
       joinableOpenGamesDiv,
       watchableGamesDiv,
       chat
     ];
 
-    //TODO weird classname?
-    return React.createElement("div", {className: "commentBox"}, contents);
+    return React.createElement("div", {key:"gameroomContents", className: "gameroom"}, contents);
 
   }
 

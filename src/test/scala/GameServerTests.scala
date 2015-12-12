@@ -37,13 +37,14 @@ class GameServletTests(_system: ActorSystem) extends TestKit(_system) with Scala
   val smtpPort = ""//config.getString("smtpPort")
   val smtpAuth = config.getBoolean("smtpAuth")
   val noReplyAddress = config.getString("noReplyAddress")
+  val helpAddress = config.getString("helpAddress")
 
   val actorSystem = system
   val mainEC: ExecutionContext = ExecutionContext.Implicits.global
   val cryptEC: ExecutionContext = mainEC
   val serverInstanceID: Long = System.currentTimeMillis
   val db = ArimaaServerInit.createDB("h2memgame")
-  val emailer = new Emailer(siteName,siteAddress,smtpHost,smtpPort,smtpAuth,noReplyAddress)(mainEC)
+  val emailer = new Emailer(siteName,siteAddress,smtpHost,smtpPort,smtpAuth,noReplyAddress,helpAddress)(mainEC)
   val accounts = new Accounts(db)(mainEC)
   val siteLogin = new SiteLogin(accounts,emailer,cryptEC)(mainEC)
   val scheduler = actorSystem.scheduler
@@ -97,7 +98,7 @@ class GameServletTests(_system: ActorSystem) extends TestKit(_system) with Scala
       state.history.length should equal (0)
       state.moveTimes.length should equal (0)
       state.toMove should equal ("g")
-      state.meta.id should equal (gameID)
+      state.meta.gameID should equal (gameID)
       state.meta.numPly should equal (0)
       state.meta.startTime should equal (None)
       state.meta.gUser should equal (None)
@@ -111,8 +112,8 @@ class GameServletTests(_system: ActorSystem) extends TestKit(_system) with Scala
       state.meta.openGameData.get.joined should equal (List(IOTypes.ShortUserInfo("Bob")))
       state.meta.activeGameData should equal (None)
       state.meta.result should equal (None)
-      state.sequence.exists(_ > sequence) should equal (true)
-      sequence = state.sequence.get
+      state.meta.sequence.exists(_ > sequence) should equal (true)
+      sequence = state.meta.sequence.get
     }
   }
 
@@ -130,7 +131,7 @@ class GameServletTests(_system: ActorSystem) extends TestKit(_system) with Scala
       state.history.length should equal (0)
       state.moveTimes.length should equal (0)
       state.toMove should equal ("g")
-      state.meta.id should equal (gameID)
+      state.meta.gameID should equal (gameID)
       state.meta.numPly should equal (0)
       state.meta.startTime should equal (None)
       state.meta.gUser should equal (None)
@@ -145,8 +146,8 @@ class GameServletTests(_system: ActorSystem) extends TestKit(_system) with Scala
       state.meta.openGameData.get.joined should equal (List(IOTypes.ShortUserInfo("Alice"),IOTypes.ShortUserInfo("Bob")))
       state.meta.activeGameData should equal (None)
       state.meta.result should equal (None)
-      state.sequence.exists(_ > sequence) should equal (true)
-      sequence = state.sequence.get
+      state.meta.sequence.exists(_ > sequence) should equal (true)
+      sequence = state.meta.sequence.get
     }
   }
 
@@ -166,7 +167,7 @@ class GameServletTests(_system: ActorSystem) extends TestKit(_system) with Scala
       state.history.length should equal (0)
       state.moveTimes.length should equal (0)
       state.toMove should equal ("g")
-      state.meta.id should equal (gameID)
+      state.meta.gameID should equal (gameID)
       state.meta.numPly should equal (0)
       state.meta.startTime.nonEmpty should equal (true)
       state.meta.gUser.exists(user => user.name == "Alice" || user.name == "Bob") should equal (true)
@@ -183,8 +184,8 @@ class GameServletTests(_system: ActorSystem) extends TestKit(_system) with Scala
       state.meta.activeGameData.get.gPresent should equal (true)
       state.meta.activeGameData.get.sPresent should equal (true)
       state.meta.result should equal (None)
-      state.sequence.exists(_ > sequence) should equal (true)
-      sequence = state.sequence.get
+      state.meta.sequence.exists(_ > sequence) should equal (true)
+      sequence = state.meta.sequence.get
       bobPlayer = if(state.meta.gUser == Some(IOTypes.ShortUserInfo("Bob"))) GOLD else SILV
     }
   }
@@ -201,7 +202,7 @@ class GameServletTests(_system: ActorSystem) extends TestKit(_system) with Scala
       state.history.length should equal (0)
       state.moveTimes.length should equal (0)
       state.toMove should equal ("g")
-      state.meta.id should equal (gameID)
+      state.meta.gameID should equal (gameID)
       state.meta.numPly should equal (0)
       state.meta.startTime.nonEmpty should equal (true)
       state.meta.gUser.exists(user => user.name == "Alice" || user.name == "Bob") should equal (true)
@@ -216,7 +217,7 @@ class GameServletTests(_system: ActorSystem) extends TestKit(_system) with Scala
       state.meta.result.nonEmpty should equal (true)
       state.meta.result.get.winner should equal (bobPlayer.flip.toString)
       state.meta.result.get.reason should equal ("r")
-      state.sequence should equal (None)
+      state.meta.sequence should equal (None)
     }
   }
 
@@ -344,7 +345,7 @@ class GameServletTests(_system: ActorSystem) extends TestKit(_system) with Scala
       state.history.length should equal (88)
       state.moveTimes.length should equal (88)
       state.toMove should equal ("g")
-      state.meta.id should equal (gameID)
+      state.meta.gameID should equal (gameID)
       state.meta.numPly should equal (88)
       state.meta.startTime.nonEmpty should equal (true)
       state.meta.gUser.exists(user => user.name == "Alice") should equal (true)
@@ -360,7 +361,7 @@ class GameServletTests(_system: ActorSystem) extends TestKit(_system) with Scala
       state.meta.result.get.winner should equal ("s")
       state.meta.result.get.reason should equal ("g")
       state.meta.position should equal ("......../..c..c../.Hr...../r.D.rrrr/R.dE..dR/R..e..R./..h.CR../rC......")
-      state.sequence should equal (None)
+      state.meta.sequence should equal (None)
     }
   }
 

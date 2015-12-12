@@ -119,3 +119,25 @@ h1 {
   }
 
 }
+
+.gameroom {
+  div.error {
+    font-size: 150%;
+    font-weight: bold;
+    color:red;
+  }
+}
+
+.gameroomGameElt.quickHighlight {
+  background: orange;
+  transition:background 0s;
+}
+
+.gameroomGameElt {
+  background: $body-bg;
+  transition:background 2s;
+}
+
+.gameroomUsersDiv {
+  float:right
+}

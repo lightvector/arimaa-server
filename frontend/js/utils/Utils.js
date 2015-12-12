@@ -1,5 +1,6 @@
 
 //Some miscellaneous useful functions
+var inMiddleOfFlash = false;
 
 //Convert number of seconds into time span string
 var Utils = {
@@ -95,7 +96,50 @@ var Utils = {
       return prefix + hstr + ":" + mstr + ":" + sstr;
 
     return prefix + mstr + ":" + sstr;
+  },
+
+  timeToHHMMSS: function(time) {
+    var date = new Date(time*1000);
+    var hours = date.getHours();
+    var minutes = "0" + date.getMinutes();
+    var seconds = "0" + date.getSeconds();
+    var formattedTime = hours + ':' + minutes.substr(-2) + ':' + seconds.substr(-2);
+    return formattedTime;
+  },
+
+  //Given a game metadata, check if the specified user has joined that game
+  isUserJoined: function(metadata, username) {
+    if(metadata.openGameData !== undefined) {
+      for(var j = 0; j<metadata.openGameData.joined.length; j++) {
+        if(metadata.openGameData.joined[j].name == username) {
+          return true;
+        }
+      }
+    }
+    if(metadata.activeGameData !== undefined) {
+      if(metadata.gUser.name == username && metadata.activeGameData.gPresent)
+        return true;
+      if(metadata.sUser.name == username && metadata.activeGameData.sPresent)
+        return true;
+    }
+    return false;
+  },
+
+  flashWindowIfNotFocused: function(reasonTitle) {
+    var title = document.title;
+    if(!document.hasFocus() && !inMiddleOfFlash) {
+      inMiddleOfFlash = true;
+      document.title = reasonTitle + " - playarimaa.org";
+      setTimeout(function() {
+        document.title = title;
+        inMiddleOfFlash = false;
+        setTimeout(function() {
+          Utils.flashWindowIfNotFocused(reasonTitle);
+        }, 3000);
+      }, 3000);
+    }
   }
+
 };
 
 module.exports = Utils;

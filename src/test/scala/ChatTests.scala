@@ -35,6 +35,7 @@ class ChatServletTests(_system: ActorSystem) extends TestKit(_system) with Scala
   val smtpPort = ""//config.getString("smtpPort")
   val smtpAuth = config.getBoolean("smtpAuth")
   val noReplyAddress = config.getString("noReplyAddress")
+  val helpAddress = config.getString("helpAddress")
 
   val actorSystem = system
   val mainEC: ExecutionContext = ExecutionContext.Implicits.global
@@ -42,7 +43,7 @@ class ChatServletTests(_system: ActorSystem) extends TestKit(_system) with Scala
   val actorEC: ExecutionContext = actorSystem.dispatcher
   val serverInstanceID: Long = System.currentTimeMillis
   val db = ArimaaServerInit.createDB("h2memchat")
-  val emailer = new Emailer(siteName,siteAddress,smtpHost,smtpPort,smtpAuth,noReplyAddress)(mainEC)
+  val emailer = new Emailer(siteName,siteAddress,smtpHost,smtpPort,smtpAuth,noReplyAddress,helpAddress)(mainEC)
   val accounts = new Accounts(db)(mainEC)
   val siteLogin = new SiteLogin(accounts,emailer,cryptEC)(mainEC)
   val scheduler = actorSystem.scheduler

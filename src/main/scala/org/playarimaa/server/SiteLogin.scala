@@ -10,8 +10,9 @@ import org.playarimaa.server.Timestamp.Timestamp
 object SiteLogin {
 
   object Constants {
-    val INACTIVITY_TIMEOUT: Double = 3600 * 24 * 2 //2 days
+    val INACTIVITY_TIMEOUT: Double = 300 //5 minutes
     val PASSWORD_RESET_TIMEOUT: Double = 1800 //30 minutes
+    val EMAIL_CHANGE_TIMEOUT: Double = 84600 //1 day
 
     val USERNAME_MIN_LENGTH: Int = 3
     val USERNAME_MAX_LENGTH: Int = 24
@@ -46,7 +47,7 @@ object SiteLogin {
   }
 }
 
-case class PasswordReset(auth: Auth, time: Timestamp)
+case class AuthTime(auth: Auth, time: Timestamp)
 
 import SiteLogin.Constants._
 
@@ -54,8 +55,23 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
 
   val logins: LoginTracker = new LoginTracker(None,INACTIVITY_TIMEOUT)
 
-  var passResets: Map[Username,PasswordReset] = Map()
+  var passResets: Map[Username,AuthTime] = Map()
   val passResetLock = new Object()
+
+  var emailChanges: Map[Username,(AuthTime,Email)] = Map()
+  val emailChangeLock = new Object()
+
+  def validateUsername(username: Username): Unit = {
+    if(username.length < USERNAME_MIN_LENGTH || username.length > USERNAME_MAX_LENGTH)
+      throw new IllegalArgumentException(USERNAME_LENGTH_ERROR)
+    if(!username.forall(USERNAME_CHARS.contains(_)))
+      throw new IllegalArgumentException(USERNAME_CHAR_ERROR)
+    if(!USERNAME_FIRST_CHARS.contains(username(0)))
+      throw new IllegalArgumentException(USERNAME_FIRST_CHAR_ERROR)
+    val lowercaseName = username.toLowerCase
+    if(INVALID_USERNAMES.exists(_ == lowercaseName))
+      throw new IllegalArgumentException(INVALID_USERNAME_ERROR)
+  }
 
   def validateEmail(email: Email): Unit = {
     if(!email.contains('@'))
@@ -69,28 +85,33 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
       throw new IllegalArgumentException(PASSWORD_LENGTH_ERROR)
   }
 
+  def doTimeouts(now: Timestamp): Unit = {
+    val usersTimedOut = logins.doTimeouts(now)
+    usersTimedOut.foreach { user =>
+      accounts.removeGuest(user)
+    }
+  }
+
+  def usersLoggedIn: Set[Username] = {
+    val now = Timestamp.get
+    doTimeouts(now)
+    logins.usersLoggedIn
+  }
+
   //TODO throttle registrations somehow?
   def register(username: Username, email: Email, password: String, isBot: Boolean): Future[(Username,SiteAuth)] = {
     Future.successful(()).flatMap { case () =>
-      if(username.length < USERNAME_MIN_LENGTH || username.length > USERNAME_MAX_LENGTH)
-        throw new IllegalArgumentException(USERNAME_LENGTH_ERROR)
-      if(!username.forall(USERNAME_CHARS.contains(_)))
-        throw new IllegalArgumentException(USERNAME_CHAR_ERROR)
-      if(!USERNAME_FIRST_CHARS.contains(username(0)))
-        throw new IllegalArgumentException(USERNAME_FIRST_CHAR_ERROR)
+      validateUsername(username)
       validateEmail(email)
       validatePassword(password)
 
       val lowercaseName = username.toLowerCase
-      if(INVALID_USERNAMES.exists(_ == lowercaseName))
-        throw new IllegalArgumentException(INVALID_USERNAME_ERROR)
-
       Future(BCrypt.hashpw(password, BCrypt.gensalt))(cryptEC).flatMap { passwordHash =>
         val now = Timestamp.get
         val createdTime = now
-        val account = Account(lowercaseName,username,email,passwordHash,isBot,createdTime)
+        val account = Account(lowercaseName,username,email,passwordHash,isBot,createdTime,isGuest=false)
         accounts.add(account).recover { case _ => throw new Exception(INVALID_USERNAME_ERROR) }.map { case () =>
-          logins.doTimeouts(now)
+          doTimeouts(now)
           val siteAuth = logins.login(account.username, now)
           (account.username,siteAuth)
         }
@@ -100,28 +121,58 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
 
   //TODO throttle login attempt rate
   def login(usernameOrEmail: String, password: String): Future[(Username,SiteAuth)] = {
-    accounts.getByNameOrEmail(usernameOrEmail).flatMap { account =>
+    accounts.getNonGuestByNameOrEmail(usernameOrEmail).flatMap { accounts =>
       def fail = throw new IllegalArgumentException("Invalid username/email and password combination.")
-      account match {
-        //Note: the quick failure here means that we're vulnerable to a time-measuring attack if we wanted
-        //to keep the existence of accounts anonymous.
-        case None => fail
-        case Some(account) =>
-          Future(BCrypt.checkpw(password, account.passwordHash))(cryptEC).map { success =>
-            if(!success)
-              fail
+
+      //Note: with this implementation, we would be vulnerable to a time-measuring attack if we wanted
+      //to keep the existence of accounts anonymous.
+      val accountMatched: List[Future[(Account,Boolean)]] = accounts.map { account =>
+        Future(BCrypt.checkpw(password, account.passwordHash))(cryptEC).map { success => (account,success) }
+      }
+      Future.sequence(accountMatched).recover { case _ =>
+        //TODO log this error
+        fail
+      }.map { accountMatched =>
+        val matchingAccounts = accountMatched.flatMap { case (account,matched) =>
+          if(matched) Some(account) else None
+        }
+        matchingAccounts match {
+          //0 matches
+          case Nil => fail
+          //1 match
+          case account :: Nil =>
             val now = Timestamp.get
-            logins.doTimeouts(now)
+            doTimeouts(now)
             val siteAuth = logins.login(account.username, now)
             (account.username,siteAuth)
-          }
+          //more matches
+          case _ =>
+            val users = matchingAccounts.map(_.username)
+            throw new Exception("Multiple users with that email/password combination: " + users.mkString(" "))
+        }
+      }
+    }
+  }
+
+  def loginGuest(username: Username): Future[(Username,SiteAuth)] = {
+    Future.successful(()).flatMap { case () =>
+      validateUsername(username)
+
+      val lowercaseName = username.toLowerCase
+      val now = Timestamp.get
+      val createdTime = now
+      val account = Account(lowercaseName,username,email="",passwordHash="N/A",isBot=false,createdTime,isGuest=true)
+      accounts.add(account).recover { case _ => throw new Exception(INVALID_USERNAME_ERROR) }.map { case () =>
+        doTimeouts(now)
+        val siteAuth = logins.login(account.username, now)
+        (account.username,siteAuth)
       }
     }
   }
 
   def requiringLogin[T](siteAuth: SiteAuth)(f:Username => T) : Try[T] = {
     val now = Timestamp.get
-    logins.doTimeouts(now)
+    doTimeouts(now)
     logins.heartbeatAuth(siteAuth,now) match {
       case None => Failure(new Exception(NO_LOGIN_MESSAGE))
       case Some(username) => Success(f(username))
@@ -130,62 +181,75 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
 
   def logout(siteAuth: SiteAuth) : Try[Unit] = {
     requiringLogin(siteAuth) { _ =>
-      logins.logoutAuth(siteAuth,Timestamp.get)
+      val now = Timestamp.get
+      logins.userOfAuth(siteAuth) match {
+        case None =>
+          logins.logoutAuth(siteAuth,now)
+        case Some(username) =>
+          if(accounts.isGuest(username)) {
+            logins.logoutUser(username,now)
+            accounts.removeGuest(username)
+          }
+          else
+            logins.logoutAuth(siteAuth,now)
+      }
     }
   }
 
   def isAuthLoggedIn(siteAuth: SiteAuth) : Boolean = {
     val now = Timestamp.get
-    logins.doTimeouts(now)
+    doTimeouts(now)
     logins.isAuthLoggedIn(siteAuth)
   }
 
   def forgotPassword(usernameOrEmail: Username) : Unit = {
     //Spawn off a job to find the user's account if it exists and send the email and don't wait for it
-    accounts.getByNameOrEmail(usernameOrEmail).onComplete { result =>
+    accounts.getNonGuestByNameOrEmail(usernameOrEmail).onComplete { result =>
       result match {
         case Failure(_) =>
           //TODO log the failure
           ()
-        case Success(None) =>
+        case Success(Nil) =>
           //Looks email-like?
           if(usernameOrEmail.contains('@'))
             emailer.sendPasswordResetNoAccount(usernameOrEmail)
-        case Success(Some(account)) =>
-          val auth = RandGen.genAuth
-          passResetLock.synchronized {
-            val now = Timestamp.get
-            //Filter all reset tokens that are too old
-            passResets = passResets.filter { case (user,resetInfo) =>
-              now - resetInfo.time < PASSWORD_RESET_TIMEOUT
+        case Success(results) =>
+          results.foreach { account =>
+            val auth = RandGen.genAuth
+            passResetLock.synchronized {
+              val now = Timestamp.get
+              //Filter all reset tokens that are too old
+              passResets = passResets.filter { case (user,authTime) =>
+                now - authTime.time < PASSWORD_RESET_TIMEOUT
+              }
+              //Add the new reset key
+              passResets = passResets + (account.username -> AuthTime(auth, Timestamp.get))
             }
-            //Add the new reset key
-            passResets = passResets + (account.username -> PasswordReset(auth, Timestamp.get))
+            //Send email to user advising about reset
+            emailer.sendPasswordResetRequest(account.email,account.username,auth)
           }
-          //Send email to user advising about reset
-          emailer.sendPasswordResetRequest(account.email,account.username,auth)
       }
     }
   }
 
   def resetPassword(usernameOrEmail: Username, resetAuth: Auth, password: String) : Future[Unit] = {
     validatePassword(password)
-    accounts.getByNameOrEmail(usernameOrEmail).flatMap { account =>
+    accounts.getNonGuestByNameOrEmail(usernameOrEmail).flatMap { matchingAccounts =>
       def fail = throw new IllegalArgumentException("Unknown username/email.")
-      account match {
-        case None => fail
-        case Some(account) =>
-          val resetInfo = passResetLock.synchronized { passResets.get(account.username) }
+      matchingAccounts match {
+        case Nil => fail
+        case account :: Nil =>
+          val authTime = passResetLock.synchronized { passResets.get(account.username) }
           val now = Timestamp.get
           def expired = throw new Exception("Password was NOT reset - forgotten password request expired. Please try requesting again.")
-          resetInfo match {
+          authTime match {
             case None => expired
-            case Some(resetInfo) =>
-              if(now - resetInfo.time >= PASSWORD_RESET_TIMEOUT || resetAuth != resetInfo.auth)
+            case Some(authTime) =>
+              if(now - authTime.time >= PASSWORD_RESET_TIMEOUT || resetAuth != authTime.auth)
                 expired
               //Expire all reset tokens for this user
               passResetLock.synchronized {
-                passResets = passResets.filter { case (user,resetInfo) =>
+                passResets = passResets.filter { case (user,authTime) =>
                   user != account.username
                 }
               }
@@ -193,6 +257,99 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
                 accounts.setPasswordHash(account.username,passwordHash)
               }
           }
+        case _ =>
+          val users = matchingAccounts.map(_.username)
+          throw new Exception("Multiple users with that email/password combination: " + users.mkString(" "))
+      }
+    }
+  }
+
+
+  def changePassword(username: Username, password: String, siteAuth: SiteAuth, newPassword: String) : Future[Unit] = {
+    Future.successful(()).flatMap { case () =>
+      validatePassword(newPassword)
+      requiringLogin(siteAuth) { uname =>
+        accounts.getNonGuestByName(username).flatMap { result =>
+          result match {
+            case None => throw new IllegalArgumentException("Unknown username.")
+            case Some(account) =>
+              if(uname != account.username)
+                throw new Exception("Username does not match login.")
+
+              Future(BCrypt.checkpw(password, account.passwordHash))(cryptEC).flatMap { success =>
+                if(!success)
+                  throw new Exception("Old password did not match.")
+                Future(BCrypt.hashpw(newPassword, BCrypt.gensalt))(cryptEC).flatMap { passwordHash =>
+                  accounts.setPasswordHash(account.username,passwordHash)
+                }
+              }
+          }
+        }
+      }.get
+    }
+  }
+
+  def changeEmail(username: Username, password: String, siteAuth: SiteAuth, newEmail: Email) : Future[Unit] = {
+    Future.successful(()).flatMap { case () =>
+      validateEmail(newEmail)
+      requiringLogin(siteAuth) { uname =>
+        accounts.getNonGuestByName(username).flatMap { result =>
+          result match {
+            case None => throw new IllegalArgumentException("Unknown username.")
+            case Some(account) =>
+              if(uname != account.username)
+                throw new Exception("Username does not match login.")
+              if(newEmail == account.email)
+                throw new Exception("New email is the same as the old email.")
+
+              Future(BCrypt.checkpw(password, account.passwordHash))(cryptEC).flatMap { success =>
+                if(!success)
+                  throw new Exception("Password did not match.")
+                val auth = RandGen.genAuth
+                emailChangeLock.synchronized {
+                  val now = Timestamp.get
+                  //Filter all reset tokens that are too old
+                  emailChanges = emailChanges.filter { case (user,(authTime,_)) =>
+                    now - authTime.time < EMAIL_CHANGE_TIMEOUT
+                  }
+                  //Add the new reset key
+                  val value = (AuthTime(auth, Timestamp.get),newEmail)
+                  emailChanges = emailChanges + (account.username -> value)
+                }
+                //Send email to user advising about change
+                emailer.sendEmailChangeRequest(newEmail,account.username,auth,account.email)
+              }
+          }
+        }
+      }.get
+    }
+  }
+
+  def confirmChangeEmail(username: Username, changeAuth: SiteAuth) : Future[Unit] = {
+    Future.successful(()).flatMap { case () =>
+      accounts.getNonGuestByName(username).flatMap { result =>
+        result match {
+          case None => throw new IllegalArgumentException("Unknown username.")
+          case Some(account) =>
+
+            val authTimeAndNewEmail = emailChangeLock.synchronized { emailChanges.get(account.username) }
+            val now = Timestamp.get
+            def expired = throw new Exception("Email was NOT changed - request expired. Please try requesting again.")
+            authTimeAndNewEmail match {
+              case None => expired
+              case Some((authTime,newEmail)) =>
+                if(now - authTime.time >= EMAIL_CHANGE_TIMEOUT || changeAuth != authTime.auth)
+                  expired
+                //Expire all reset tokens for this user
+                emailChangeLock.synchronized {
+                  emailChanges = emailChanges.filter { case (user,(authTime,_)) =>
+                    user != account.username
+                  }
+                }
+                accounts.setEmail(account.username,newEmail)
+                emailer.sendOldEmailChangeNotification(account.email,account.username,newEmail)
+            }
+        }
       }
     }
   }
