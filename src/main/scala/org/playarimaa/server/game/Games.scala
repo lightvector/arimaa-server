@@ -1247,44 +1247,49 @@ class ActiveGame(
     else if(plyNum != meta.numPly)
       Failure(new Exception("Tried to make move for turn " + notation.turnString(plyNum) + " but current turn is " + notation.turnString(meta.numPly)))
     else {
-      game.parseAndMakeMove(moveStr, notation).flatMap { newGame =>
-        val now = Timestamp.get
-        val (clock,timeSpent) = clockAndSpent(now)
-        if(tryLoseByTime(clock,timeSpent,now))
-          Failure(new Exception("Game is over"))
-        else {
-          meta = meta.copy(
-            numPly = plyNum + 1,
-            result = meta.result.copy(endTime = now),
-            position = newGame.currentBoardString
-          )
-          moves = moves :+ MoveInfo(
-            gameID = meta.id,
-            ply = plyNum,
-            move = moveStr,
-            time = now,
-            start = moveStartTime
-          )
-          moveStartTime = now
-          clockBeforeTurn = clockBeforeTurn + (player -> clock)
-          game = newGame
+      //Special case for resign move
+      if(moveStr.toLowerCase == "resign" || moveStr.toLowerCase == "resigns")
+        resign(player)
+      else {
+        game.parseAndMakeMove(moveStr, notation).flatMap { newGame =>
+          val now = Timestamp.get
+          val (clock,timeSpent) = clockAndSpent(now)
+          if(tryLoseByTime(clock,timeSpent,now))
+            Failure(new Exception("Game is over"))
+          else {
+            meta = meta.copy(
+              numPly = plyNum + 1,
+              result = meta.result.copy(endTime = now),
+              position = newGame.currentBoardString
+            )
+            moves = moves :+ MoveInfo(
+              gameID = meta.id,
+              ply = plyNum,
+              move = moveStr,
+              time = now,
+              start = moveStartTime
+            )
+            moveStartTime = now
+            clockBeforeTurn = clockBeforeTurn + (player -> clock)
+            game = newGame
 
-          saveMetaToDB()
-          saveMovesToDB()
+            saveMetaToDB()
+            saveMovesToDB()
 
-          game.winner match {
-            case None => ()
-            case Some((winner,why)) =>
-              val reason = why match {
-                case Game.GOAL => EndingReason.GOAL
-                case Game.ELIMINATION => EndingReason.ELIMINATION
-                case Game.IMMOBILIZATION => EndingReason.IMMOBILIZATION
-              }
-              declareWinner(winner, reason, now)
+            game.winner match {
+              case None => ()
+              case Some((winner,why)) =>
+                val reason = why match {
+                  case Game.GOAL => EndingReason.GOAL
+                  case Game.ELIMINATION => EndingReason.ELIMINATION
+                  case Game.IMMOBILIZATION => EndingReason.IMMOBILIZATION
+                }
+                declareWinner(winner, reason, now)
+            }
+
+            scheduleNextTimeLossCheck(now)
+            Success(())
           }
-
-          scheduleNextTimeLossCheck(now)
-          Success(())
         }
       }
     }
