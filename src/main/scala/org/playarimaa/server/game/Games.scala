@@ -12,6 +12,7 @@ import org.playarimaa.server.Timestamp.Timestamp
 import org.playarimaa.server.RandGen
 import org.playarimaa.server.LoginTracker
 import org.playarimaa.server.Accounts
+import org.playarimaa.server.Rating
 import org.playarimaa.server.SimpleUserInfo
 import org.playarimaa.server.Utils._
 import org.playarimaa.board.{Player,GOLD,SILV}
@@ -1202,14 +1203,16 @@ class ActiveGame(
     saveMetaToDB()
 
     //Update statistics for players, but don't wait for the update
+    val loser = winner.flip
     Future {
-      accounts.updateGameStats(meta.users(winner).name) { stats =>
-        stats.copy(numGamesWon = stats.numGamesWon+1)
-      }.onFailure { case exn => logger.error("Error updating numGamesWon for " + meta.users(winner).name + " :" + exn) }
-      accounts.updateGameStats(meta.users(winner.flip).name) { stats =>
-        stats.copy(numGamesLost = stats.numGamesLost+1)
-      }.onFailure { case exn => logger.error("Error updating numGamesLost for " + meta.users(winner.flip).name + " :" + exn) }
-      //TODO update ratings here
+      accounts.updateGameStats2(meta.users(winner).name, meta.users(loser).name) { case (wStats,lStats) =>
+        val (newWRating,newLRating) = Rating.newRatings(wStats.rating,lStats.rating)
+        val newWStats = wStats.copy(numGamesWon = wStats.numGamesWon+1, rating = newWRating)
+        val newLStats = lStats.copy(numGamesLost = lStats.numGamesLost+1, rating = newLRating)
+        (newWStats,newLStats)
+      }.onFailure { case exn =>
+          logger.error("Error updating post-game stats for " + meta.users(winner).name + ", " +meta.users(loser).name  + " :" + exn)
+      }
     }
   }
 
@@ -1455,10 +1458,12 @@ class GameTable(tag: Tag) extends Table[GameMetadata](tag, "gameTable") {
   def startTime : Rep[Option[Timestamp]] = column[Option[Timestamp]]("startTime")
   def gUser : Rep[Username] = column[Username]("gUser")
   def gRating : Rep[Double] = column[Double]("gRating")
+  def gRatingStdev : Rep[Double] = column[Double]("gRatingStdev")
   def gIsBot : Rep[Boolean] = column[Boolean]("gIsBot")
   def gIsGuest : Rep[Boolean] = column[Boolean]("gIsGuest")
   def sUser : Rep[Username] = column[Username]("sUser")
   def sRating : Rep[Double] = column[Double]("sRating")
+  def sRatingStdev : Rep[Double] = column[Double]("sRatingStdev")
   def sIsBot : Rep[Boolean] = column[Boolean]("sIsBot")
   def sIsGuest : Rep[Boolean] = column[Boolean]("sIsGuest")
 
@@ -1509,8 +1514,8 @@ class GameTable(tag: Tag) extends Table[GameMetadata](tag, "gameTable") {
   def * : ProvenShape[GameMetadata] = (
     //Define database projection shape
     id,numPly,startTime,
-    (gUser,gRating,gIsBot,gIsGuest),
-    (sUser,sRating,sIsBot,sIsGuest),
+    (gUser,gRating,gRatingStdev,gIsBot,gIsGuest),
+    (sUser,sRating,sRatingStdev,sIsBot,sIsGuest),
     (gInitialTime,gIncrement,gDelay,gMaxReserve,gMaxMoveTime,gOvertimeAfter),
     (sInitialTime,sIncrement,sDelay,sMaxReserve,sMaxMoveTime,sOvertimeAfter),
     rated,postal,gameType,tags,
@@ -1529,8 +1534,8 @@ class GameTable(tag: Tag) extends Table[GameMetadata](tag, "gameTable") {
       serverInstanceID) =>
       GameMetadata(id,numPly,startTime,
         PlayerArray(
-          gold = (SimpleUserInfo.apply _).tupled.apply(gInfo),
-          silv = (SimpleUserInfo.apply _).tupled.apply(sInfo)
+          gold = SimpleUserInfo.ofDB(gInfo),
+          silv = SimpleUserInfo.ofDB(sInfo)
         ),
         PlayerArray(
           gold = (TimeControl.apply _).tupled.apply(gTC),
@@ -1546,8 +1551,8 @@ class GameTable(tag: Tag) extends Table[GameMetadata](tag, "gameTable") {
     { g: GameMetadata =>
       Some((
         g.id,g.numPly,g.startTime,
-        SimpleUserInfo.unapply(g.users(GOLD)).get,
-        SimpleUserInfo.unapply(g.users(SILV)).get,
+        SimpleUserInfo.toDB(g.users(GOLD)),
+        SimpleUserInfo.toDB(g.users(SILV)),
         TimeControl.unapply(g.tcs(GOLD)).get,
         TimeControl.unapply(g.tcs(SILV)).get,
         g.rated,g.postal,g.gameType.toString,g.tags,

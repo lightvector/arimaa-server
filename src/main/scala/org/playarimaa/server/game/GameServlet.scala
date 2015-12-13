@@ -414,7 +414,7 @@ class GameServlet(val accounts: Accounts, val siteLogin: SiteLogin, val games: G
   }
 
   def convUser(user: SimpleUserInfo): IOTypes.ShortUserInfo = {
-    IOTypes.ShortUserInfo(user.name,user.rating,user.isBot,user.isGuest)
+    IOTypes.ShortUserInfo(user.name,user.rating.mean,user.isBot,user.isGuest)
   }
 
   def convMeta(data: Games.GetMetadata): IOTypes.GameMetadata = {

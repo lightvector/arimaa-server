@@ -103,7 +103,7 @@ class ChatServlet(val accounts: Accounts, val siteLogin: SiteLogin, val chat: Ch
   }
 
   def convUser(user: SimpleUserInfo): IOTypes.ShortUserInfo = {
-    IOTypes.ShortUserInfo(user.name,user.rating,user.isBot,user.isGuest)
+    IOTypes.ShortUserInfo(user.name,user.rating.mean,user.isBot,user.isGuest)
   }
 
   def getAction(action: String): Option[Action] = {

@@ -44,13 +44,25 @@ case class AccountGameStats(
   numGamesSilv: Int,
   numGamesWon: Int,
   numGamesLost: Int,
-  rating: Double,
-  ratingStdev: Double
+  rating: Rating
 )
 
 case object AccountGameStats {
-  val initialRating: Double = 1500
-  val initial: AccountGameStats = new AccountGameStats(0,0,0,0,initialRating,500)
+  val initial: AccountGameStats = new AccountGameStats(0,0,0,0,Rating.initial)
+
+  //Each time we fail to update user stats in a transaction, wait this many seconds then try again, failing out right if we hit the end of the list.
+  val updateRetryDelays: List[Double] = List(1.0,3.0,10.0)
+
+  def ofDB(stats : (Int,Int,Int,Int,Double,Double)) = {
+    stats match {
+      case (numGamesGold, numGamesSilv, numGamesWon, numGamesLost, rating, ratingStdev) =>
+        AccountGameStats(numGamesGold, numGamesSilv, numGamesWon, numGamesLost, Rating(rating,ratingStdev))
+    }
+  }
+
+  def toDB(gs: AccountGameStats) : (Int,Int,Int,Int,Double,Double) = {
+    (gs.numGamesGold, gs.numGamesSilv, gs.numGamesWon, gs.numGamesLost, gs.rating.mean, gs.rating.stdev)
+  }
 }
 
 class Accounts(val db: Database, val scheduler: Scheduler)(implicit ec: ExecutionContext) {
@@ -132,62 +144,62 @@ class Accounts(val db: Database, val scheduler: Scheduler)(implicit ec: Executio
     db.run(DBIO.seq(query))
   }
 
-  def setGameStats(username: Username, stats: AccountGameStats): Future[Unit] = {
+  def getGameStatsQuery(username: Username): DBIO[Option[AccountGameStats]] = {
     val lowercaseName = username.toLowerCase
-    val now = Timestamp.get
-    val query: DBIO[Int] =
-      Accounts.table.filter(_.lowercaseName === lowercaseName).map{
-        a => (a.numGamesGold, a.numGamesSilv, a.numGamesWon, a.numGamesLost, a.rating, a.ratingStdev)
-      }.update(AccountGameStats.unapply(stats).get)
-    db.run(DBIO.seq(query))
+    Accounts.table.filter(_.lowercaseName === lowercaseName).map{
+      a => (a.numGamesGold, a.numGamesSilv, a.numGamesWon, a.numGamesLost, a.rating, a.ratingStdev)
+    }.result.map(_.headOption).map {
+      case None => None
+      case Some(result) => Some(AccountGameStats.ofDB(result))
+    }
   }
 
-  private def doUpdateGameStats(username: Username, f:(AccountGameStats => AccountGameStats)): Future[Unit] = {
+  def setGameStatsQuery(username: Username, stats: AccountGameStats): DBIO[Int] = {
     val lowercaseName = username.toLowerCase
-    val now = Timestamp.get
-    //Build up a transaction
-    val query: DBIO[Int] =
-      //Get the account's existing stats...
-      Accounts.table.filter(_.lowercaseName === lowercaseName).map{
-        a => (a.numGamesGold, a.numGamesSilv, a.numGamesWon, a.numGamesLost, a.rating, a.ratingStdev)
-      }.result.flatMap { result =>
-        //Once we have a result...
-        result.headOption match {
-          case None => DBIO.failed(new Exception("User not found when updating game stats"))
-          case Some(result) =>
-            //Parse out the existing stats and map them with the user's provided f
-            val stats = f((AccountGameStats.apply _).tupled.apply(result))
-            //Write the result back
-            Accounts.table.filter(_.lowercaseName === lowercaseName).map{
-              a => (a.numGamesGold, a.numGamesSilv, a.numGamesWon, a.numGamesLost, a.rating, a.ratingStdev)
-            }.update(AccountGameStats.unapply(stats).get)
-        }
-      }.transactionally //And do this all within a db transaction
-    db.run(DBIO.seq(query))
+    Accounts.table.filter(_.lowercaseName === lowercaseName).map{
+      a => (a.numGamesGold, a.numGamesSilv, a.numGamesWon, a.numGamesLost, a.rating, a.ratingStdev)
+    }.update(AccountGameStats.toDB(stats))
   }
 
   //Tries updating the game stats a few times, then fails
   def updateGameStats(username: Username)(f:(AccountGameStats => AccountGameStats)): Future[Unit] = {
-    doUpdateGameStats(username,f).recoverWith { case _ => after(1 seconds,scheduler) {
-      doUpdateGameStats(username,f).recoverWith { case _ => after(3 seconds,scheduler) {
-        doUpdateGameStats(username,f).recoverWith { case _ => after(10 seconds,scheduler) {
-          doUpdateGameStats(username,f)
-      }}}}}}
+    Utils.withRetry(AccountGameStats.updateRetryDelays,scheduler) {
+      val query: DBIO[Int] =
+        getGameStatsQuery(username).flatMap {
+          case None => DBIO.failed(new Exception("User " + username + " not found when updating game stats"))
+          case Some(stats) =>
+            //Map stats with the user's provided f
+            val newStats = f(stats)
+            //Write the result back
+            setGameStatsQuery(username,newStats)
+        }.transactionally
+      db.run(DBIO.seq(query))
+    }
   }
 
-
-
-  // def gameStats : ProvenShape[AccountGameStats] = (numGamesGold, numGamesSilv, numGamesWon, numGamesLost, rating, ratingStdev).shaped <> (
-  //   //Database shape -> Scala object
-  //   { case (numGamesGold, numGamesSilv, numGamesWon, numGamesLost, rating, ratingStdev) =>
-  //     AccountGameStats(numGamesGold, numGamesSilv, numGamesWon, numGamesLost, rating, ratingStdev)
-  //   },
-  //   //Scala object -> Database shape
-  //   { a: AccountGameStats =>
-  //     Some((a.numGamesGold, a.numGamesSilv, a.numGamesWon, a.numGamesLost, a.rating, a.ratingStdev))
-  //   }
-  // )
-
+  //Tries updating the game stats for a pair of players together a few times, then fails
+  def updateGameStats2(username1: Username, username2: Username)
+    (f: (AccountGameStats,AccountGameStats) => (AccountGameStats,AccountGameStats)): Future[Unit] = {
+    Utils.withRetry(AccountGameStats.updateRetryDelays,scheduler) {
+      val query: DBIO[Unit] =
+        getGameStatsQuery(username1).flatMap {
+          case None => DBIO.failed(new Exception("User " + username1 + " not found when updating game stats"))
+          case Some(stats1) =>
+            getGameStatsQuery(username2).flatMap {
+              case None => DBIO.failed(new Exception("User " + username2 + " not found when updating game stats"))
+              case Some(stats2) =>
+                //Map stats with the user's provided f
+                val (newStats1,newStats2) = f(stats1,stats2)
+                //Write the result back
+                DBIO.seq(
+                  setGameStatsQuery(username1,stats1),
+                  setGameStatsQuery(username2,stats2)
+                )
+            }
+        }.transactionally
+      db.run(DBIO.seq(query))
+    }
+  }
 
 }
 
@@ -211,16 +223,16 @@ class AccountTable(tag: Tag) extends Table[Account](tag, "accountTable") {
     (lowercaseName, username, email, passwordHash, isBot, createdTime, isGuest, lastLogin,
       (numGamesGold, numGamesSilv, numGamesWon, numGamesLost, rating, ratingStdev)).shaped <> (
     //Database shape -> Scala object
-    { case (lowercaseName, username, email, passwordHash, isBot, createdTime, isGuest, lastLogin, stats) =>
+    { case (lowercaseName, username, email, passwordHash, isBot, createdTime, isGuest, lastLogin, gameStats) =>
       Account(lowercaseName, username, email, passwordHash, isBot, createdTime, isGuest, lastLogin,
-        (AccountGameStats.apply _).tupled.apply(stats)
+        AccountGameStats.ofDB(gameStats)
       )
     },
     //Scala object -> Database shape
     { a: Account =>
       Some((
         a.lowercaseName,a.username,a.email,a.passwordHash,a.isBot,a.createdTime,a.isGuest,a.lastLogin,
-        AccountGameStats.unapply(a.gameStats).get
+        AccountGameStats.toDB(a.gameStats)
       ))
     }
   )

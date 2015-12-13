@@ -3,7 +3,7 @@ import org.playarimaa.server.CommonTypes._
 
 case class SimpleUserInfo (
   name: Username,
-  rating: Double,
+  rating: Rating,
   isBot: Boolean,
   isGuest: Boolean
 ) extends Ordered[SimpleUserInfo]
@@ -15,5 +15,15 @@ case class SimpleUserInfo (
 }
 
 case object SimpleUserInfo {
-  val blank : SimpleUserInfo = new SimpleUserInfo("",0,false,false)
+  val blank : SimpleUserInfo = new SimpleUserInfo("",Rating(0,0),false,false)
+
+  def ofDB(x: (String,Double,Double,Boolean,Boolean)) = {
+    x match { case (name, rating, ratingStdev, isBot, isGuest) =>
+      SimpleUserInfo(name, Rating(rating, ratingStdev), isBot, isGuest)
+    }
+  }
+
+  def toDB(x: SimpleUserInfo) : (String,Double,Double,Boolean,Boolean) = {
+    (x.name, x.rating.mean, x.rating.stdev, x.isBot, x.isGuest)
+  }
 }

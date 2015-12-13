@@ -27,6 +27,7 @@ object ArimaaServerBuild extends Build {
         "org.eclipse.jetty"           %  "jetty-plus"          % "9.2.10.v20150310"     % "container;provided",
         "org.eclipse.jetty"           %  "jetty-webapp"        % "9.2.10.v20150310"     % "container",
         "org.eclipse.jetty.websocket" %  "websocket-server"    % "9.2.10.v20150310"     % "container;provided",
+        "org.scalanlp"  %% "breeze" % "0.11.2",
         "org.scalatest" %% "scalatest"         % "2.2.5" % "test",
         "org.scalatra"  %% "scalatra"          % "2.4.0-RC2-2",
         "org.scalatra"  %% "scalatra-scalate"  % "2.4.0-RC2-2",

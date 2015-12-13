@@ -1,6 +1,10 @@
 package org.playarimaa.server
 import scala.concurrent.{ExecutionContext, Future, Promise, future}
+import scala.concurrent.duration.{DurationInt, DurationDouble}
+import scala.language.postfixOps
 import scala.util.{Try, Success, Failure}
+import akka.actor.{Scheduler,Cancellable}
+import akka.pattern.{after}
 
 object Utils {
   implicit class FutureExtended[T](val future: Future[T]) {
@@ -19,6 +23,19 @@ object Utils {
         throw new NumberFormatException("Double value is infinite or nan: " + x)
       else
         x
+    }
+  }
+
+  //So long as f returns a failed future, try it again after each successive time delay specified
+  def withRetry[T](delaySeconds:List[Double], scheduler:Scheduler)(f: => Future[T])(implicit ec: ExecutionContext): Future[T] = {
+    f.recoverWith { case exn =>
+      delaySeconds match {
+        case Nil => Future.failed(exn)
+        case delay :: tail =>
+          after(delay seconds,scheduler) {
+            withRetry(tail,scheduler)(f)
+          }
+      }
     }
   }
 }
