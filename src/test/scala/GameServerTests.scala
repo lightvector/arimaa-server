@@ -3,7 +3,7 @@ import org.scalatra.test.scalatest._
 import org.scalatest.FunSuiteLike
 import akka.actor.{ActorSystem}
 import akka.testkit.{TestKit, ImplicitSender}
-import slick.driver.H2Driver.api._
+import org.playarimaa.server.DatabaseConfig.driver.api._
 import scala.util.{Try, Success, Failure}
 import scala.concurrent.ExecutionContext
 import com.typesafe.config.ConfigFactory
@@ -20,7 +20,7 @@ class GameServletTests(_system: ActorSystem) extends TestKit(_system) with Scala
 
   def this() = this(ActorSystem("GameServerTests"))
 
-  override def afterAll {
+  override def afterAll : Unit = {
     TestKit.shutdownActorSystem(system)
   }
 
@@ -43,12 +43,12 @@ class GameServletTests(_system: ActorSystem) extends TestKit(_system) with Scala
   val mainEC: ExecutionContext = ExecutionContext.Implicits.global
   val cryptEC: ExecutionContext = mainEC
   val serverInstanceID: Long = System.currentTimeMillis
-  val db = ArimaaServerInit.createDB("h2memgame")
-  val emailer = new Emailer(siteName,siteAddress,smtpHost,smtpPort,smtpAuth,noReplyAddress,helpAddress)(mainEC)
-  val accounts = new Accounts(db)(mainEC)
-  val siteLogin = new SiteLogin(accounts,emailer,cryptEC)(mainEC)
+  val db = DatabaseConfig.createDB("h2memgame")
   val scheduler = actorSystem.scheduler
-  val games = new Games(db,siteLogin.logins,scheduler,serverInstanceID)(mainEC)
+  val emailer = new Emailer(siteName,siteAddress,smtpHost,smtpPort,smtpAuth,noReplyAddress,helpAddress)(mainEC)
+  val accounts = new Accounts(db,scheduler)(mainEC)
+  val siteLogin = new SiteLogin(accounts,emailer,cryptEC,scheduler)(mainEC)
+  val games = new Games(db,siteLogin.logins,scheduler,accounts,serverInstanceID)(mainEC)
   addServlet(new AccountServlet(siteLogin,mainEC), "/accounts/*")
   addServlet(new GameServlet(accounts,siteLogin,games,mainEC), "/games/*")
 
@@ -69,6 +69,9 @@ class GameServletTests(_system: ActorSystem) extends TestKit(_system) with Scala
   var bobGameAuth = ""
   var bobPlayer: Player = GOLD
   var sequence: Long = -1
+
+  def userInfo(name: String): IOTypes.ShortUserInfo =
+    IOTypes.ShortUserInfo(name,Rating.initial.mean,false,false)
 
   "GameServer" should "allow users to create games" in {
 
@@ -108,8 +111,8 @@ class GameServletTests(_system: ActorSystem) extends TestKit(_system) with Scala
       state.meta.rated should equal (true)
       state.meta.gameType should equal ("standard")
       state.meta.tags should equal (List())
-      state.meta.openGameData.get.creator should equal (Some(IOTypes.ShortUserInfo("Bob")))
-      state.meta.openGameData.get.joined should equal (List(IOTypes.ShortUserInfo("Bob")))
+      state.meta.openGameData.get.creator should equal (Some(userInfo("Bob")))
+      state.meta.openGameData.get.joined should equal (List(userInfo("Bob")))
       state.meta.activeGameData should equal (None)
       state.meta.result should equal (None)
       state.meta.sequence.exists(_ > sequence) should equal (true)
@@ -142,8 +145,8 @@ class GameServletTests(_system: ActorSystem) extends TestKit(_system) with Scala
       state.meta.gameType should equal ("standard")
       state.meta.tags should equal (List())
       state.meta.openGameData.nonEmpty should equal (true)
-      state.meta.openGameData.get.creator should equal (Some(IOTypes.ShortUserInfo("Bob")))
-      state.meta.openGameData.get.joined should equal (List(IOTypes.ShortUserInfo("Alice"),IOTypes.ShortUserInfo("Bob")))
+      state.meta.openGameData.get.creator should equal (Some(userInfo("Bob")))
+      state.meta.openGameData.get.joined should equal (List(userInfo("Alice"),userInfo("Bob")))
       state.meta.activeGameData should equal (None)
       state.meta.result should equal (None)
       state.meta.sequence.exists(_ > sequence) should equal (true)
@@ -186,7 +189,7 @@ class GameServletTests(_system: ActorSystem) extends TestKit(_system) with Scala
       state.meta.result should equal (None)
       state.meta.sequence.exists(_ > sequence) should equal (true)
       sequence = state.meta.sequence.get
-      bobPlayer = if(state.meta.gUser == Some(IOTypes.ShortUserInfo("Bob"))) GOLD else SILV
+      bobPlayer = if(state.meta.gUser == Some(userInfo("Bob"))) GOLD else SILV
     }
   }
 

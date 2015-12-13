@@ -125,6 +125,17 @@ var Utils = {
     return false;
   },
 
+  userDisplayStr: function(userInfo) {
+    var displayStr = userInfo.name;
+    if(userInfo.isGuest)
+      displayStr += " (guest)";
+    else if(userInfo.isBot)
+      displayStr += " (" + userInfo.rating + ") (bot)";
+    else
+      displayStr += " (" + userInfo.rating + ")";
+    return displayStr;
+  },
+
   flashWindowIfNotFocused: function(reasonTitle) {
     var title = document.title;
     if(!document.hasFocus() && !inMiddleOfFlash) {

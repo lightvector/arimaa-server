@@ -44,7 +44,7 @@ class ArimaaServlet(val siteLogin: SiteLogin)
   }
 
   get("/login/?") {
-    redirect("/");
+    redirect("/") : Any
   }
 
   get("/register/?") {

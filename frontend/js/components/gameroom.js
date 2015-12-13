@@ -112,17 +112,17 @@ var component = React.createClass({
     var hasCreator = metadata.openGameData !== undefined && metadata.openGameData.creator !== undefined;
 
     if(metadata.gUser !== undefined && metadata.sUser !== undefined)
-      title = metadata.gUser.name + " (G) vs " + metadata.sUser.name + " (S)";
+      title = Utils.userDisplayStr(metadata.gUser) + " (G) vs " + Utils.userDisplayStr(metadata.sUser) + " (S)";
     else if(metadata.gUser !== undefined && hasCreator && metadata.openGameData.creator.name != metadata.gUser.name)
-      title = metadata.gUser.name + " (G) vs " + metadata.openGameData.creator.name + " (S)";
+      title = Utils.userDisplayStr(metadata.gUser) + " (G) vs " + Utils.userDisplayStr(metadata.openGameData.creator) + " (S)";
     else if(metadata.sUser !== undefined && hasCreator && metadata.openGameData.creator.name != metadata.sUser.name)
-      title = metadata.openGameData.creator.name + " (G) vs " + metadata.sUser.name + " (S)";
+      title = Utils.userDisplayStr(metadata.openGameData.creator) + " (G) vs " + Utils.userDisplayStr(metadata.sUser) + " (S)";
     else if(metadata.gUser !== undefined)
-      title = metadata.gUser.name + " (G) vs " + "anyone" + " (S)";
+      title = Utils.userDisplayStr(metadata.gUser) + " (G) vs " + "anyone" + " (S)";
     else if(metadata.sUser !== undefined)
-      title = "anyone (G)" + " vs " + metadata.sUser.name + " (S)";
+      title = "anyone (G)" + " vs " + Utils.userDisplayStr(metadata.sUser) + " (S)";
     else if(metadata.openGameData.creator !== undefined)
-      title = metadata.openGameData.creator.name + " vs " + "anyone" + " (random color)";
+      title = Utils.userDisplayStr(metadata.openGameData.creator) + " vs " + "anyone" + " (random color)";
     else
       title = "anyone" + " vs " + "anyone" + " (random color)";
 
@@ -190,8 +190,10 @@ var component = React.createClass({
 
       if(!joined)
         joinAccepts.push(<button onClick={this.joinGameButtonClicked.bind(this, metadata.gameID)}>Play</button>);
-      else if(joinedNotUs.length <= 0 || (metadata.openGameData.creator !== undefined && metadata.openGameData.creator.name != username))
-        joinAccepts.push(<span>Waiting for opponent...</span>);
+      else if(metadata.openGameData.creator !== undefined && metadata.openGameData.creator.name != username)
+        joinAccepts.push(<span>Requested game, waiting for opponent to reply...</span>);
+      else if(joinedNotUs.length <= 0)
+        joinAccepts.push(<span>Waiting for opponent to join...</span>);
       else {
         var selectedPlayer = null;
         if(metadata.gameID in this.state.selectedPlayers) {
@@ -210,7 +212,7 @@ var component = React.createClass({
         var selections = [];
         for(var i = 0; i<joinedNotUs.length; i++) {
           var userinfo = joinedNotUs[i];
-          selections.push(React.createElement("option", {key: "joinedPlayer_"+metadata.gameID+"_"+userinfo.name, value: userinfo.name}, userinfo.name));
+          selections.push(React.createElement("option", {key: "joinedPlayer_"+metadata.gameID+"_"+userinfo.name, value: userinfo.name}, Utils.userDisplayStr(userinfo)));
         }
         var selector;
         if(selectedPlayer !== null)
@@ -281,7 +283,7 @@ var component = React.createClass({
   },
 
   renderUser: function(userInfo) {
-    return React.createElement("div", {key: "users_"+userInfo.name}, userInfo.name);
+    return React.createElement("div", {key: "users_"+userInfo.name}, Utils.userDisplayStr(userInfo));
   },
 
   render: function() {

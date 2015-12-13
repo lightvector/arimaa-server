@@ -3,7 +3,7 @@ import org.scalatra.test.scalatest._
 import org.scalatest.FunSuiteLike
 import akka.actor.{ActorSystem}
 import akka.testkit.{TestKit, ImplicitSender}
-import slick.driver.H2Driver.api._
+import org.playarimaa.server.DatabaseConfig.driver.api._
 import scala.util.{Try, Success, Failure}
 import scala.concurrent.ExecutionContext
 import com.typesafe.config.ConfigFactory
@@ -18,7 +18,7 @@ class ChatServletTests(_system: ActorSystem) extends TestKit(_system) with Scala
 
   def this() = this(ActorSystem("ChatTests"))
 
-  override def afterAll {
+  override def afterAll : Unit = {
     TestKit.shutdownActorSystem(system)
   }
 
@@ -42,12 +42,12 @@ class ChatServletTests(_system: ActorSystem) extends TestKit(_system) with Scala
   val cryptEC: ExecutionContext = mainEC
   val actorEC: ExecutionContext = actorSystem.dispatcher
   val serverInstanceID: Long = System.currentTimeMillis
-  val db = ArimaaServerInit.createDB("h2memchat")
-  val emailer = new Emailer(siteName,siteAddress,smtpHost,smtpPort,smtpAuth,noReplyAddress,helpAddress)(mainEC)
-  val accounts = new Accounts(db)(mainEC)
-  val siteLogin = new SiteLogin(accounts,emailer,cryptEC)(mainEC)
+  val db = DatabaseConfig.createDB("h2memchat")
   val scheduler = actorSystem.scheduler
-  val games = new Games(db,siteLogin.logins,scheduler,serverInstanceID)(mainEC)
+  val emailer = new Emailer(siteName,siteAddress,smtpHost,smtpPort,smtpAuth,noReplyAddress,helpAddress)(mainEC)
+  val accounts = new Accounts(db,scheduler)(mainEC)
+  val siteLogin = new SiteLogin(accounts,emailer,cryptEC,scheduler)(mainEC)
+  val games = new Games(db,siteLogin.logins,scheduler,accounts,serverInstanceID)(mainEC)
   val chat = new ChatSystem(db,siteLogin.logins,actorSystem)(actorEC)
   addServlet(new AccountServlet(siteLogin,mainEC), "/accounts/*")
   addServlet(new ChatServlet(accounts,siteLogin,chat,games,scheduler,actorEC), "/*")

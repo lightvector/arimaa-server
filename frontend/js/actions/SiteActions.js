@@ -105,7 +105,7 @@ var SiteActions = {
     if(!data.value)
       window.location.pathname = "/";
   },
-  
+
   createGame: function(opts) {
     APIUtils.createGame(opts, SiteActions.createGameSuccess, SiteActions.createGameError);
   },
@@ -126,8 +126,7 @@ var SiteActions = {
       gameAuth: data.gameAuth
     });
 
-    SiteActions.beginJoinedOpenGameMetadataLoop(data.gameID,data.gameAuth);
-    SiteActions.startOpenJoinedHeartbeatLoop(data.gameID,data.gameAuth);
+    SiteActions.beginJoinedOpenGameMetadataLoop(data.gameID,data.gameAuth,true);
   },
   createGameError: function(data) {
     SiteActions.goLoginPageIfNotLoggedIn();
@@ -147,8 +146,7 @@ var SiteActions = {
       gameAuth: data.gameAuth
     });
 
-    SiteActions.beginJoinedOpenGameMetadataLoop(gameID,data.gameAuth);
-    SiteActions.startOpenJoinedHeartbeatLoop(gameID,data.gameAuth);
+    SiteActions.beginJoinedOpenGameMetadataLoop(gameID,data.gameAuth,true);
   },
 
   acceptUserForGame: function(gameID, gameAuth, username) {
@@ -195,7 +193,7 @@ var SiteActions = {
     SiteActions.goLoginPageIfNotLoggedIn();
     setTimeout(SiteActions.beginLoginCheckLoop, SiteConstants.VALUES.LOGIN_CHECK_LOOP_DELAY * 1000);
   },
-  
+
   updateErrorMessage :
   "Error getting gameroom updates, possible network or other connection issues, consider refreshing the page.",
 
@@ -286,12 +284,12 @@ var SiteActions = {
   //the provided auth is latest one we joined with (auth not needed to perform the query, but we only
   //care about rapid updating of metadata if we're joined with the game, and this also gives
   //us deduplication of loops)
-  beginJoinedOpenGameMetadataLoop: function(gameID, gameAuth) {
+  beginJoinedOpenGameMetadataLoop: function(gameID, gameAuth, startHeartbeats) {
     APIUtils.gameMetadata(gameID, 0,
-                          function(data) {return SiteActions.joinedOpenGameMetadataSuccess(gameAuth,data);},
+                          function(data) {return SiteActions.joinedOpenGameMetadataSuccess(gameAuth,data,startHeartbeats);},
                           function(data) {return SiteActions.joinedOpenGameMetadataError(gameID,gameAuth,data);});
   },
-  joinedOpenGameMetadataSuccess: function(gameAuth,data) {
+  joinedOpenGameMetadataSuccess: function(gameAuth,data,startHeartbeats) {
     var seqNum = data.sequence;
     var gameID = data.gameID;
     var username = UserStore.getUsername();
@@ -306,9 +304,13 @@ var SiteActions = {
     if(storedGameAuth === null || storedGameAuth != gameAuth || data.openGameData === undefined)
       return;
 
+    //If we should start heartbeating, do so
+    if(startHeartbeats)
+      SiteActions.startOpenJoinedHeartbeatLoop(gameID,gameAuth);
+
     setTimeout(function () {
       APIUtils.gameMetadata(gameID, seqNum+1,
-                            function(data) {return SiteActions.joinedOpenGameMetadataSuccess(gameAuth,data);},
+                            function(data) {return SiteActions.joinedOpenGameMetadataSuccess(gameAuth,data,false);},
                             function(data) {return SiteActions.joinedOpenGameMetadataError(gameID,gameAuth,data);});
     }, SiteConstants.VALUES.JOINED_GAME_META_LOOP_DELAY * 1000);
   },
@@ -326,10 +328,14 @@ var SiteActions = {
       });
     }
 
+    //If we should start heartbeating, do so
+    if(startHeartbeats)
+      SiteActions.startOpenJoinedHeartbeatLoop(gameID,gameAuth);
+
     console.log(data);
     setTimeout(function () {
       APIUtils.gameMetadata(gameID, 0,
-                            function(data) {return SiteActions.joinedOpenGameMetadataSuccess(gameAuth,data);},
+                            function(data) {return SiteActions.joinedOpenGameMetadataSuccess(gameAuth,data,false);},
                             function(data) {return SiteActions.joinedOpenGameMetadataError(gameID,gameAuth,data);});
     }, SiteConstants.VALUES.JOINED_GAME_META_LOOP_DELAY_ON_ERROR * 1000);
   },

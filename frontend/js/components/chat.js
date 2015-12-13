@@ -9,7 +9,7 @@ const FUNC_NOP = function(){};
 
 var chatBox = React.createClass({
   getInitialState: function() {
-    return {lines:[], nextMinId:-1, chatAuth:null, userInput:"", error:""};
+    return {lines:[], nextMinId:-1, chatAuth:null, userInput:"", usersLoggedIn:[], error:""};
   },
   componentDidMount: function() {
     this.doJoin();
@@ -78,6 +78,7 @@ var chatBox = React.createClass({
   startHeartbeatLoop: function(chatAuth) {
     if(this.state.chatAuth !== null && this.state.chatAuth == chatAuth) {
       APIUtils.chatHeartbeat(this.props.params.chatChannel, chatAuth, FUNC_NOP, this.onHeartbeatError);
+      APIUtils.chatUsersLoggedIn(this.props.params.chatChannel, this.onUsersLoggedIn, this.onUsersLoggedInError);
       var that = this;
       setTimeout(function () {that.startHeartbeatLoop(chatAuth);}, SiteConstants.VALUES.CHAT_HEARTBEAT_PERIOD * 1000);
     }
@@ -86,6 +87,14 @@ var chatBox = React.createClass({
     this.setState({error:data.error});
     this.setState({chatAuth:null});
   },
+  onUsersLoggedInError: function(data) {
+    this.setState({error:data.error});
+    this.setState({chatAuth:null});
+  },
+  onUsersLoggedIn: function(data) {
+    this.setState({usersLoggedIn:data.users});
+  },
+
 
   startPollLoop: function(chatAuth) {
     if(this.state.chatAuth !== null && this.state.chatAuth == chatAuth) {
@@ -119,36 +128,51 @@ var chatBox = React.createClass({
     setTimeout(function () {that.startPollLoop(chatAuth);}, SiteConstants.VALUES.CHAT_LOOP_DELAY_ON_ERROR * 1000);
   },
 
+  renderUser: function(userInfo) {
+    return React.createElement("div", {key: "chatUsers_"+userInfo.name}, Utils.userDisplayStr(userInfo));
+  },
+
   render: function() {
     var lines = this.state.lines.map(function(line) {
       var lineContents = [
         Utils.timeToHHMMSS(line.timestamp) + " ",
-        React.createElement("b", null, line.username + ": "),
+        React.createElement("b", {key: "chatLineName_"+line.id}, line.username + ": "),
         line.text
       ];
-      return React.createElement("tr", {key: line.id}, React.createElement("td", {key: line.id + "td"}, lineContents));
+      return React.createElement("tr", {key: "chatLine_"+line.id}, React.createElement("td", {key: "chatLineTD_"+line.id}, lineContents));
     });
 
+    var usersDiv = "";
+    {
+      var that = this;
+      var usersList = this.state.usersLoggedIn.map(function(user) {
+        return that.renderUser(user);
+      });
+      usersList.unshift(React.createElement("h4", {key: "chatUsersLoggedInLabel"}, "Users In Chatroom:"));
+      usersDiv = React.createElement("div", {key: "chatUsersDiv", className:"gameroomUsersDiv"}, usersList);
+    }
+
     var contents = [
-      React.createElement("h1", null, "Chat"),
+      React.createElement("h1", {key: "chatLabel"}, "Chat"),
+      usersDiv,
       React.createElement(
         "table", null,
-        React.createElement("tbody", null, lines)
+        React.createElement("tbody", {key: "chatBody"}, lines)
       ),
       React.createElement(
         "form", {className: "commentForm", onSubmit: this.submitUserInput},
-        React.createElement("input", {type: "text", ref: "text", value: this.state.userInput, onChange: this.handleUserInputChange, placeholder: "Say something..."}),
-        React.createElement("input", {type: "submit", disabled: !this.state.chatAuth, value: "Post"})
+        React.createElement("input", {key:"chatInput", type: "text", ref: "text", value: this.state.userInput, onChange: this.handleUserInputChange, placeholder: "Say something..."}),
+        React.createElement("input", {key:"chatSubmit", type: "submit", disabled: !this.state.chatAuth, value: "Post"})
       ),
-      React.createElement("button", {onClick: this.submitJoin, disabled: !(!this.state.chatAuth)}, "Join"),
-      React.createElement("button", {onClick: this.submitLeave, disabled: !this.state.chatAuth}, "Leave"),
+      React.createElement("button", {key:"chatJoin", onClick: this.submitJoin, disabled: !(!this.state.chatAuth)}, "Join"),
+      React.createElement("button", {key:"chatLeave", onClick: this.submitLeave, disabled: !this.state.chatAuth}, "Leave"),
     ];
 
     if(this.state.error != "") {
-      contents.push(React.createElement("div", {className:"error"}, this.state.error));
+      contents.push(React.createElement("div", {key: "chatError", className:"error"}, this.state.error));
     }
 
-    return React.createElement("div", {className: "commentBox"}, contents);
+    return React.createElement("div", {key: "chatContainer", className: "commentBox"}, contents);
   }
 
 });

@@ -13,7 +13,7 @@ import org.json4s.jackson.Serialization
 import org.slf4j.{Logger, LoggerFactory}
 
 import org.playarimaa.server.CommonTypes._
-import org.playarimaa.server.{Accounts,Json,LoginTracker,SiteLogin,Timestamp,WebAppStack}
+import org.playarimaa.server.{Accounts,Json,LoginTracker,SimpleUserInfo,SiteLogin,Timestamp,WebAppStack}
 import org.playarimaa.server.Timestamp.Timestamp
 import org.playarimaa.server.Utils._
 
@@ -26,16 +26,18 @@ object GameServlet {
     case class SimpleError(error: String)
 
     case class ShortUserInfo(
-      name: String
+      name: String,
+      rating: Double,
+      isBot: Boolean,
+      isGuest: Boolean
     )
 
     case class TimeControl(
-      //TODO: should we allow non-integer values for these?
-      initialTime: Int,
-      increment: Option[Int],
-      delay: Option[Int],
-      maxReserve: Option[Int],
-      maxMoveTime: Option[Int],
+      initialTime: Double,
+      increment: Option[Double],
+      delay: Option[Double],
+      maxReserve: Option[Double],
+      maxMoveTime: Option[Double],
       overtimeAfter: Option[Int]
     )
 
@@ -280,13 +282,20 @@ class GameServlet(val accounts: Accounts, val siteLogin: SiteLogin, val games: G
     GameAction.all.find(_.name == action)
   }
 
-  def maybeGetUser(user: Option[String]): Future[Option[Username]] = {
-    user match {
+  def getUserInfo(username: Username): Future[SimpleUserInfo] = {
+    accounts.getByName(username,excludeGuests=false).flatMap {
+      case None => Future.failed(new Exception("Unknown user: " + username))
+      case Some(acct) => Future(acct.info)
+    }
+  }
+
+  def maybeGetUser(username: Option[String]): Future[Option[SimpleUserInfo]] = {
+    username match {
       case None => Future(None)
-      case Some(user) =>
-        accounts.getByName(user).flatMap {
-          case None => Future.failed(new Exception("Unknown user: " + user))
-          case Some(acct) => Future(Some(acct.username))
+      case Some(username) =>
+        accounts.getByName(username,excludeGuests=false).flatMap {
+          case None => Future.failed(new Exception("Unknown user: " + username))
+          case Some(acct) => Future(Some(acct.info))
         }
     }
   }
@@ -353,9 +362,11 @@ class GameServlet(val accounts: Accounts, val siteLogin: SiteLogin, val games: G
         }.get
       case Some(Accept) =>
         val query = Json.read[Accept.Query](requestBody)
-        games.accept(id,query.gameAuth,query.opponent).map { case () =>
-          Accept.Reply("Ok")
-        }.get
+        getUserInfo(query.opponent).map { opponent =>
+          games.accept(id,query.gameAuth,opponent).map { case () =>
+            Accept.Reply("Ok")
+          }.get
+        }
       case Some(Decline) =>
         val query = Json.read[Decline.Query](requestBody)
         games.decline(id,query.gameAuth,query.opponent).map { case () =>
@@ -380,7 +391,7 @@ class GameServlet(val accounts: Accounts, val siteLogin: SiteLogin, val games: G
   }
 
   def tcOfIOTC(tc: IOTypes.TimeControl): TimeControl = {
-    TimeControl(
+    val tc2 = TimeControl(
       initialTime = tc.initialTime,
       increment = tc.increment.getOrElse(0),
       delay = tc.delay.getOrElse(0),
@@ -388,6 +399,8 @@ class GameServlet(val accounts: Accounts, val siteLogin: SiteLogin, val games: G
       maxMoveTime = tc.maxMoveTime,
       overtimeAfter = tc.overtimeAfter
     )
+    tc2.validate()
+    tc2
   }
 
   def convTC(tc: TimeControl): IOTypes.TimeControl = {
@@ -401,8 +414,8 @@ class GameServlet(val accounts: Accounts, val siteLogin: SiteLogin, val games: G
     )
   }
 
-  def convUser(username: Username): IOTypes.ShortUserInfo = {
-    IOTypes.ShortUserInfo(username)
+  def convUser(user: SimpleUserInfo): IOTypes.ShortUserInfo = {
+    IOTypes.ShortUserInfo(user.name,user.rating.mean,user.isBot,user.isGuest)
   }
 
   def convMeta(data: Games.GetMetadata): IOTypes.GameMetadata = {
