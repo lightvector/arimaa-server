@@ -33,12 +33,11 @@ object GameServlet {
     )
 
     case class TimeControl(
-      //TODO: should we allow non-integer values for these?
-      initialTime: Int,
-      increment: Option[Int],
-      delay: Option[Int],
-      maxReserve: Option[Int],
-      maxMoveTime: Option[Int],
+      initialTime: Double,
+      increment: Option[Double],
+      delay: Option[Double],
+      maxReserve: Option[Double],
+      maxMoveTime: Option[Double],
       overtimeAfter: Option[Int]
     )
 

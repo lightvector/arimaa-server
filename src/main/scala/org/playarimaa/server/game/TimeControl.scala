@@ -10,11 +10,11 @@ object TimeControl {
 }
 
 case class TimeControl(
-  initialTime: Int,
-  increment: Int,
-  delay: Int,
-  maxReserve: Option[Int],
-  maxMoveTime: Option[Int],
+  initialTime: Double,
+  increment: Double,
+  delay: Double,
+  maxReserve: Option[Double],
+  maxMoveTime: Option[Double],
   overtimeAfter: Option[Int]
 )
 {
@@ -22,7 +22,7 @@ case class TimeControl(
   def clockAfterTurn(clockBeforeTurn: Double, timeSpent: Double, turn: Int): Double = {
     val overtimeFactor =
       if(overtimeAfter.exists(turn >= _))
-        math.pow(TimeControl.OVERTIME_FACTOR_PER_TURN, turn - overtimeAfter.get + 1)
+        math.pow(TimeControl.OVERTIME_FACTOR_PER_TURN, turn - overtimeAfter.get + 1.0)
       else
         1.0
     val adjIncrement = increment * overtimeFactor
