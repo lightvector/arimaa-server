@@ -109,6 +109,7 @@ object Rating {
       if(errorOf(factor / 2.0) < errorOf(factor))
         factor /= 2.0
       mean :+= mean + x * factor
+      ()
     }
 
     //TODO do something smarter?

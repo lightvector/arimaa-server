@@ -251,6 +251,7 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
         case Some(user) =>
           logins.logoutUser(user.name,now)
           accounts.removeIfGuest(user.name)
+          ()
       }
     }
   }

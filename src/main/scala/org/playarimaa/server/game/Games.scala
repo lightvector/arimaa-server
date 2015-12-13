@@ -167,6 +167,7 @@ class Games(val db: Database, val parentLogins: LoginTracker, val scheduler: Sch
       }
     try {
       scheduler.scheduleOnce(nextDelay seconds) { checkTimeoutLoop() }
+      ()
     }
     catch {
       //Thrown when the actorsystem shuts down, ignore
@@ -1154,7 +1155,7 @@ class ActiveGame(
 
   def saveMetaToDB(): Unit = this.synchronized {
     val metaToSave = meta
-    metaSaveFinished = metaSaveFinished.resultMap { _ =>
+    metaSaveFinished = metaSaveFinished.resultFlatMap { _ =>
       val query: DBIO[Int] = Games.gameTable.filter(_.id === metaToSave.id).update(metaToSave)
       db.run(query).resultMap { result =>
         result match {
@@ -1172,7 +1173,7 @@ class ActiveGame(
     if(movesWritten < moves.length) {
       val newMoves = moves.slice(movesWritten,moves.length)
       movesWritten = moves.length
-      moveSaveFinished = moveSaveFinished.resultMap { _ =>
+      moveSaveFinished = moveSaveFinished.resultFlatMap { _ =>
         val query: DBIO[Option[Int]] = Games.movesTable ++= newMoves
         db.run(query).resultMap { result =>
           result match {
@@ -1214,6 +1215,7 @@ class ActiveGame(
           logger.error("Error updating post-game stats for " + meta.users(winner).name + ", " +meta.users(loser).name  + " :" + exn)
       }
     }
+    ()
   }
 
   private def scheduleNextTimeLossCheck(now: Timestamp): Unit = this.synchronized {

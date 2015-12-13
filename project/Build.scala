@@ -10,9 +10,20 @@ object ArimaaServerBuild extends Build {
     settings = Seq(
       scalaVersion := "2.11.6",
 
-      scalacOptions += "-deprecation",
-      scalacOptions += "-feature",
-      scalacOptions += "-Xlint",
+
+      scalacOptions ++= Seq(
+          "-deprecation",
+          "-feature",
+          "-language:existentials",
+          "-unchecked",
+          "-Xfatal-warnings",
+          "-Xlint",
+          "-Yno-adapted-args",
+          "-Ywarn-dead-code",
+          "-Ywarn-numeric-widen",
+          "-Ywarn-value-discard",
+          "-Xfuture"
+      ),
 
       libraryDependencies ++= Seq(
         "com.typesafe" % "config" % "1.2.1",

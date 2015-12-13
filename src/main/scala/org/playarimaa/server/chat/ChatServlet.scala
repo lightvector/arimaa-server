@@ -182,8 +182,10 @@ class ChatServlet(val accounts: Accounts, val siteLogin: SiteLogin, val chat: Ch
     var connected = false
     var chatAuth : Option[ChatAuth] = None
     new AtmosphereClient {
-      def sendError(msg: String) =
+      def sendError(msg: String): Unit = {
         send(Json.write(IOTypes.SimpleError(msg)))
+        ()
+      }
 
       def receive = {
         case Atmosphere.Connected =>
@@ -252,11 +254,11 @@ class ChatServlet(val accounts: Accounts, val siteLogin: SiteLogin, val chat: Ch
           logger.error("chat channel " + channel + ": " + error)
         case Atmosphere.TextMessage(_) =>
           sendError("Unable to parse message")
-          ()
         case Atmosphere.JsonMessage(json) =>
           val msg = Try(Json.extract[SocketMessage.Query](json))
           msg match {
-            case Failure(e) => sendError(e.getMessage())
+            case Failure(e) =>
+              sendError(e.getMessage())
             case Success(msg) =>
               msg.action match {
                 case "join" =>

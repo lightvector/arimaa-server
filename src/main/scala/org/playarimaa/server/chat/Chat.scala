@@ -192,6 +192,7 @@ class ChatChannel(val channel: Channel, val db: Database, val parentLogins: Logi
     if(!timeoutCycleStarted) {
       timeoutCycleStarted = true
       actorSystem.scheduler.scheduleOnce(ChatSystem.CHAT_CHECK_TIMEOUT_PERIOD seconds, self, DoTimeouts())
+      ()
     }
   }
 
@@ -302,6 +303,7 @@ class ChatChannel(val channel: Channel, val db: Database, val parentLogins: Logi
         }
       }
       result pipeTo sender
+      ()
 
     case DBWritten(upToId: Long) =>
       messagesNotYetInDB = messagesNotYetInDB.dropWhile { line =>
@@ -313,6 +315,7 @@ class ChatChannel(val channel: Channel, val db: Database, val parentLogins: Logi
       //TODO if nobody is logged in for long enough, then shut down this chat!
       logins.doTimeouts(now)
       actorSystem.scheduler.scheduleOnce(ChatSystem.CHAT_CHECK_TIMEOUT_PERIOD seconds, self, DoTimeouts())
+      ()
   }
 
   def replyWith[T](sender: ActorRef, result: Try[T]) : Unit = {

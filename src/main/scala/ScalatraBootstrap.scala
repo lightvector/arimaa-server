@@ -4,7 +4,7 @@ import org.scalatra.LifeCycle
 import javax.servlet.ServletContext
 import akka.actor.ActorSystem
 import java.util.concurrent.Executors
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, Future, Promise, future}
 import scala.concurrent.Await
 import scala.concurrent.duration.Duration
 import slick.driver.H2Driver.api._
@@ -50,6 +50,7 @@ class ScalatraBootstrap extends LifeCycle {
       val threadPool = Executors.newFixedThreadPool(numThreads)
       def execute(runnable: Runnable): Unit = {
         threadPool.submit(runnable)
+        ()
       }
       def reportFailure(t: Throwable): Unit = {
         logger.error(t.toString)
