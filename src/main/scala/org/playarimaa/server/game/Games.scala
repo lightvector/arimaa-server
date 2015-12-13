@@ -895,7 +895,7 @@ class ActiveGames(val db: Database, val scheduler: Scheduler,
           accounts.updateGameStats(game.users(SILV).name) { stats =>
             stats.copy(numGamesSilv = stats.numGamesSilv+1)
           }.onFailure { case exn => logger.error("Error updating numGamesSilv for " + game.users(SILV).name + " :" + exn) }
-        }
+        }.onFailure { case exn => logger.error("Error updating stats for game " + id + " :" + exn) }
         activeGames = activeGames + (id -> game)
       }
     }

@@ -192,8 +192,8 @@ class Accounts(val db: Database, val scheduler: Scheduler)(implicit ec: Executio
                 val (newStats1,newStats2) = f(stats1,stats2)
                 //Write the result back
                 DBIO.seq(
-                  setGameStatsQuery(username1,stats1),
-                  setGameStatsQuery(username2,stats2)
+                  setGameStatsQuery(username1,newStats1),
+                  setGameStatsQuery(username2,newStats2)
                 )
             }
         }.transactionally
