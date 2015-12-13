@@ -27,7 +27,8 @@ case class Account(
     SimpleUserInfo(
       name = username,
       rating = gameStats.rating,
-      isBot = isBot
+      isBot = isBot,
+      isGuest = isGuest
     )
   }
 }

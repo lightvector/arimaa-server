@@ -1430,9 +1430,11 @@ class GameTable(tag: Tag) extends Table[GameMetadata](tag, "gameTable") {
   def gUser : Rep[Username] = column[Username]("gUser")
   def gRating : Rep[Double] = column[Double]("gRating")
   def gIsBot : Rep[Boolean] = column[Boolean]("gIsBot")
+  def gIsGuest : Rep[Boolean] = column[Boolean]("gIsGuest")
   def sUser : Rep[Username] = column[Username]("sUser")
   def sRating : Rep[Double] = column[Double]("sRating")
   def sIsBot : Rep[Boolean] = column[Boolean]("sIsBot")
+  def sIsGuest : Rep[Boolean] = column[Boolean]("sIsGuest")
 
   //TODO should these be doubles?
   def gInitialTime : Rep[Int] = column[Int]("gInitialTime")
@@ -1481,8 +1483,8 @@ class GameTable(tag: Tag) extends Table[GameMetadata](tag, "gameTable") {
   def * : ProvenShape[GameMetadata] = (
     //Define database projection shape
     id,numPly,startTime,
-    (gUser,gRating,gIsBot),
-    (sUser,sRating,sIsBot),
+    (gUser,gRating,gIsBot,gIsGuest),
+    (sUser,sRating,sIsBot,sIsGuest),
     (gInitialTime,gIncrement,gDelay,gMaxReserve,gMaxMoveTime,gOvertimeAfter),
     (sInitialTime,sIncrement,sDelay,sMaxReserve,sMaxMoveTime,sOvertimeAfter),
     rated,postal,gameType,tags,
