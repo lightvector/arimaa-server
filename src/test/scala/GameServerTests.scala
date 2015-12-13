@@ -71,7 +71,7 @@ class GameServletTests(_system: ActorSystem) extends TestKit(_system) with Scala
   var sequence: Long = -1
 
   def userInfo(name: String): IOTypes.ShortUserInfo =
-    IOTypes.ShortUserInfo(name,AccountGameStats.initialRating,false,false)
+    IOTypes.ShortUserInfo(name,Rating.initial.mean,false,false)
 
   "GameServer" should "allow users to create games" in {
 

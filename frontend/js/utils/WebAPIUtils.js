@@ -189,6 +189,10 @@ var APIUtils = {
 
   chatPoll: function(chatChannel, minId, success, error) {
     GET('/api/chat/'+chatChannel, {minId:minId, doWait:true}, success, error);
+  },
+
+  chatUsersLoggedIn: function(chatChannel, success, error) {
+    POST('/api/chat/'+chatChannel +'/usersLoggedIn', {}, success, error);
   }
 
 };
