@@ -5,6 +5,7 @@ import scala.language.postfixOps
 import scala.util.{Try, Success, Failure}
 import slick.driver.H2Driver.api._
 import slick.lifted.{PrimaryKey,ProvenShape}
+import org.slf4j.{Logger, LoggerFactory}
 import org.playarimaa.server.CommonTypes._
 import org.playarimaa.server.Timestamp.Timestamp
 import akka.actor.{Scheduler,Cancellable}
@@ -53,6 +54,8 @@ case object AccountGameStats {
 
 class Accounts(val db: Database, val scheduler: Scheduler)(implicit ec: ExecutionContext) {
 
+  val logger =  LoggerFactory.getLogger(getClass)
+
   //Returns any account with this name
   def getByName(username: Username, excludeGuests: Boolean): Future[Option[Account]] = {
     val lowercaseName = username.toLowerCase
@@ -80,9 +83,16 @@ class Accounts(val db: Database, val scheduler: Scheduler)(implicit ec: Executio
   //In the case where there is an existing guest account, replaces the guest account with the new account.
   def add(account: Account): Future[Unit] = {
     getByName(account.username, excludeGuests=true).map {
-      case Some(_) => Future.failed(new Exception("Account for " + account.username + " already exists"))
+      case Some(acct) =>
+        if(acct.isGuest) {
+          val lowercaseName = account.username.toLowerCase
+          val query = Accounts.table.filter(_.lowercaseName === lowercaseName).update(account)
+          db.run(DBIO.seq(query))
+        }
+        else
+          Future.failed(new Exception("Account for " + account.username + " already exists"))
       case None =>
-        val query = Accounts.table.insertOrUpdate(account)
+        val query = Accounts.table += account
         db.run(DBIO.seq(query))
     }
   }
