@@ -28,7 +28,7 @@ object Utils {
 
   //So long as f returns a failed future, try it again after each successive time delay specified
   def withRetry[T](delaySeconds:List[Double], scheduler:Scheduler)(f: => Future[T])(implicit ec: ExecutionContext): Future[T] = {
-    f.recoverWith { case exn =>
+    f.recoverWith { case exn : Throwable =>
       delaySeconds match {
         case Nil => Future.failed(exn)
         case delay :: tail =>

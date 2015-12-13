@@ -363,7 +363,7 @@ class GameServlet(val accounts: Accounts, val siteLogin: SiteLogin, val games: G
         }.get
       case Some(Accept) =>
         val query = Json.read[Accept.Query](requestBody)
-        getUserInfo(query.opponent).map { case opponent =>
+        getUserInfo(query.opponent).map { opponent =>
           games.accept(id,query.gameAuth,opponent).map { case () =>
             Accept.Reply("Ok")
           }.get

@@ -75,7 +75,7 @@ object Games {
 
     limit: Option[Int]
   ) {
-    def getLimit = math.min(Games.MAX_SEARCH_LIMIT, math.max(0,limit.getOrElse(Games.DEFAULT_SEARCH_LIMIT)))
+    def getLimit : Int = math.min(Games.MAX_SEARCH_LIMIT, math.max(0,limit.getOrElse(Games.DEFAULT_SEARCH_LIMIT)))
   }
 }
 
@@ -891,11 +891,11 @@ class ActiveGames(val db: Database, val scheduler: Scheduler,
         Future {
           accounts.updateGameStats(game.users(GOLD).name) { stats =>
             stats.copy(numGamesGold = stats.numGamesGold+1)
-          }.onFailure { case exn => logger.error("Error updating numGamesGold for " + game.users(GOLD).name + " :" + exn) }
+          }.onFailure { case exn : Throwable => logger.error("Error updating numGamesGold for " + game.users(GOLD).name + " :" + exn) }
           accounts.updateGameStats(game.users(SILV).name) { stats =>
             stats.copy(numGamesSilv = stats.numGamesSilv+1)
-          }.onFailure { case exn => logger.error("Error updating numGamesSilv for " + game.users(SILV).name + " :" + exn) }
-        }.onFailure { case exn => logger.error("Error updating stats for game " + id + " :" + exn) }
+          }.onFailure { case exn : Throwable => logger.error("Error updating numGamesSilv for " + game.users(SILV).name + " :" + exn) }
+        }.onFailure { case exn : Throwable => logger.error("Error updating stats for game " + id + " :" + exn) }
         activeGames = activeGames + (id -> game)
       }
     }

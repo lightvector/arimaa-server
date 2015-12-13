@@ -7,8 +7,8 @@ case class Rating(
   val mean: Double,
   val stdev: Double //standard deviation measuring uncertainty of belief about rating
 ) extends Ordered[Rating] {
-  def *(x: Double) = new Rating(mean*x,stdev*x)
-  def /(x: Double) = new Rating(mean/x,stdev/x)
+  def *(x: Double) : Rating = new Rating(mean*x,stdev*x)
+  def /(x: Double) : Rating = new Rating(mean/x,stdev/x)
 
   import scala.math.Ordered.orderingToOrdered
 
@@ -24,9 +24,9 @@ object Rating {
   /* Converts from Elo scale (400 points = 10x odds of winning) to nat scale (1 point = ex odds of winning)
    * where e is the base of the natural log. */
   val eloPerNat = 400.0 / math.log(10)
-  def toNat(r: Rating) =
+  def toNat(r: Rating) : Rating =
     r / eloPerNat
-  def ofNat(r: Rating) =
+  def ofNat(r: Rating) : Rating =
     r * eloPerNat
 
   def square(x: Double) : Double = x * x

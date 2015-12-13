@@ -17,7 +17,7 @@ case class SimpleUserInfo (
 case object SimpleUserInfo {
   val blank : SimpleUserInfo = new SimpleUserInfo("",Rating(0,0),false,false)
 
-  def ofDB(x: (String,Double,Double,Boolean,Boolean)) = {
+  def ofDB(x: (String,Double,Double,Boolean,Boolean)) : SimpleUserInfo = {
     x match { case (name, rating, ratingStdev, isBot, isGuest) =>
       SimpleUserInfo(name, Rating(rating, ratingStdev), isBot, isGuest)
     }

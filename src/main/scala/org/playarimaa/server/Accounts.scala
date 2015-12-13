@@ -53,10 +53,9 @@ case object AccountGameStats {
   //Each time we fail to update user stats in a transaction, wait this many seconds then try again, failing out right if we hit the end of the list.
   val updateRetryDelays: List[Double] = List(1.0,3.0,10.0)
 
-  def ofDB(stats : (Int,Int,Int,Int,Double,Double)) = {
-    stats match {
-      case (numGamesGold, numGamesSilv, numGamesWon, numGamesLost, rating, ratingStdev) =>
-        AccountGameStats(numGamesGold, numGamesSilv, numGamesWon, numGamesLost, Rating(rating,ratingStdev))
+  def ofDB(stats : (Int,Int,Int,Int,Double,Double)) : AccountGameStats = {
+    stats match { case (numGamesGold, numGamesSilv, numGamesWon, numGamesLost, rating, ratingStdev) =>
+      AccountGameStats(numGamesGold, numGamesSilv, numGamesWon, numGamesLost, Rating(rating,ratingStdev))
     }
   }
 
