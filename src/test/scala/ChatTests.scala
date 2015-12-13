@@ -43,9 +43,9 @@ class ChatServletTests(_system: ActorSystem) extends TestKit(_system) with Scala
   val actorEC: ExecutionContext = actorSystem.dispatcher
   val serverInstanceID: Long = System.currentTimeMillis
   val db = ArimaaServerInit.createDB("h2memchat")
-  val emailer = new Emailer(siteName,siteAddress,smtpHost,smtpPort,smtpAuth,noReplyAddress,helpAddress)(mainEC)
-  val accounts = new Accounts(db)(mainEC)
   val scheduler = actorSystem.scheduler
+  val emailer = new Emailer(siteName,siteAddress,smtpHost,smtpPort,smtpAuth,noReplyAddress,helpAddress)(mainEC)
+  val accounts = new Accounts(db,scheduler)(mainEC)
   val siteLogin = new SiteLogin(accounts,emailer,cryptEC,scheduler)(mainEC)
   val games = new Games(db,siteLogin.logins,scheduler,serverInstanceID)(mainEC)
   val chat = new ChatSystem(db,siteLogin.logins,actorSystem)(actorEC)
