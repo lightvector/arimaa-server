@@ -46,8 +46,8 @@ class GameServletTests(_system: ActorSystem) extends TestKit(_system) with Scala
   val db = ArimaaServerInit.createDB("h2memgame")
   val emailer = new Emailer(siteName,siteAddress,smtpHost,smtpPort,smtpAuth,noReplyAddress,helpAddress)(mainEC)
   val accounts = new Accounts(db)(mainEC)
-  val siteLogin = new SiteLogin(accounts,emailer,cryptEC)(mainEC)
   val scheduler = actorSystem.scheduler
+  val siteLogin = new SiteLogin(accounts,emailer,cryptEC,scheduler)(mainEC)
   val games = new Games(db,siteLogin.logins,scheduler,serverInstanceID)(mainEC)
   addServlet(new AccountServlet(siteLogin,mainEC), "/accounts/*")
   addServlet(new GameServlet(accounts,siteLogin,games,mainEC), "/games/*")

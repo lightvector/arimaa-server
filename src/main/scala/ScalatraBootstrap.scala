@@ -83,8 +83,8 @@ class ScalatraBootstrap extends LifeCycle {
     val db = ArimaaServerInit.createDB("h2mem1")
     val emailer = new Emailer(siteName,siteAddress,smtpHost,smtpPort,smtpAuth,noReplyAddress,helpAddress)(mainEC)
     val accounts = new Accounts(db)(mainEC)
-    val siteLogin = new SiteLogin(accounts,emailer,cryptEC)(mainEC)
     val scheduler = actorSystem.scheduler
+    val siteLogin = new SiteLogin(accounts,emailer,cryptEC,scheduler)(mainEC)
     val games = new Games(db,siteLogin.logins,scheduler,serverInstanceID)(mainEC)
     val chat = new ChatSystem(db,siteLogin.logins,actorSystem)(actorEC)
 

@@ -155,4 +155,12 @@ class LoginTracker(val parent: Option[LoginTracker], val inactivityTimeout: Doub
     usersTimedOut
   }
 
+
+  /* Updates the SimpleUserInfo for the specified user if that user is logged in */
+  def updateInfo(user: SimpleUserInfo): Unit = synchronized {
+    loginData.get(user.name).foreach { ld =>
+      ld.info = user
+    }
+  }
+
 }

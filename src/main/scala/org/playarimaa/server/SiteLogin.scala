@@ -1,9 +1,13 @@
 package org.playarimaa.server
 import scala.concurrent.{ExecutionContext, Future, Promise, future}
+import scala.concurrent.duration.{DurationInt, DurationDouble}
+import scala.language.postfixOps
 import scala.util.{Try, Success, Failure}
+import org.slf4j.{Logger, LoggerFactory}
 import org.mindrot.jbcrypt.BCrypt
 import org.playarimaa.server.CommonTypes._
 import org.playarimaa.server.Timestamp.Timestamp
+import akka.actor.{Scheduler,Cancellable}
 
 //TODO add logging and throttling/bucketing to everything here
 
@@ -13,6 +17,10 @@ object SiteLogin {
     val INACTIVITY_TIMEOUT: Double = 300 //5 minutes
     val PASSWORD_RESET_TIMEOUT: Double = 1800 //30 minutes
     val EMAIL_CHANGE_TIMEOUT: Double = 84600 //1 day
+
+    //Rate of refresh of simple user infos (displayed ratings and such)
+    val REFRESH_PERIOD: Double = 10 //10 seconds
+    val REFRESH_PERIOD_IF_ERROR: Double = 120 //2 minutes
 
     val USERNAME_MIN_LENGTH: Int = 3
     val USERNAME_MAX_LENGTH: Int = 24
@@ -51,7 +59,7 @@ case class AuthTime(auth: Auth, time: Timestamp)
 
 import SiteLogin.Constants._
 
-class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: ExecutionContext)(implicit ec: ExecutionContext) {
+class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: ExecutionContext, val scheduler: Scheduler)(implicit ec: ExecutionContext) {
 
   val logins: LoginTracker = new LoginTracker(None,INACTIVITY_TIMEOUT)
 
@@ -60,6 +68,11 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
 
   var emailChanges: Map[Username,(AuthTime,Email)] = Map()
   val emailChangeLock = new Object()
+
+  val logger =  LoggerFactory.getLogger(getClass)
+
+  //Begin loop on initialization
+  refreshLoginInfosLoop()
 
   def validateUsername(username: Username): Unit = {
     if(username.length < USERNAME_MIN_LENGTH || username.length > USERNAME_MAX_LENGTH)
@@ -91,6 +104,38 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
       accounts.removeIfGuest(user)
     }
   }
+
+  private def refreshLoginInfos() : Future[Unit] = {
+    doTimeouts(Timestamp.get)
+    val futures = logins.usersLoggedIn.map { user =>
+      accounts.getByName(user.name,excludeGuests=false).map {
+        case None => ()
+        case Some(acct) =>logins.updateInfo(acct.info)
+      }
+    }
+    Future.sequence(futures).map { _ : List[Unit] => () }
+  }
+
+  private def refreshLoginInfosLoop(): Unit = {
+    refreshLoginInfos().onComplete { result =>
+      val nextDelay =
+        result match {
+          case Failure(exn) =>
+            logger.error("Error in refreshLoginInfosLoop: " + exn)
+            REFRESH_PERIOD_IF_ERROR
+          case Success(()) =>
+            REFRESH_PERIOD
+        }
+      try {
+        scheduler.scheduleOnce(nextDelay seconds) { refreshLoginInfosLoop() }
+      }
+      catch {
+        //Thrown when the actorsystem shuts down, ignore
+        case _ : IllegalStateException => ()
+      }
+    }
+  }
+
 
   def usersLoggedIn: List[SimpleUserInfo] = {
     val now = Timestamp.get
