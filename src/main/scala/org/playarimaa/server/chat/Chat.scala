@@ -94,6 +94,13 @@ class ChatSystem(val db: Database, val parentLogins: LoginTracker, val actorSyst
     }
   }
 
+  /** Gets all users logged in. */
+  def usersLoggedIn(channel: Channel): Future[List[SimpleUserInfo]] = {
+    withChannel(channel) { cc =>
+      (cc ? ChatChannel.UsersLoggedIn()).map(_.asInstanceOf[List[SimpleUserInfo]])
+    }
+  }
+
   /** Get the specified range of lines of chat from a channel.
     * If [doWait] is true and there are no lines meeting the criteria, wait a short time,
     * returning when a new line is posted or upon timeout.
@@ -129,6 +136,9 @@ object ChatChannel {
   case class Post(chatAuth: ChatAuth, text:String)
   //Replies with Unit
   case class Heartbeat(chatAuth: ChatAuth)
+
+  //Replies with List[SimpleUserInfo]
+  case class UsersLoggedIn()
 
   /** [minId] defaults to the current end of chat minus [READ_MAX_LINES]
     * [doWait] defaults to false.
@@ -235,6 +245,10 @@ class ChatChannel(val channel: Channel, val db: Database, val parentLogins: Logi
     case ChatChannel.Heartbeat(chatAuth: ChatAuth) =>
       val result: Try[Unit] = requiringLogin(chatAuth) { (_ : SimpleUserInfo) => () }
       replyWith(sender, result)
+
+    case ChatChannel.UsersLoggedIn() =>
+      val result = logins.usersLoggedIn
+      sender ! (result : List[SimpleUserInfo])
 
 
     case ChatChannel.Get(

@@ -121,6 +121,10 @@ class AccountServlet(val siteLogin: SiteLogin, val ec: ExecutionContext)
     Action.all.find(_.name == action)
   }
 
+  def convUser(user: SimpleUserInfo): IOTypes.ShortUserInfo = {
+    IOTypes.ShortUserInfo(user.name,user.rating,user.isBot,user.isGuest)
+  }
+
   def handleAction(params: Map[String,String]) : AnyRef = {
     getAction(params("action")) match {
       case None =>
@@ -150,7 +154,7 @@ class AccountServlet(val siteLogin: SiteLogin, val ec: ExecutionContext)
         val isLoggedIn = siteLogin.isAuthLoggedIn(query.siteAuth)
         Json.write(AuthLoggedIn.Reply(isLoggedIn))
       case Some(UsersLoggedIn) =>
-        val usersLoggedIn = siteLogin.usersLoggedIn.toList.map { user => IOTypes.ShortUserInfo(user.name,user.rating,user.isBot,user.isGuest) }
+        val usersLoggedIn = siteLogin.usersLoggedIn.toList.map(convUser(_))
         Json.write(UsersLoggedIn.Reply(usersLoggedIn))
       case Some(ForgotPassword) =>
         val query = Json.read[ForgotPassword.Query](request.body)

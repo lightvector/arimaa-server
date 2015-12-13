@@ -18,7 +18,7 @@ import akka.util.Timeout
 import slick.driver.H2Driver.api.Database
 
 import org.playarimaa.server.CommonTypes._
-import org.playarimaa.server.{Accounts,Json,LoginTracker,SiteLogin,Timestamp,WebAppStack}
+import org.playarimaa.server.{Accounts,Json,LoginTracker,SimpleUserInfo,SiteLogin,Timestamp,WebAppStack}
 import org.playarimaa.server.Timestamp.Timestamp
 import org.playarimaa.server.game.Games
 
@@ -26,6 +26,13 @@ object ChatServlet {
   object IOTypes {
     case class SimpleError(error: String)
     case class ChatLine(id: Long, channel: String, username: String, text: String, timestamp: Double)
+
+    case class ShortUserInfo(
+      name: String,
+      rating: Double,
+      isBot: Boolean,
+      isGuest: Boolean
+    )
   }
 
   sealed trait Action {
@@ -34,7 +41,7 @@ object ChatServlet {
     abstract class Reply
   }
   object Action {
-    val all: List[Action] = List(Join,Leave,Heartbeat,Post)
+    val all: List[Action] = List(Join,Leave,Heartbeat,Post,UsersLoggedIn)
   }
 
   case object Join extends Action {
@@ -56,6 +63,11 @@ object ChatServlet {
     val name = "post"
     case class Query(chatAuth: String, text: String)
     case class Reply(message: String)
+  }
+  case object UsersLoggedIn extends Action {
+    val name = "usersLoggedIn"
+    case class Query()
+    case class Reply(users: List[IOTypes.ShortUserInfo])
   }
 
   case object Get {
@@ -88,6 +100,10 @@ class ChatServlet(val accounts: Accounts, val siteLogin: SiteLogin, val chat: Ch
   //Before every action runs, set the content type to be in JSON format.
   before() {
     contentType = formats("json")
+  }
+
+  def convUser(user: SimpleUserInfo): IOTypes.ShortUserInfo = {
+    IOTypes.ShortUserInfo(user.name,user.rating,user.isBot,user.isGuest)
   }
 
   def getAction(action: String): Option[Action] = {
@@ -124,6 +140,11 @@ class ChatServlet(val accounts: Accounts, val siteLogin: SiteLogin, val chat: Ch
               val query = Json.read[Post.Query](requestBody)
               chat.post(channel, query.chatAuth, query.text).map { case () =>
                 Post.Reply("Ok")
+              }
+            case UsersLoggedIn =>
+              val query = Json.read[UsersLoggedIn.Query](requestBody)
+              chat.usersLoggedIn(channel).map { users =>
+                UsersLoggedIn.Reply(users.map(convUser(_)))
               }
           }
         }
