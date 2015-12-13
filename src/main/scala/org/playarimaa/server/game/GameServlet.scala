@@ -391,7 +391,7 @@ class GameServlet(val accounts: Accounts, val siteLogin: SiteLogin, val games: G
   }
 
   def tcOfIOTC(tc: IOTypes.TimeControl): TimeControl = {
-    TimeControl(
+    val tc2 = TimeControl(
       initialTime = tc.initialTime,
       increment = tc.increment.getOrElse(0),
       delay = tc.delay.getOrElse(0),
@@ -399,6 +399,8 @@ class GameServlet(val accounts: Accounts, val siteLogin: SiteLogin, val games: G
       maxMoveTime = tc.maxMoveTime,
       overtimeAfter = tc.overtimeAfter
     )
+    tc2.validate()
+    tc2
   }
 
   def convTC(tc: TimeControl): IOTypes.TimeControl = {

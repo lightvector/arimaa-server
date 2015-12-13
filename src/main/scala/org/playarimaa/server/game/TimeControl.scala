@@ -18,6 +18,30 @@ case class TimeControl(
   overtimeAfter: Option[Int]
 )
 {
+  /* Raise an exception if this time control is nonsensical */
+  def validate() : Unit = {
+    if(initialTime < 0)
+      throw new Exception("Invalid time control: initialTime < 0")
+    if(increment < 0)
+      throw new Exception("Invalid time control: increment < 0")
+    if(delay < 0)
+      throw new Exception("Invalid time control: delay < 0")
+    if(maxReserve.exists(_ < 0))
+      throw new Exception("Invalid time control: maxReserve < 0")
+    if(maxMoveTime.exists(_ < 0))
+      throw new Exception("Invalid time control: maxMoveTime < 0")
+    if(overtimeAfter.exists(_ < 0))
+      throw new Exception("Invalid time control: overtimeAfter < 0")
+
+   if(maxReserve.exists(_ < initialTime))
+      throw new Exception("Invalid time control: maxReserve < initialTime")
+
+    //Exclude some obviously unreasonable time controls
+    val startingTime = initialTime + increment + delay
+    if(startingTime < 10 || maxMoveTime.exists(_ < 10))
+      throw new Exception("Invalid time control: too fast")
+  }
+
   /* Compute the amount of time left on player clock after a player's turn */
   def clockAfterTurn(clockBeforeTurn: Double, timeSpent: Double, turn: Int): Double = {
     val overtimeFactor =
