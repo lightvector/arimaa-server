@@ -19,7 +19,9 @@ object AccountServlet {
     case class SimpleError(error: String)
 
     case class ShortUserInfo(
-      name: String
+      name: String,
+      rating: Double,
+      isBot: Boolean
     )
   }
 
@@ -147,7 +149,7 @@ class AccountServlet(val siteLogin: SiteLogin, val ec: ExecutionContext)
         val isLoggedIn = siteLogin.isAuthLoggedIn(query.siteAuth)
         Json.write(AuthLoggedIn.Reply(isLoggedIn))
       case Some(UsersLoggedIn) =>
-        val usersLoggedIn = siteLogin.usersLoggedIn.toList.map { user => IOTypes.ShortUserInfo(user) }
+        val usersLoggedIn = siteLogin.usersLoggedIn.toList.map { user => IOTypes.ShortUserInfo(user.name,user.rating,user.isBot) }
         Json.write(UsersLoggedIn.Reply(usersLoggedIn))
       case Some(ForgotPassword) =>
         val query = Json.read[ForgotPassword.Query](request.body)

@@ -11,6 +11,7 @@ import slick.driver.H2Driver.api._
 import slick.lifted.{PrimaryKey,ProvenShape}
 import org.slf4j.{Logger, LoggerFactory}
 import org.playarimaa.server.CommonTypes._
+import org.playarimaa.server.SimpleUserInfo
 import org.playarimaa.server.{LoginTracker,SiteLogin,Timestamp}
 import org.playarimaa.server.Timestamp.Timestamp
 
@@ -67,9 +68,9 @@ class ChatSystem(val db: Database, val parentLogins: LoginTracker, val actorSyst
   }
 
   /** Join the specified chat channel */
-  def join(channel: Channel, username: Username, siteAuth: SiteAuth): Future[ChatAuth] = {
+  def join(channel: Channel, user: SimpleUserInfo, siteAuth: SiteAuth): Future[ChatAuth] = {
     val cc = openChannel(channel)
-    (cc ? ChatChannel.Join(username,siteAuth)).map(_.asInstanceOf[ChatAuth])
+    (cc ? ChatChannel.Join(user,siteAuth)).map(_.asInstanceOf[ChatAuth])
   }
 
   /** Leave the specified chat channel. Failed if not logged in. */
@@ -121,7 +122,7 @@ object ChatChannel {
   //ACTOR MESSAGES---------------------------------------------------------
 
   //Replies with ChatAuth
-  case class Join(username: Username, siteAuth: SiteAuth)
+  case class Join(user: SimpleUserInfo, siteAuth: SiteAuth)
   //Replies with Unit
   case class Leave(chatAuth: ChatAuth)
   //Replies with Unit
@@ -198,22 +199,22 @@ class ChatChannel(val channel: Channel, val db: Database, val parentLogins: Logi
   }
 
   def normalReceive: Receive = {
-    case ChatChannel.Join(username: Username, siteAuth: SiteAuth) =>
+    case ChatChannel.Join(user: SimpleUserInfo, siteAuth: SiteAuth) =>
       val now = Timestamp.get
       logins.doTimeouts(now)
-      val chatAuth = logins.login(username, now, Some(siteAuth))
+      val chatAuth = logins.login(user, now, Some(siteAuth))
       lastActive = now
       sender ! (chatAuth : ChatAuth)
 
     case ChatChannel.Leave(chatAuth: ChatAuth) =>
-      val result: Try[Unit] = requiringLogin(chatAuth) { username =>
-        logins.logout(username,chatAuth,Timestamp.get)
+      val result: Try[Unit] = requiringLogin(chatAuth) { user =>
+        logins.logout(user.name,chatAuth,Timestamp.get)
       }
       replyWith(sender, result)
 
     case ChatChannel.Post(chatAuth: ChatAuth, text:String) =>
-      val result: Try[Unit] = requiringLogin(chatAuth) { username =>
-        val line = ChatLine(nextId, channel, username, text, Timestamp.get)
+      val result: Try[Unit] = requiringLogin(chatAuth) { user =>
+        val line = ChatLine(nextId, channel, user.name, text, Timestamp.get)
         nextId = nextId + 1
 
         //Add to queue of lines that we will remember until they show up in the db
@@ -232,7 +233,7 @@ class ChatChannel(val channel: Channel, val db: Database, val parentLogins: Logi
       replyWith(sender, result)
 
     case ChatChannel.Heartbeat(chatAuth: ChatAuth) =>
-      val result: Try[Unit] = requiringLogin(chatAuth) { (_ : Username) => () }
+      val result: Try[Unit] = requiringLogin(chatAuth) { (_ : SimpleUserInfo) => () }
       replyWith(sender, result)
 
 
@@ -307,14 +308,14 @@ class ChatChannel(val channel: Channel, val db: Database, val parentLogins: Logi
     }
   }
 
-  def requiringLogin[T](chatAuth: ChatAuth)(f:Username => T) : Try[T] = {
+  def requiringLogin[T](chatAuth: ChatAuth)(f:SimpleUserInfo => T) : Try[T] = {
     val now = Timestamp.get
     logins.doTimeouts(now)
     logins.heartbeatAuth(chatAuth,now) match {
       case None => Failure(new Exception(ChatSystem.NO_LOGIN_MESSAGE))
-      case Some(username) =>
+      case Some(user) =>
       lastActive = now
-      Success(f(username))
+      Success(f(user))
     }
   }
 

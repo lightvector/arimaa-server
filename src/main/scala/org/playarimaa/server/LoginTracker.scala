@@ -10,7 +10,7 @@ import org.playarimaa.server.Timestamp.Timestamp
  * check if the parent is logged in or not.
  */
 class LoginTracker(val parent: Option[LoginTracker], val inactivityTimeout: Double) {
-  class LoginData() {
+  class LoginData(var info: SimpleUserInfo) {
     //All auth keys this user has, along with the time they were most recently used
     var auths: Map[Auth,Timestamp] = Map()
     //Most recent time anything happened for this user
@@ -20,11 +20,11 @@ class LoginTracker(val parent: Option[LoginTracker], val inactivityTimeout: Doub
   private var loginData: Map[Username,LoginData] = Map()
   private var lastActive: Timestamp = Timestamp.get
 
-  private var userAndParentAuth: Map[Auth,(Username,Option[Auth])] = Map()
+  private var userAndParentAuth: Map[Auth,(SimpleUserInfo,Option[Auth])] = Map()
 
-  private def findOrAddLoginData(username: Username): LoginData = synchronized {
-    val ld = loginData.getOrElse(username, new LoginData)
-    loginData = loginData + (username -> ld)
+  private def findOrAddLoginData(user: SimpleUserInfo): LoginData = synchronized {
+    val ld = loginData.getOrElse(user.name, new LoginData(user))
+    loginData = loginData + (user.name -> ld)
     ld
   }
 
@@ -39,21 +39,21 @@ class LoginTracker(val parent: Option[LoginTracker], val inactivityTimeout: Doub
   }
 
   /* Log a user in. */
-  def login(username: Username, now: Timestamp): Auth =
-    login(username,now,None)
-  def login(username: Username, now: Timestamp, parentAuth: Option[Auth]): Auth = {
+  def login(user: SimpleUserInfo, now: Timestamp): Auth =
+    login(user,now,None)
+  def login(user: SimpleUserInfo, now: Timestamp, parentAuth: Option[Auth]): Auth = {
     val auth = RandGen.genAuth
     if(userAndParentAuth.contains(auth))
-      login(username,now,parentAuth)
+      login(user,now,parentAuth)
     else synchronized {
       if(parentAuth.nonEmpty && parent.isEmpty)
         throw new IllegalArgumentException("parentAuth provided when parent is None")
       if(parentAuth.isEmpty && parent.nonEmpty)
         throw new IllegalArgumentException("parentAuth not provided when parent is Some")
 
-      val ld = findOrAddLoginData(username)
+      val ld = findOrAddLoginData(user)
       ld.auths = ld.auths + (auth -> now)
-      userAndParentAuth = userAndParentAuth + (auth -> ((username,parentAuth)))
+      userAndParentAuth = userAndParentAuth + (auth -> ((user,parentAuth)))
       ld.lastActive = now
       lastActive = now
       auth
@@ -73,8 +73,8 @@ class LoginTracker(val parent: Option[LoginTracker], val inactivityTimeout: Doub
     loginData.nonEmpty
   }
 
-  def userOfAuth(auth: Auth): Option[Username] = synchronized {
-    userAndParentAuth.get(auth).map { case (username,_) => username }
+  def userOfAuth(auth: Auth): Option[SimpleUserInfo] = synchronized {
+    userAndParentAuth.get(auth).map { case (user,_) => user }
   }
 
   /* Returns the last time that any activity occurred */
@@ -82,28 +82,28 @@ class LoginTracker(val parent: Option[LoginTracker], val inactivityTimeout: Doub
     lastActive
   }
   /* Returns all users logged in */
-  def usersLoggedIn: Set[Username] = synchronized {
-    loginData.keySet
+  def usersLoggedIn: List[SimpleUserInfo] = synchronized {
+    loginData.values.map(_.info).toList
   }
 
   /* Updates a user's last active time for timeout-checking purposes.
    * Returns None if the user was not logged in, and Some if the user was. */
-  def heartbeat(username: Username, auth: Auth, now: Timestamp): Option[Username] = synchronized {
+  def heartbeat(username: Username, auth: Auth, now: Timestamp): Option[SimpleUserInfo] = synchronized {
     lastActive = now
     getLoginData(username,auth).map { ld =>
       ld.auths = ld.auths + (auth -> now)
       ld.lastActive = now
-      val (username,parentAuth) = userAndParentAuth(auth)
+      val (user,parentAuth) = userAndParentAuth(auth)
       parentAuth.foreach { parentAuth => parent.get.heartbeat(username, auth, now) }
-      username
+      user
     }
   }
 
   /* Same as [heartbeat], but performs a lookup to find the username using only the auth */
-  def heartbeatAuth(auth: Auth, now: Timestamp): Option[Username] = synchronized {
+  def heartbeatAuth(auth: Auth, now: Timestamp): Option[SimpleUserInfo] = synchronized {
     lastActive = now
-    userAndParentAuth.get(auth).flatMap { case (username,_) =>
-      heartbeat(username, auth, now)
+    userAndParentAuth.get(auth).flatMap { case (user,_) =>
+      heartbeat(user.name, auth, now)
     }
   }
 
@@ -117,8 +117,8 @@ class LoginTracker(val parent: Option[LoginTracker], val inactivityTimeout: Doub
   /* Log a single auth of a user out */
   def logoutAuth(auth: Auth, now: Timestamp): Unit = synchronized {
     lastActive = now
-    userAndParentAuth.get(auth).foreach { case (username,_) =>
-      logout(username, auth, now)
+    userAndParentAuth.get(auth).foreach { case (user,_) =>
+      logout(user.name, auth, now)
     }
   }
   /* Log all of a user's auths out */

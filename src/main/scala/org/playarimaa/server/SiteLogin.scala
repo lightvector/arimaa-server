@@ -88,11 +88,11 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
   def doTimeouts(now: Timestamp): Unit = {
     val usersTimedOut = logins.doTimeouts(now)
     usersTimedOut.foreach { user =>
-      accounts.removeGuest(user)
+      accounts.removeIfGuest(user)
     }
   }
 
-  def usersLoggedIn: Set[Username] = {
+  def usersLoggedIn: List[SimpleUserInfo] = {
     val now = Timestamp.get
     doTimeouts(now)
     logins.usersLoggedIn
@@ -108,11 +108,20 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
       val lowercaseName = username.toLowerCase
       Future(BCrypt.hashpw(password, BCrypt.gensalt))(cryptEC).flatMap { passwordHash =>
         val now = Timestamp.get
-        val createdTime = now
-        val account = Account(lowercaseName,username,email,passwordHash,isBot,createdTime,isGuest=false)
+        val account = Account(
+          lowercaseName,
+          username,
+          email,
+          passwordHash,
+          isBot,
+          createdTime = now,
+          isGuest = false,
+          lastLogin = now,
+          gameStats = AccountGameStats.initial
+        )
         accounts.add(account).recover { case _ => throw new Exception(INVALID_USERNAME_ERROR) }.map { case () =>
           doTimeouts(now)
-          val siteAuth = logins.login(account.username, now)
+          val siteAuth = logins.login(account.info, now)
           (account.username,siteAuth)
         }
       }
@@ -121,7 +130,7 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
 
   //TODO throttle login attempt rate
   def login(usernameOrEmail: String, password: String): Future[(Username,SiteAuth)] = {
-    accounts.getNonGuestByNameOrEmail(usernameOrEmail).flatMap { accounts =>
+    accounts.getByNameOrEmail(usernameOrEmail, excludeGuests=true).flatMap { accounts =>
       def fail = throw new IllegalArgumentException("Invalid username/email and password combination.")
 
       //Note: with this implementation, we would be vulnerable to a time-measuring attack if we wanted
@@ -143,7 +152,7 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
           case account :: Nil =>
             val now = Timestamp.get
             doTimeouts(now)
-            val siteAuth = logins.login(account.username, now)
+            val siteAuth = logins.login(account.info, now)
             (account.username,siteAuth)
           //more matches
           case _ =>
@@ -160,17 +169,26 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
 
       val lowercaseName = username.toLowerCase
       val now = Timestamp.get
-      val createdTime = now
-      val account = Account(lowercaseName,username,email="",passwordHash="N/A",isBot=false,createdTime,isGuest=true)
+      val account = Account(
+        lowercaseName,
+        username,
+        email = "",
+        passwordHash = "N/A",
+        isBot = false,
+        createdTime = now,
+        isGuest = true,
+        lastLogin = now,
+        gameStats = AccountGameStats.initial
+      )
       accounts.add(account).recover { case _ => throw new Exception(INVALID_USERNAME_ERROR) }.map { case () =>
         doTimeouts(now)
-        val siteAuth = logins.login(account.username, now)
+        val siteAuth = logins.login(account.info, now)
         (account.username,siteAuth)
       }
     }
   }
 
-  def requiringLogin[T](siteAuth: SiteAuth)(f:Username => T) : Try[T] = {
+  def requiringLogin[T](siteAuth: SiteAuth)(f:SimpleUserInfo => T) : Try[T] = {
     val now = Timestamp.get
     doTimeouts(now)
     logins.heartbeatAuth(siteAuth,now) match {
@@ -185,13 +203,9 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
       logins.userOfAuth(siteAuth) match {
         case None =>
           logins.logoutAuth(siteAuth,now)
-        case Some(username) =>
-          if(accounts.isGuest(username)) {
-            logins.logoutUser(username,now)
-            accounts.removeGuest(username)
-          }
-          else
-            logins.logoutAuth(siteAuth,now)
+        case Some(user) =>
+          logins.logoutUser(user.name,now)
+          accounts.removeIfGuest(user.name)
       }
     }
   }
@@ -204,7 +218,7 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
 
   def forgotPassword(usernameOrEmail: Username) : Unit = {
     //Spawn off a job to find the user's account if it exists and send the email and don't wait for it
-    accounts.getNonGuestByNameOrEmail(usernameOrEmail).onComplete { result =>
+    accounts.getByNameOrEmail(usernameOrEmail, excludeGuests=true).onComplete { result =>
       result match {
         case Failure(_) =>
           //TODO log the failure
@@ -234,7 +248,7 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
 
   def resetPassword(usernameOrEmail: Username, resetAuth: Auth, password: String) : Future[Unit] = {
     validatePassword(password)
-    accounts.getNonGuestByNameOrEmail(usernameOrEmail).flatMap { matchingAccounts =>
+    accounts.getByNameOrEmail(usernameOrEmail, excludeGuests=true).flatMap { matchingAccounts =>
       def fail = throw new IllegalArgumentException("Unknown username/email.")
       matchingAccounts match {
         case Nil => fail
@@ -268,12 +282,12 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
   def changePassword(username: Username, password: String, siteAuth: SiteAuth, newPassword: String) : Future[Unit] = {
     Future.successful(()).flatMap { case () =>
       validatePassword(newPassword)
-      requiringLogin(siteAuth) { uname =>
-        accounts.getNonGuestByName(username).flatMap { result =>
+      requiringLogin(siteAuth) { user =>
+        accounts.getByName(username, excludeGuests=true).flatMap { result =>
           result match {
             case None => throw new IllegalArgumentException("Unknown username.")
             case Some(account) =>
-              if(uname != account.username)
+              if(user.name != account.username)
                 throw new Exception("Username does not match login.")
 
               Future(BCrypt.checkpw(password, account.passwordHash))(cryptEC).flatMap { success =>
@@ -292,12 +306,12 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
   def changeEmail(username: Username, password: String, siteAuth: SiteAuth, newEmail: Email) : Future[Unit] = {
     Future.successful(()).flatMap { case () =>
       validateEmail(newEmail)
-      requiringLogin(siteAuth) { uname =>
-        accounts.getNonGuestByName(username).flatMap { result =>
+      requiringLogin(siteAuth) { user =>
+        accounts.getByName(username, excludeGuests=true).flatMap { result =>
           result match {
             case None => throw new IllegalArgumentException("Unknown username.")
             case Some(account) =>
-              if(uname != account.username)
+              if(user.name != account.username)
                 throw new Exception("Username does not match login.")
               if(newEmail == account.email)
                 throw new Exception("New email is the same as the old email.")
@@ -327,7 +341,7 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
 
   def confirmChangeEmail(username: Username, changeAuth: SiteAuth) : Future[Unit] = {
     Future.successful(()).flatMap { case () =>
-      accounts.getNonGuestByName(username).flatMap { result =>
+      accounts.getByName(username, excludeGuests=true).flatMap { result =>
         result match {
           case None => throw new IllegalArgumentException("Unknown username.")
           case Some(account) =>

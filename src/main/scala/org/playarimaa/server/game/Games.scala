@@ -11,6 +11,7 @@ import org.playarimaa.server.Timestamp
 import org.playarimaa.server.Timestamp.Timestamp
 import org.playarimaa.server.RandGen
 import org.playarimaa.server.LoginTracker
+import org.playarimaa.server.SimpleUserInfo
 import org.playarimaa.server.Utils._
 import org.playarimaa.board.{Player,GOLD,SILV}
 import org.playarimaa.board.{Board,Game,Notation,StandardNotation,GameType}
@@ -94,12 +95,12 @@ class Games(val db: Database, val parentLogins: LoginTracker, val scheduler: Sch
   checkTimeoutLoop()
 
   def createStandardGame(
-    creator: Username,
+    creator: SimpleUserInfo,
     siteAuth: SiteAuth,
     tc: TimeControl,
     rated: Boolean,
-    gUser: Option[Username],
-    sUser: Option[Username]
+    gUser: Option[SimpleUserInfo],
+    sUser: Option[SimpleUserInfo]
   ): Future[(GameID,GameAuth)] = {
     openGames.reserveNewGameID.map { id =>
       val gameAuth = openGames.createStandardGame(id,creator,siteAuth,tc,rated,gUser,sUser)
@@ -108,12 +109,12 @@ class Games(val db: Database, val parentLogins: LoginTracker, val scheduler: Sch
   }
 
   def createHandicapGame(
-    creator: Username,
+    creator: SimpleUserInfo,
     siteAuth: SiteAuth,
     gTC: TimeControl,
     sTC: TimeControl,
-    gUser: Option[Username],
-    sUser: Option[Username]
+    gUser: Option[SimpleUserInfo],
+    sUser: Option[SimpleUserInfo]
   ): Future[(GameID,GameAuth)] = {
     openGames.reserveNewGameID.map { id =>
       val gameAuth = openGames.createHandicapGame(id,creator,siteAuth,gTC,sTC,gUser,sUser)
@@ -182,7 +183,7 @@ class Games(val db: Database, val parentLogins: LoginTracker, val scheduler: Sch
   }
 
   /* Attempt to join an open or active game with the specified id */
-  def join(user: Username, siteAuth: SiteAuth, id: GameID): Try[GameAuth] = {
+  def join(user: SimpleUserInfo, siteAuth: SiteAuth, id: GameID): Try[GameAuth] = {
     tryOpenAndActive(id)(_.join(user,siteAuth,id))(_.join(user,siteAuth,id))
   }
 
@@ -197,7 +198,7 @@ class Games(val db: Database, val parentLogins: LoginTracker, val scheduler: Sch
   }
 
   /* Accept the joining of a given opponent and starts the game if necessary */
-  def accept(id: GameID, gameAuth: GameAuth, opponent: Username): Try[Unit] = {
+  def accept(id: GameID, gameAuth: GameAuth, opponent: SimpleUserInfo): Try[Unit] = {
     openGames.accept(id,gameAuth,opponent).map { successResult =>
       successResult match {
         case None => ()
@@ -325,10 +326,10 @@ class Games(val db: Database, val parentLogins: LoginTracker, val scheduler: Sch
 
 object OpenGames {
   case class GetData(
-    creator: Option[Username],
-    joined: Set[Username],
-    users: PlayerArray[Option[Username]],
-    accepted: Map[Username,Username], //TODO use this in output
+    creator: Option[SimpleUserInfo],
+    joined: List[SimpleUserInfo],
+    users: PlayerArray[Option[SimpleUserInfo]],
+    accepted: Map[Username,SimpleUserInfo],
     creationTime: Timestamp
   )
 }
@@ -338,12 +339,12 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker, val serverInst
   case class OpenGameData(
     val meta: GameMetadata,
     val moves: Vector[MoveInfo],
-    val users: PlayerArray[Option[Username]],
-    val creator: Option[Username],
+    val users: PlayerArray[Option[SimpleUserInfo]],
+    val creator: Option[SimpleUserInfo],
     val creationTime: Timestamp,
     val logins: LoginTracker,
     //A map indicating who has accepted to play who
-    var accepted: Map[Username,Username],
+    var accepted: Map[Username,SimpleUserInfo],
     //A flag indicating that this game has been started and will imminently be removed
     var starting: Boolean,
 
@@ -361,7 +362,7 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker, val serverInst
     //Unaccepts anyone who is logged out at the time of this function call
     def filterAcceptedByLogins(): Unit = {
       accepted = accepted.filter { case (user1,user2) =>
-        logins.isUserLoggedIn(user1) && !logins.isUserLoggedIn(user2)
+        logins.isUserLoggedIn(user1) && !logins.isUserLoggedIn(user2.name)
       }
     }
 
@@ -442,10 +443,10 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker, val serverInst
   /* Creates a new game and joins the game with the creator, unreserving the id after the game is created */
   private def createGame(
     reservedID: GameID,
-    creator: Username,
+    creator: SimpleUserInfo,
     siteAuth: SiteAuth,
     tcs: PlayerArray[TimeControl],
-    users: PlayerArray[Option[Username]],
+    users: PlayerArray[Option[SimpleUserInfo]],
     rated: Boolean,
     gameType: GameType
   ): GameAuth = this.synchronized {
@@ -455,7 +456,7 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker, val serverInst
       id = reservedID,
       numPly = 0,
       startTime = None,
-      users = users.map(_.getOrElse("")),
+      users = users.map(_.getOrElse(SimpleUserInfo.blank)),
       tcs = tcs,
       rated = rated,
       postal = tcs.exists(_.isPostal),
@@ -485,12 +486,12 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker, val serverInst
 
   def createStandardGame(
     reservedID: GameID,
-    creator: Username,
+    creator: SimpleUserInfo,
     siteAuth: SiteAuth,
     tc: TimeControl,
     rated: Boolean,
-    gUser: Option[Username],
-    sUser: Option[Username]
+    gUser: Option[SimpleUserInfo],
+    sUser: Option[SimpleUserInfo]
   ): GameAuth = {
     val users = PlayerArray(gold = gUser, silv = sUser)
     createGame(reservedID, creator, siteAuth, PlayerArray(gold = tc, silv = tc), users, rated, GameType.STANDARD)
@@ -498,12 +499,12 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker, val serverInst
 
   def createHandicapGame(
     reservedID: GameID,
-    creator: Username,
+    creator: SimpleUserInfo,
     siteAuth: SiteAuth,
     gTC: TimeControl,
     sTC: TimeControl,
-    gUser: Option[Username],
-    sUser: Option[Username]
+    gUser: Option[SimpleUserInfo],
+    sUser: Option[SimpleUserInfo]
   ): GameAuth = {
     val users = PlayerArray(gold = gUser, silv = sUser)
     createGame(reservedID, creator, siteAuth, PlayerArray(gold = gTC, silv = sTC), users, rated = false, GameType.HANDICAP)
@@ -571,7 +572,7 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker, val serverInst
               now <= game.logins.lastActiveTime + Games.NO_CREATOR_GAME_CLEANUP_AGE
             //A user created this game - keep it if the user is joined
             case Some(creator) =>
-              game.logins.isUserLoggedIn(creator)
+              game.logins.isUserLoggedIn(creator.name)
           }
         }
       //Trigger anyone waiting if we're about to clean up this game
@@ -584,7 +585,7 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker, val serverInst
   /* Attempt to join an open game with the specified id.
    * Returns None if there was no game, Some(Failure(...)) if there was but it failed, and Some(Success(...)) on success.
    */
-  def join(user: Username, siteAuth: SiteAuth, id: GameID): Option[Try[GameAuth]] = this.synchronized {
+  def join(user: SimpleUserInfo, siteAuth: SiteAuth, id: GameID): Option[Try[GameAuth]] = this.synchronized {
     openGames.get(id).map { game =>
       //If the game has fixed users specified, then only those users can join
       if(game.users.forAll(_.nonEmpty) && game.users.forAll(_ != Some(user)))
@@ -603,7 +604,7 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker, val serverInst
    * Some(Success(...)) otherwise.
    * In the case that the user is logged in, heartbeats the user.
    */
-  private def ifLoggedInOpt[T](id: GameID, gameAuth: GameAuth)(f: (Username,OpenGameData) => Try[T]): Option[Try[T]] = {
+  private def ifLoggedInOpt[T](id: GameID, gameAuth: GameAuth)(f: (SimpleUserInfo,OpenGameData) => Try[T]): Option[Try[T]] = {
     openGames.get(id).map { game =>
       val now = Timestamp.get
       game.doTimeouts(now)
@@ -617,7 +618,7 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker, val serverInst
   /* Returns Failure(...) if there was no game or the user was not logged in or [f] failed, Success(...) otherwise.
    * In the case that the user is logged in, heartbeats the user.
    */
-  private def ifLoggedIn[T](id: GameID, gameAuth: GameAuth)(f: (Username,OpenGameData) => Try[T]): Try[T] = {
+  private def ifLoggedIn[T](id: GameID, gameAuth: GameAuth)(f: (SimpleUserInfo,OpenGameData) => Try[T]): Try[T] = {
     ifLoggedInOpt(id,gameAuth)(f).getOrElse(Failure(new Exception("No open game with the given id.")))
   }
 
@@ -634,7 +635,7 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker, val serverInst
   def leave(id: GameID, gameAuth: GameAuth): Option[Try[Unit]] = this.synchronized {
     ifLoggedInOpt(id,gameAuth) { case (user,game) =>
       val now = Timestamp.get
-      game.logins.logoutUser(user,now)
+      game.logins.logoutUser(user.name,now)
       game.filterAcceptedByLogins()
       game.advanceSequence()
       Success(())
@@ -648,35 +649,39 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker, val serverInst
    * NOTE: In the event that a game should begin, one must call [clearStartedGame] after the newly active game is inserted into
    * the database (or otherwise on failure of the game to start for other reasons).
    */
-  def accept(id: GameID, gameAuth: GameAuth, opponent: Username): Try[Option[ActiveGames.InitData]] = this.synchronized {
+  def accept(id: GameID, gameAuth: GameAuth, opponent: SimpleUserInfo): Try[Option[ActiveGames.InitData]] = this.synchronized {
     ifLoggedIn(id,gameAuth) { case (user,game) =>
       //Do nothing if the game is already starting
       if(game.starting)
         Failure(new Exception("Game already starting"))
       else {
-        game.accepted = game.accepted + (user -> opponent)
+        game.accepted = game.accepted + (user.name -> opponent)
         game.advanceSequence()
 
         val shouldBegin = game.creator match {
-          case None => game.accepted.get(user) == Some(opponent) && game.accepted.get(opponent) == Some(user)
-          case Some(creator) => user == creator
+          case None =>
+            //Each player accepted one another - the game starts
+            val userAccepted = game.accepted.get(user.name)
+            val opponentAccepted = game.accepted.get(opponent.name)
+            userAccepted.exists(_.name == opponent.name) &&
+            opponentAccepted.exists(_.name == user.name)
+          case Some(creator) =>
+            //The creator accepted - the game starts
+            user.name == creator.name
         }
+
         if(!shouldBegin)
           Success(None)
         else {
-          def otherUser(u: Username): Username = if(u == user) opponent else user
+          def otherUser(u: SimpleUserInfo): SimpleUserInfo = if(u.name == user.name) opponent else user
           //Fill in players based on acceptance, randomizing if necessary
           val (gUser,sUser) = (game.users(GOLD), game.users(SILV)) match {
             case (Some(gUser), Some(sUser)) => (gUser,sUser)
             case (None, Some(sUser)) => (otherUser(sUser),sUser)
             case (Some(gUser), None) => (gUser,otherUser(gUser))
-            case (None, None) =>
-              if(RandGen.genBoolean)
-                (user,opponent)
-              else
-                (opponent,user)
+            case (None, None) => if(RandGen.genBoolean) (user,opponent) else (opponent,user)
           }
-          val users: PlayerArray[Username] = PlayerArray(gold = gUser, silv = sUser)
+          val users: PlayerArray[SimpleUserInfo] = PlayerArray(gold = gUser, silv = sUser)
 
           //Flag the game as starting
           game.starting = true
@@ -759,12 +764,12 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker, val serverInst
       searchParams.rated.forall(_ == game.meta.rated) &&
       searchParams.postal.forall(_ == game.meta.postal) &&
       searchParams.gameType.forall(_ == game.meta.gameType) &&
-      searchParams.usersInclude.forall { set => set.forall { user => game.users.contains(Some(user)) } } &&
-      searchParams.gUser.forall { gUser => game.users(GOLD) == Some(gUser) } &&
-      searchParams.sUser.forall { sUser => game.users(SILV) == Some(sUser) } &&
-      searchParams.creator.forall { _ == game.creator }
-      searchParams.creatorNot.forall { _ != game.creator }
-      searchParams.minTime.forall { game.creationTime >= _ }
+      searchParams.usersInclude.forall { set => set.forall { username => game.users.exists { user => user.exists(_.name.toLowerCase == username.toLowerCase) } } } &&
+      searchParams.gUser.forall { gUser => game.users(GOLD).exists(_.name.toLowerCase == gUser.toLowerCase) } &&
+      searchParams.sUser.forall { sUser => game.users(SILV).exists(_.name.toLowerCase == sUser.toLowerCase) } &&
+      searchParams.creator.forall { creator => game.creator.exists(_.name.toLowerCase == creator.toLowerCase) } &&
+      searchParams.creatorNot.forall { creator => game.creator.forall(_.name.toLowerCase != creator.toLowerCase) } &&
+      searchParams.minTime.forall { game.creationTime >= _ } &&
       searchParams.maxTime.forall { game.creationTime <= _ }
     }
     openGames.values.filter(matches).map(metadataOfGame).
@@ -785,7 +790,7 @@ object ActiveGames {
     meta: GameMetadata,
     moves: Vector[MoveInfo],
     logins: LoginTracker,
-    users: PlayerArray[Username],
+    users: PlayerArray[SimpleUserInfo],
     sequence: Long
   )
 
@@ -801,7 +806,7 @@ object ActiveGames {
 class ActiveGames(val db: Database, val scheduler: Scheduler, val serverInstanceID: Long) (implicit ec: ExecutionContext) {
   case class ActiveGameData(
     val logins: LoginTracker,
-    val users: PlayerArray[Username],
+    val users: PlayerArray[SimpleUserInfo],
     val initMeta: GameMetadata, //initial metadata as of game start
     val game: ActiveGame,
 
@@ -864,7 +869,7 @@ class ActiveGames(val db: Database, val scheduler: Scheduler, val serverInstance
           ()
         }
         //Log out everyone except the two users chosen
-        data.logins.logoutAllExcept(data.users.values)
+        data.logins.logoutAllExcept(data.users.values.map(_.name))
 
         //And initialize the new state
         val game = ActiveGameData(
@@ -902,7 +907,7 @@ class ActiveGames(val db: Database, val scheduler: Scheduler, val serverInstance
   /* Attempt to join an active game with the specified id.
    * Returns None if there was no game, Some(Failure(...)) if there was but it failed, and Some(Success(...)) on success.
    */
-  def join(user: Username, siteAuth: SiteAuth, id: GameID): Option[Try[GameAuth]] = this.synchronized {
+  def join(user: SimpleUserInfo, siteAuth: SiteAuth, id: GameID): Option[Try[GameAuth]] = this.synchronized {
     activeGames.get(id).map { game =>
       val now = Timestamp.get
       game.doTimeouts(now)
@@ -920,7 +925,7 @@ class ActiveGames(val db: Database, val scheduler: Scheduler, val serverInstance
    * Some(Success(...)) otherwise.
    * In the case that the user is logged in, heartbeats the user.
    */
-  private def ifLoggedInOpt[T](id: GameID, gameAuth: GameAuth)(f: (Username,ActiveGameData) => Try[T]): Option[Try[T]] = {
+  private def ifLoggedInOpt[T](id: GameID, gameAuth: GameAuth)(f: (SimpleUserInfo,ActiveGameData) => Try[T]): Option[Try[T]] = {
     activeGames.get(id).map { game =>
       val now = Timestamp.get
       game.doTimeouts(now)
@@ -938,7 +943,7 @@ class ActiveGames(val db: Database, val scheduler: Scheduler, val serverInstance
   /* Returns Failure(...) if there was no game or the user was not logged in or [f] failed, Success(...) otherwise.
    * In the case that the user is logged in, heartbeats the user.
    */
-  private def ifLoggedIn[T](id: GameID, gameAuth: GameAuth)(f: (Username,ActiveGameData) => Try[T]): Try[T] = {
+  private def ifLoggedIn[T](id: GameID, gameAuth: GameAuth)(f: (SimpleUserInfo,ActiveGameData) => Try[T]): Try[T] = {
     ifLoggedInOpt(id,gameAuth)(f).getOrElse(Failure(new Exception("No active game with the given id.")))
   }
 
@@ -955,14 +960,14 @@ class ActiveGames(val db: Database, val scheduler: Scheduler, val serverInstance
   def leave(id: GameID, gameAuth: GameAuth): Option[Try[Unit]] = this.synchronized {
     ifLoggedInOpt(id,gameAuth) { case (user,game) =>
       val now = Timestamp.get
-      game.logins.logoutUser(user,now)
+      game.logins.logoutUser(user.name,now)
       game.advanceSequence()
       Success(())
     }
   }
 
   private def lookupPlayer(game: ActiveGameData, user: Username): Player = {
-    game.users.findPlayer(_ == user).get
+    game.users.findPlayer(_.name == user).get
   }
 
   /* Performs [f] not synchronized with the ActiveGames. */
@@ -970,7 +975,7 @@ class ActiveGames(val db: Database, val scheduler: Scheduler, val serverInstance
     val result =
       this.synchronized {
         ifLoggedIn(id,gameAuth) { case (user,game) =>
-          val player = lookupPlayer(game,user)
+          val player = lookupPlayer(game,user.name)
           Success((game,player))
         }
       }
@@ -999,7 +1004,7 @@ class ActiveGames(val db: Database, val scheduler: Scheduler, val serverInstance
   }
 
   private def metadataAndMovesOfGame(game: ActiveGameData): (Games.GetMetadata, Vector[MoveInfo]) = {
-    val present = game.users.map { user => game.logins.isUserLoggedIn(user) }
+    val present = game.users.map { user => game.logins.isUserLoggedIn(user.name) }
     val (meta,moves,activeGameData) = game.game.getActiveGetData(present)
     val gm = Games.GetMetadata(
       meta = meta,
@@ -1021,7 +1026,7 @@ class ActiveGames(val db: Database, val scheduler: Scheduler, val serverInstance
       if(minSequence.exists(_ > game.sequence))
         Left(game.sequencePromise.future)
       else {
-        val present = game.users.map { user => game.logins.isUserLoggedIn(user) }
+        val present = game.users.map { user => game.logins.isUserLoggedIn(user.name) }
         val (meta,moves,activeGameData) = game.game.getActiveGetData(present)
         val gmeta = Games.GetMetadata(
           meta = meta,
@@ -1040,7 +1045,7 @@ class ActiveGames(val db: Database, val scheduler: Scheduler, val serverInstance
   }
 
   private def metadataOfGame(game: ActiveGameData): Games.GetMetadata = {
-    val present = game.users.map { user => game.logins.isUserLoggedIn(user) }
+    val present = game.users.map { user => game.logins.isUserLoggedIn(user.name) }
     val (meta,_,activeGameData) = game.game.getActiveGetData(present)
     Games.GetMetadata(
       meta = meta,
@@ -1065,10 +1070,10 @@ class ActiveGames(val db: Database, val scheduler: Scheduler, val serverInstance
       searchParams.rated.forall(_ == game.initMeta.rated) &&
       searchParams.postal.forall(_ == game.initMeta.postal) &&
       searchParams.gameType.forall(_ == game.initMeta.gameType) &&
-      searchParams.usersInclude.forall { set => set.forall { user => game.users.contains(user) } } &&
-      searchParams.gUser.forall { gUser => game.users(GOLD) == gUser } &&
-      searchParams.sUser.forall { sUser => game.users(SILV) == sUser }
-      searchParams.minTime.forall { game.initMeta.startTime.get >= _ }
+      searchParams.usersInclude.forall { set => set.forall { username => game.users.exists { user => user.name.toLowerCase == username.toLowerCase } } } &&
+      searchParams.gUser.forall { gUser => game.users(GOLD).name.toLowerCase == gUser.toLowerCase } &&
+      searchParams.sUser.forall { sUser => game.users(SILV).name.toLowerCase == sUser.toLowerCase } &&
+      searchParams.minTime.forall { game.initMeta.startTime.get >= _ } &&
       searchParams.maxTime.forall { game.initMeta.startTime.get <= _ }
     }
     activeGames.values.filter(matches).map(metadataOfGame).
@@ -1387,7 +1392,7 @@ case class GameMetadata(
   id: GameID,
   numPly: Int,
   startTime: Option[Timestamp],
-  users: PlayerArray[Username],
+  users: PlayerArray[SimpleUserInfo],
   tcs: PlayerArray[TimeControl],
   rated: Boolean,
   postal: Boolean,
@@ -1423,7 +1428,11 @@ class GameTable(tag: Tag) extends Table[GameMetadata](tag, "gameTable") {
   def numPly : Rep[Int] = column[Int]("numPly")
   def startTime : Rep[Option[Timestamp]] = column[Option[Timestamp]]("startTime")
   def gUser : Rep[Username] = column[Username]("gUser")
+  def gRating : Rep[Double] = column[Double]("gRating")
+  def gIsBot : Rep[Boolean] = column[Boolean]("gIsBot")
   def sUser : Rep[Username] = column[Username]("sUser")
+  def sRating : Rep[Double] = column[Double]("sRating")
+  def sIsBot : Rep[Boolean] = column[Boolean]("sIsBot")
 
   //TODO should these be doubles?
   def gInitialTime : Rep[Int] = column[Int]("gInitialTime")
@@ -1471,7 +1480,9 @@ class GameTable(tag: Tag) extends Table[GameMetadata](tag, "gameTable") {
 
   def * : ProvenShape[GameMetadata] = (
     //Define database projection shape
-    id,numPly,startTime,gUser,sUser,
+    id,numPly,startTime,
+    (gUser,gRating,gIsBot),
+    (sUser,sRating,sIsBot),
     (gInitialTime,gIncrement,gDelay,gMaxReserve,gMaxMoveTime,gOvertimeAfter),
     (sInitialTime,sIncrement,sDelay,sMaxReserve,sMaxMoveTime,sOvertimeAfter),
     rated,postal,gameType,tags,
@@ -1480,9 +1491,19 @@ class GameTable(tag: Tag) extends Table[GameMetadata](tag, "gameTable") {
     serverInstanceID
   ).shaped <> (
     //Database shape -> Scala object
-    { case (id,numPly,startTime,gUser,sUser,gTC,sTC,rated,postal,gameType,tags,(winner,reason,endTime),position,serverInstanceID) =>
+    { case (id,numPly,startTime,
+      gInfo,
+      sInfo,
+      gTC,
+      sTC,rated,postal,gameType,tags,
+      (winner,reason,endTime),
+      position,
+      serverInstanceID) =>
       GameMetadata(id,numPly,startTime,
-        PlayerArray(gold = gUser, silv = sUser),
+        PlayerArray(
+          gold = (SimpleUserInfo.apply _).tupled.apply(gInfo),
+          silv = (SimpleUserInfo.apply _).tupled.apply(sInfo)
+        ),
         PlayerArray(
           gold = (TimeControl.apply _).tupled.apply(gTC),
           silv = (TimeControl.apply _).tupled.apply(sTC)
@@ -1496,7 +1517,9 @@ class GameTable(tag: Tag) extends Table[GameMetadata](tag, "gameTable") {
     //Scala object -> Database shape
     { g: GameMetadata =>
       Some((
-        g.id,g.numPly,g.startTime,g.users(GOLD),g.users(SILV),
+        g.id,g.numPly,g.startTime,
+        SimpleUserInfo.unapply(g.users(GOLD)).get,
+        SimpleUserInfo.unapply(g.users(SILV)).get,
         TimeControl.unapply(g.tcs(GOLD)).get,
         TimeControl.unapply(g.tcs(SILV)).get,
         g.rated,g.postal,g.gameType.toString,g.tags,
