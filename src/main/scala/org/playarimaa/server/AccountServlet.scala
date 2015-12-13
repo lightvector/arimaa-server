@@ -151,7 +151,7 @@ class AccountServlet(val siteLogin: SiteLogin, val ec: ExecutionContext)
         }.get
       case Some(AuthLoggedIn) =>
         val query = Json.read[AuthLoggedIn.Query](request.body)
-        val isLoggedIn = siteLogin.isAuthLoggedIn(query.siteAuth)
+        val isLoggedIn = siteLogin.isAuthLoggedInAndHeartbeat(query.siteAuth)
         Json.write(AuthLoggedIn.Reply(isLoggedIn))
       case Some(UsersLoggedIn) =>
         val usersLoggedIn = siteLogin.usersLoggedIn.toList.map(convUser(_))

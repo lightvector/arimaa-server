@@ -94,7 +94,7 @@ class LoginTracker(val parent: Option[LoginTracker], val inactivityTimeout: Doub
       ld.auths = ld.auths + (auth -> now)
       ld.lastActive = now
       val (user,parentAuth) = userAndParentAuth(auth)
-      parentAuth.foreach { parentAuth => parent.get.heartbeat(username, auth, now) }
+      parentAuth.foreach { parentAuth => parent.get.heartbeat(username, parentAuth, now) }
       user
     }
   }
