@@ -3,7 +3,7 @@ import scala.concurrent.{ExecutionContext, Future, Promise, future}
 import scala.concurrent.duration.{DurationInt, DurationDouble}
 import scala.language.postfixOps
 import scala.util.{Try, Success, Failure}
-import slick.driver.H2Driver.api._
+import org.playarimaa.server.DatabaseConfig.driver.api._
 import slick.lifted.{Query,PrimaryKey,ProvenShape}
 import org.slf4j.{Logger, LoggerFactory}
 import org.playarimaa.server.CommonTypes._

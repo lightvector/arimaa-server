@@ -7,7 +7,7 @@ import scala.util.{Try, Success, Failure}
 import akka.actor.{Actor, ActorRef, ActorSystem, Props, Stash}
 import akka.pattern.{ask, pipe, after}
 import akka.util.Timeout
-import slick.driver.H2Driver.api._
+import org.playarimaa.server.DatabaseConfig.driver.api._
 import slick.lifted.{PrimaryKey,ProvenShape}
 import org.slf4j.{Logger, LoggerFactory}
 import org.playarimaa.server.CommonTypes._

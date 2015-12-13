@@ -3,7 +3,7 @@ import org.scalatra.test.scalatest._
 import org.scalatest.FunSuiteLike
 import akka.actor.{ActorSystem}
 import akka.testkit.{TestKit, ImplicitSender}
-import slick.driver.H2Driver.api._
+import org.playarimaa.server.DatabaseConfig.driver.api._
 import scala.util.{Try, Success, Failure}
 import scala.concurrent.ExecutionContext
 import com.typesafe.config.ConfigFactory
@@ -20,7 +20,7 @@ class GameServletTests(_system: ActorSystem) extends TestKit(_system) with Scala
 
   def this() = this(ActorSystem("GameServerTests"))
 
-  override def afterAll {
+  override def afterAll : Unit = {
     TestKit.shutdownActorSystem(system)
   }
 
@@ -43,7 +43,7 @@ class GameServletTests(_system: ActorSystem) extends TestKit(_system) with Scala
   val mainEC: ExecutionContext = ExecutionContext.Implicits.global
   val cryptEC: ExecutionContext = mainEC
   val serverInstanceID: Long = System.currentTimeMillis
-  val db = ArimaaServerInit.createDB("h2memgame")
+  val db = DatabaseConfig.createDB("h2memgame")
   val scheduler = actorSystem.scheduler
   val emailer = new Emailer(siteName,siteAddress,smtpHost,smtpPort,smtpAuth,noReplyAddress,helpAddress)(mainEC)
   val accounts = new Accounts(db,scheduler)(mainEC)

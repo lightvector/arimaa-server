@@ -15,7 +15,7 @@ import org.slf4j.{Logger, LoggerFactory}
 import akka.actor.{Actor, ActorRef, ActorSystem, Props, Scheduler}
 import akka.pattern.{ask, pipe, after}
 import akka.util.Timeout
-import slick.driver.H2Driver.api.Database
+import org.playarimaa.server.DatabaseConfig.driver.api.Database
 
 import org.playarimaa.server.CommonTypes._
 import org.playarimaa.server.{Accounts,Json,LoginTracker,SimpleUserInfo,SiteLogin,Timestamp,WebAppStack}

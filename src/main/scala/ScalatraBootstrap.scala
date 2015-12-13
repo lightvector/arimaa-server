@@ -7,9 +7,10 @@ import java.util.concurrent.Executors
 import scala.concurrent.{ExecutionContext, Future, Promise, future}
 import scala.concurrent.Await
 import scala.concurrent.duration.Duration
-import slick.driver.H2Driver.api._
 import org.slf4j.{Logger, LoggerFactory}
 import com.typesafe.config.ConfigFactory
+
+import org.playarimaa.server.DatabaseConfig.driver.api._
 
 import org.playarimaa.server._
 import org.playarimaa.server.chat._
@@ -25,19 +26,6 @@ object ArimaaServerInit {
         initialized = true
       }
     }
-  }
-
-  def createDB(configName: String) : Database = {
-    //Initialize in-memory database and create tables for testing
-    val db = Database.forConfig(configName)
-    Await.result(db.run(DBIO.seq(
-      ( ChatSystem.table.schema ++
-        Games.gameTable.schema ++
-        Games.movesTable.schema ++
-        Accounts.table.schema
-      ).create
-    )), Duration.Inf)
-    db
   }
 }
 
@@ -81,7 +69,7 @@ class ScalatraBootstrap extends LifeCycle {
     //A value that should be unique in practice between each time the server is started
     val serverInstanceID: Long = System.currentTimeMillis
 
-    val db = ArimaaServerInit.createDB("h2mem1")
+    val db = DatabaseConfig.createDB("h2mem1")
     val scheduler = actorSystem.scheduler
     val emailer = new Emailer(siteName,siteAddress,smtpHost,smtpPort,smtpAuth,noReplyAddress,helpAddress)(mainEC)
     val accounts = new Accounts(db,scheduler)(mainEC)
