@@ -85,7 +85,7 @@ class ScalatraBootstrap extends LifeCycle {
     val emailer = new Emailer(siteName,siteAddress,smtpHost,smtpPort,smtpAuth,noReplyAddress,helpAddress)(mainEC)
     val accounts = new Accounts(db,scheduler)(mainEC)
     val siteLogin = new SiteLogin(accounts,emailer,cryptEC,scheduler)(mainEC)
-    val games = new Games(db,siteLogin.logins,scheduler,serverInstanceID)(mainEC)
+    val games = new Games(db,siteLogin.logins,scheduler,accounts,serverInstanceID)(mainEC)
     val chat = new ChatSystem(db,siteLogin.logins,actorSystem)(actorEC)
 
     context.mount(new ArimaaServlet(siteLogin), "/*")

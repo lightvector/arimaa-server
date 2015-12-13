@@ -11,6 +11,7 @@ import org.playarimaa.server.Timestamp
 import org.playarimaa.server.Timestamp.Timestamp
 import org.playarimaa.server.RandGen
 import org.playarimaa.server.LoginTracker
+import org.playarimaa.server.Accounts
 import org.playarimaa.server.SimpleUserInfo
 import org.playarimaa.server.Utils._
 import org.playarimaa.board.{Player,GOLD,SILV}
@@ -77,15 +78,16 @@ object Games {
   }
 }
 
-class Games(val db: Database, val parentLogins: LoginTracker, val scheduler: Scheduler, val serverInstanceID: Long)(implicit ec: ExecutionContext) {
+class Games(val db: Database, val parentLogins: LoginTracker, val scheduler: Scheduler,
+  val accounts: Accounts, val serverInstanceID: Long)(implicit ec: ExecutionContext) {
 
   //Properties/invariants maintained by the implementation of this and of OpenGames and ActiveGames:
   //1. Every game is either open or is recorded in the database (or both)
   //2. If a game is neither active nor open, it cannot become active directly, it must be opened first
   //   (and there is no point during the transition open -> active where a game will appear to be not active yet but also no longer open)
 
-  private val openGames = new OpenGames(db,parentLogins,serverInstanceID)
-  private val activeGames = new ActiveGames(db,scheduler,serverInstanceID)
+  private val openGames = new OpenGames(db,parentLogins,accounts,serverInstanceID)
+  private val activeGames = new ActiveGames(db,scheduler,accounts,serverInstanceID)
   val logger =  LoggerFactory.getLogger(getClass)
 
   //TODO upon creation, should we load interrupted games from the DB and start them?
@@ -334,7 +336,8 @@ object OpenGames {
   )
 }
 
-class OpenGames(val db: Database, val parentLogins: LoginTracker, val serverInstanceID: Long)(implicit ec: ExecutionContext) {
+class OpenGames(val db: Database, val parentLogins: LoginTracker,
+  val accounts: Accounts, val serverInstanceID: Long)(implicit ec: ExecutionContext) {
 
   case class OpenGameData(
     val meta: GameMetadata,
@@ -803,7 +806,8 @@ object ActiveGames {
 }
 
 
-class ActiveGames(val db: Database, val scheduler: Scheduler, val serverInstanceID: Long) (implicit ec: ExecutionContext) {
+class ActiveGames(val db: Database, val scheduler: Scheduler,
+  val accounts: Accounts, val serverInstanceID: Long) (implicit ec: ExecutionContext) {
   case class ActiveGameData(
     val logins: LoginTracker,
     val users: PlayerArray[SimpleUserInfo],
@@ -877,10 +881,20 @@ class ActiveGames(val db: Database, val scheduler: Scheduler, val serverInstance
           users = data.users,
           initMeta = meta,
           //Note that this could raise an exception if the moves aren't legal somehow
-          game = new ActiveGame(meta,data.moves,now,db,scheduler,onTimeLoss,logger),
+          game = new ActiveGame(meta,data.moves,now,db,scheduler,accounts,onTimeLoss,logger),
           sequencePromise = Promise(),
           sequence = data.sequence+1 //Add one because the transition from open -> active is a state change
         )
+
+        //Update statistics for players, but don't wait for the update
+        Future {
+          accounts.updateGameStats(game.users(GOLD).name) { stats =>
+            stats.copy(numGamesGold = stats.numGamesGold+1)
+          }.onFailure { case exn => logger.error("Error updating numGamesGold for " + game.users(GOLD).name + " :" + exn) }
+          accounts.updateGameStats(game.users(SILV).name) { stats =>
+            stats.copy(numGamesSilv = stats.numGamesSilv+1)
+          }.onFailure { case exn => logger.error("Error updating numGamesSilv for " + game.users(SILV).name + " :" + exn) }
+        }
         activeGames = activeGames + (id -> game)
       }
     }
@@ -1095,6 +1109,7 @@ class ActiveGame(
   val initNow: Timestamp,
   val db: Database,
   val scheduler: Scheduler,
+  val accounts: Accounts,
   val onTimeLoss: (() => Unit),
   val logger: Logger //borrows a logger so that we don't create a new one on every game
 )(implicit ec: ExecutionContext) {
@@ -1181,10 +1196,21 @@ class ActiveGame(
     gameOver && metaSaveFinished.isCompleted && moveSaveFinished.isCompleted
   }
 
-  private def declareWinner(player: Player, reason: EndingReason, now: Timestamp): Unit = this.synchronized {
-    meta = meta.copy(result = GameResult(winner = Some(player), reason = reason, endTime = now))
+  private def declareWinner(winner: Player, reason: EndingReason, now: Timestamp): Unit = this.synchronized {
+    meta = meta.copy(result = GameResult(winner = Some(winner), reason = reason, endTime = now))
     timeLossCheckEvent.foreach(_.cancel)
     saveMetaToDB()
+
+    //Update statistics for players, but don't wait for the update
+    Future {
+      accounts.updateGameStats(meta.users(winner).name) { stats =>
+        stats.copy(numGamesWon = stats.numGamesWon+1)
+      }.onFailure { case exn => logger.error("Error updating numGamesWon for " + meta.users(winner).name + " :" + exn) }
+      accounts.updateGameStats(meta.users(winner.flip).name) { stats =>
+        stats.copy(numGamesLost = stats.numGamesLost+1)
+      }.onFailure { case exn => logger.error("Error updating numGamesLost for " + meta.users(winner.flip).name + " :" + exn) }
+      //TODO update ratings here
+    }
   }
 
   private def scheduleNextTimeLossCheck(now: Timestamp): Unit = this.synchronized {

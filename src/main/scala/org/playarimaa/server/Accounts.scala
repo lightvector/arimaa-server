@@ -38,6 +38,7 @@ case class Account(
   }
 }
 
+//TODO add query to display user info and rating and stats
 case class AccountGameStats(
   numGamesGold: Int,
   numGamesSilv: Int,
@@ -166,7 +167,7 @@ class Accounts(val db: Database, val scheduler: Scheduler)(implicit ec: Executio
   }
 
   //Tries updating the game stats a few times, then fails
-  def updateGameStats(username: Username, f:(AccountGameStats => AccountGameStats)): Future[Unit] = {
+  def updateGameStats(username: Username)(f:(AccountGameStats => AccountGameStats)): Future[Unit] = {
     doUpdateGameStats(username,f).recoverWith { case _ => after(1 seconds,scheduler) {
       doUpdateGameStats(username,f).recoverWith { case _ => after(3 seconds,scheduler) {
         doUpdateGameStats(username,f).recoverWith { case _ => after(10 seconds,scheduler) {

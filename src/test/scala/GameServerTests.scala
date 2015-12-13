@@ -48,7 +48,7 @@ class GameServletTests(_system: ActorSystem) extends TestKit(_system) with Scala
   val emailer = new Emailer(siteName,siteAddress,smtpHost,smtpPort,smtpAuth,noReplyAddress,helpAddress)(mainEC)
   val accounts = new Accounts(db,scheduler)(mainEC)
   val siteLogin = new SiteLogin(accounts,emailer,cryptEC,scheduler)(mainEC)
-  val games = new Games(db,siteLogin.logins,scheduler,serverInstanceID)(mainEC)
+  val games = new Games(db,siteLogin.logins,scheduler,accounts,serverInstanceID)(mainEC)
   addServlet(new AccountServlet(siteLogin,mainEC), "/accounts/*")
   addServlet(new GameServlet(accounts,siteLogin,games,mainEC), "/games/*")
 
