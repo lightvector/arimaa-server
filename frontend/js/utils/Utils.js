@@ -127,12 +127,18 @@ var Utils = {
 
   userDisplayStr: function(userInfo) {
     var displayStr = userInfo.name;
+    var ratingStr = "" + Math.round(userInfo.rating);
+
+    //TODO think about this threshold and/or other ways of displaying the rating
+    if(userInfo.ratingStdev > 100)
+      ratingStr += "?";
+
     if(userInfo.isGuest)
       displayStr += " (guest)";
     else if(userInfo.isBot)
-      displayStr += " (" + userInfo.rating + ") (bot)";
+      displayStr += " (" + ratingStr + ") (bot)";
     else
-      displayStr += " (" + userInfo.rating + ")";
+      displayStr += " (" + ratingStr + ")";
     return displayStr;
   },
 

@@ -1,4 +1,5 @@
 package org.playarimaa.server.game
+import org.playarimaa.server.Utils._
 
 object TimeControl {
   /* Increment and delay are multiplied by this every turn during overtime
@@ -20,20 +21,14 @@ case class TimeControl(
 {
   /* Raise an exception if this time control is nonsensical */
   def validate() : Unit = {
-    if(initialTime < 0)
-      throw new Exception("Invalid time control: initialTime < 0")
-    if(increment < 0)
-      throw new Exception("Invalid time control: increment < 0")
-    if(delay < 0)
-      throw new Exception("Invalid time control: delay < 0")
-    if(maxReserve.exists(_ < 0))
-      throw new Exception("Invalid time control: maxReserve < 0")
-    if(maxMoveTime.exists(_ < 0))
-      throw new Exception("Invalid time control: maxMoveTime < 0")
-    if(overtimeAfter.exists(_ < 0))
-      throw new Exception("Invalid time control: overtimeAfter < 0")
+    initialTime.validateNonNegative("initialTime")
+    increment.validateNonNegative("increment")
+    delay.validateNonNegative("delay")
+    maxReserve.foreach(_.validateNonNegative("maxReserve"))
+    maxMoveTime.foreach(_.validateNonNegative("maxMoveTime"))
+    overtimeAfter.foreach(_.validateNonNegative("overtimeAfter"))
 
-   if(maxReserve.exists(_ < initialTime))
+    if(maxReserve.exists(_ < initialTime))
       throw new Exception("Invalid time control: maxReserve < initialTime")
 
     //Exclude some obviously unreasonable time controls

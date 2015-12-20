@@ -7,6 +7,7 @@ import org.slf4j.{Logger, LoggerFactory}
 import org.mindrot.jbcrypt.BCrypt
 import org.playarimaa.server.CommonTypes._
 import org.playarimaa.server.Timestamp.Timestamp
+import org.playarimaa.server.Utils._
 import akka.actor.{Scheduler,Cancellable}
 
 //TODO add logging and throttling/bucketing to everything here
@@ -144,13 +145,19 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
   }
 
   //TODO throttle registrations somehow?
-  def register(username: Username, email: Email, password: String, isBot: Boolean): Future[(Username,SiteAuth)] = {
+  def register(username: Username, email: Email, password: String, isBot: Boolean, priorRating:Option[Double]): Future[(Username,SiteAuth)] = {
     Future.successful(()).flatMap { case () =>
       validateUsername(username)
       validateEmail(email)
       validatePassword(password)
+      priorRating.foreach(_.validateNonNegative("priorRating"))
 
       val lowercaseName = username.toLowerCase
+      val rating = priorRating match {
+        case None => Rating.newPlayerPrior
+        case Some(x) => Rating.givenRatingPrior(x)
+      }
+
       Future(BCrypt.hashpw(password, BCrypt.gensalt))(cryptEC).flatMap { passwordHash =>
         val now = Timestamp.get
         val account = Account(
@@ -162,7 +169,8 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
           createdTime = now,
           isGuest = false,
           lastLogin = now,
-          gameStats = AccountGameStats.initial
+          gameStats = AccountGameStats.initial(rating),
+          priorRating = rating
         )
         accounts.add(account).recover { case _ => throw new Exception(INVALID_USERNAME_ERROR) }.map { case () =>
           doTimeouts(now)
@@ -214,6 +222,7 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
 
       val lowercaseName = username.toLowerCase
       val now = Timestamp.get
+      val rating = Rating.newPlayerPrior
       val account = Account(
         lowercaseName,
         username,
@@ -223,7 +232,8 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
         createdTime = now,
         isGuest = true,
         lastLogin = now,
-        gameStats = AccountGameStats.initial
+        gameStats = AccountGameStats.initial(rating),
+        priorRating = rating
       )
       accounts.add(account).recover { case _ => throw new Exception(INVALID_USERNAME_ERROR) }.map { case () =>
         doTimeouts(now)

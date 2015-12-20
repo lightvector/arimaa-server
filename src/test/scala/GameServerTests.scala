@@ -70,18 +70,20 @@ class GameServletTests(_system: ActorSystem) extends TestKit(_system) with Scala
   var bobPlayer: Player = GOLD
   var sequence: Long = -1
 
-  def userInfo(name: String): IOTypes.ShortUserInfo =
-    IOTypes.ShortUserInfo(name,Rating.initial.mean,false,false)
+  def userInfoBob: IOTypes.ShortUserInfo =
+    IOTypes.ShortUserInfo("Bob",Rating.newPlayerPrior.mean,Rating.newPlayerPrior.stdev,false,false)
+  def userInfoAlice: IOTypes.ShortUserInfo =
+    IOTypes.ShortUserInfo("Alice",Rating.givenRatingPrior(2000).mean,Rating.givenRatingPrior(2000).stdev,false,false)
 
   "GameServer" should "allow users to create games" in {
 
-    post("/accounts/register", Json.write(AccountServlet.Register.Query("Bob","bob@domainname.com","password",false))) {
+    post("/accounts/register", Json.write(AccountServlet.Register.Query("Bob","bob@domainname.com","password",false,""))) {
       status should equal (200)
       val reply = readJson[AccountServlet.Register.Reply](body)
       bobSiteAuth = reply.siteAuth
       (bobSiteAuth.length > 10) should be (true)
     }
-    post("/accounts/register", Json.write(AccountServlet.Register.Query("Alice","alice@domainname.com","password",false))) {
+    post("/accounts/register", Json.write(AccountServlet.Register.Query("Alice","alice@domainname.com","password",false,"2000"))) {
       status should equal (200)
       val reply = readJson[AccountServlet.Register.Reply](body)
       aliceSiteAuth = reply.siteAuth
@@ -111,8 +113,8 @@ class GameServletTests(_system: ActorSystem) extends TestKit(_system) with Scala
       state.meta.rated should equal (true)
       state.meta.gameType should equal ("standard")
       state.meta.tags should equal (List())
-      state.meta.openGameData.get.creator should equal (Some(userInfo("Bob")))
-      state.meta.openGameData.get.joined should equal (List(userInfo("Bob")))
+      state.meta.openGameData.get.creator should equal (Some(userInfoBob))
+      state.meta.openGameData.get.joined should equal (List(userInfoBob))
       state.meta.activeGameData should equal (None)
       state.meta.result should equal (None)
       state.meta.sequence.exists(_ > sequence) should equal (true)
@@ -145,8 +147,8 @@ class GameServletTests(_system: ActorSystem) extends TestKit(_system) with Scala
       state.meta.gameType should equal ("standard")
       state.meta.tags should equal (List())
       state.meta.openGameData.nonEmpty should equal (true)
-      state.meta.openGameData.get.creator should equal (Some(userInfo("Bob")))
-      state.meta.openGameData.get.joined should equal (List(userInfo("Alice"),userInfo("Bob")))
+      state.meta.openGameData.get.creator should equal (Some(userInfoBob))
+      state.meta.openGameData.get.joined should equal (List(userInfoAlice,userInfoBob))
       state.meta.activeGameData should equal (None)
       state.meta.result should equal (None)
       state.meta.sequence.exists(_ > sequence) should equal (true)
@@ -189,7 +191,7 @@ class GameServletTests(_system: ActorSystem) extends TestKit(_system) with Scala
       state.meta.result should equal (None)
       state.meta.sequence.exists(_ > sequence) should equal (true)
       sequence = state.meta.sequence.get
-      bobPlayer = if(state.meta.gUser == Some(userInfo("Bob"))) GOLD else SILV
+      bobPlayer = if(state.meta.gUser == Some(userInfoBob)) GOLD else SILV
     }
   }
 

@@ -25,7 +25,8 @@ case class Account(
   isGuest: Boolean,
 
   lastLogin: Timestamp,
-  gameStats: AccountGameStats
+  gameStats: AccountGameStats,
+  priorRating: Rating
 )
 {
   def info : SimpleUserInfo = {
@@ -48,7 +49,7 @@ case class AccountGameStats(
 )
 
 case object AccountGameStats {
-  val initial: AccountGameStats = new AccountGameStats(0,0,0,0,Rating.initial)
+  def initial(priorRating: Rating): AccountGameStats = new AccountGameStats(0,0,0,0,priorRating)
 
   //Each time we fail to update user stats in a transaction, wait this many seconds then try again, failing out right if we hit the end of the list.
   val updateRetryDelays: List[Double] = List(1.0,3.0,10.0)
@@ -217,21 +218,24 @@ class AccountTable(tag: Tag) extends Table[Account](tag, "accountTable") {
   def numGamesLost : Rep[Int] = column[Int]("numGamesLost")
   def rating : Rep[Double] = column[Double]("rating")
   def ratingStdev : Rep[Double] = column[Double]("ratingStdev")
+  def priorRating : Rep[Double] = column[Double]("priorRating")
+  def priorRatingStdev : Rep[Double] = column[Double]("priorRatingStdev")
 
   def * : ProvenShape[Account] =
     (lowercaseName, username, email, passwordHash, isBot, createdTime, isGuest, lastLogin,
-      (numGamesGold, numGamesSilv, numGamesWon, numGamesLost, rating, ratingStdev)).shaped <> (
+      (numGamesGold, numGamesSilv, numGamesWon, numGamesLost, rating, ratingStdev),
+      priorRating, priorRatingStdev).shaped <> (
     //Database shape -> Scala object
-    { case (lowercaseName, username, email, passwordHash, isBot, createdTime, isGuest, lastLogin, gameStats) =>
+    { case (lowercaseName, username, email, passwordHash, isBot, createdTime, isGuest, lastLogin, gameStats, priorRating, priorRatingStdev) =>
       Account(lowercaseName, username, email, passwordHash, isBot, createdTime, isGuest, lastLogin,
-        AccountGameStats.ofDB(gameStats)
+        AccountGameStats.ofDB(gameStats), Rating(priorRating, priorRatingStdev)
       )
     },
     //Scala object -> Database shape
     { a: Account =>
       Some((
         a.lowercaseName,a.username,a.email,a.passwordHash,a.isBot,a.createdTime,a.isGuest,a.lastLogin,
-        AccountGameStats.toDB(a.gameStats)
+        AccountGameStats.toDB(a.gameStats), a.priorRating.mean, a.priorRating.stdev
       ))
     }
   )

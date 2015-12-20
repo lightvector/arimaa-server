@@ -28,6 +28,7 @@ object GameServlet {
     case class ShortUserInfo(
       name: String,
       rating: Double,
+      ratingStdev: Double,
       isBot: Boolean,
       isGuest: Boolean
     )
@@ -419,7 +420,13 @@ class GameServlet(val accounts: Accounts, val siteLogin: SiteLogin, val games: G
   }
 
   def convUser(user: SimpleUserInfo): IOTypes.ShortUserInfo = {
-    IOTypes.ShortUserInfo(user.name,user.rating.mean,user.isBot,user.isGuest)
+    IOTypes.ShortUserInfo(
+      name = user.name,
+      rating = user.rating.mean,
+      ratingStdev = user.rating.stdev,
+      isBot = user.isBot,
+      isGuest = user.isGuest
+    )
   }
 
   def convMeta(data: Games.GetMetadata): IOTypes.GameMetadata = {

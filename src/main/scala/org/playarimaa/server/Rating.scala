@@ -19,7 +19,13 @@ case class Rating(
 object Rating {
 
   //Initial rating value for new players
-  val initial = new Rating(1500,500)
+  val newPlayerPrior = new Rating(1500,500)
+  def givenRatingPrior(rating: Double) = {
+    //Clamp user-provided ratings to avoid silly numbers
+    val mean = math.min(math.max(rating,1200),2400)
+    val stdev = 150.0
+    new Rating(mean,stdev)
+  }
 
   /* Converts from Elo scale (400 points = 10x odds of winning) to nat scale (1 point = ex odds of winning)
    * where e is the base of the natural log. */

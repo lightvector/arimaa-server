@@ -32,8 +32,8 @@ var SiteActions = {
     });
   },
 
-  register: function(username, email, password) {
-    APIUtils.register(username, email, password, SiteActions.registerSuccess, SiteActions.registerError);
+  register: function(username, email, password, priorRating) {
+    APIUtils.register(username, email, password, priorRating, SiteActions.registerSuccess, SiteActions.registerError);
   },
   registerSuccess: function(data) {
     cookie.save('siteAuth',data.siteAuth, {path:'/'});

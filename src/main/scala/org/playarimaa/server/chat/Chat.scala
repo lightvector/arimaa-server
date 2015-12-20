@@ -26,6 +26,8 @@ object ChatSystem {
   val AKKA_TIMEOUT: Timeout = new Timeout(20 seconds)
   //Period for checking timeouts in a chat even if nothing happens
   val CHAT_CHECK_TIMEOUT_PERIOD: Double = 120.0
+  //Max length of text in characters
+  val MAX_TEXT_LENGTH: Int = 4000
 
   val NO_CHANNEL_MESSAGE = "No such chat channel, or not authorized"
   val NO_LOGIN_MESSAGE = "Not logged in, or timed out due to inactivity"
@@ -225,6 +227,9 @@ class ChatChannel(val channel: Channel, val db: Database, val parentLogins: Logi
 
     case ChatChannel.Post(chatAuth: ChatAuth, text:String) =>
       val result: Try[Unit] = requiringLogin(chatAuth) { user =>
+        if(text.length > ChatSystem.MAX_TEXT_LENGTH)
+          throw new Exception("Text too long: " + text)
+
         val line = ChatLine(nextId, channel, user.name, text, Timestamp.get)
         nextId = nextId + 1
 
@@ -331,8 +336,8 @@ class ChatChannel(val channel: Channel, val db: Database, val parentLogins: Logi
     logins.heartbeatAuth(chatAuth,now) match {
       case None => Failure(new Exception(ChatSystem.NO_LOGIN_MESSAGE))
       case Some(user) =>
-      lastActive = now
-      Success(f(user))
+        lastActive = now
+        Try(f(user))
     }
   }
 
