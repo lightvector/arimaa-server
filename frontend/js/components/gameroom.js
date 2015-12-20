@@ -100,7 +100,6 @@ var component = React.createClass({
   },
   handleCreateGameCancelled: function(opts) {
     this.setState({createGameDialogOpen:false});
-    SiteActions.createGame(opts);
   },
 
   handlePopupOk: function(opts) {
