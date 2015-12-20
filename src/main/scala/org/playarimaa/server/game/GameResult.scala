@@ -5,5 +5,6 @@ import org.playarimaa.board.Player
 case class GameResult(
   winner: Option[Player],
   reason: EndingReason,
-  endTime: Timestamp
+  endTime: Timestamp,
+  countForStats: Boolean
 )

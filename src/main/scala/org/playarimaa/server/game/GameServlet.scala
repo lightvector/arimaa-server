@@ -227,6 +227,8 @@ object GameServlet {
       minDateTime: Option[Timestamp],
       maxDateTime: Option[Timestamp],
 
+      includeUncounted: Option[Boolean],
+
       limit: Option[Int]
     )
     type Reply = List[IOTypes.GameMetadata]
@@ -252,6 +254,7 @@ object GameServlet {
         maxTime = params.get("maxTime").map(_.toFiniteDouble),
         minDateTime = params.get("minDateTime").map(Timestamp.parse),
         maxDateTime = params.get("maxDateTime").map(Timestamp.parse),
+        includeUncounted = params.get("includeUncounted").map(_.toBoolean),
         limit = params.get("limit").map(_.toInt)
       )
     }
@@ -502,6 +505,7 @@ class GameServlet(val accounts: Accounts, val siteLogin: SiteLogin, val games: G
       creatorNot = query.creatorNot,
       minTime = (query.minTime ++ query.minDateTime).reduceOption[Double](math.max),
       maxTime = (query.maxTime ++ query.maxDateTime).reduceOption[Double](math.min),
+      includeUncounted = query.includeUncounted,
       limit = query.limit
     )
     games.searchMetadata(searchParams).map { data =>

@@ -73,6 +73,8 @@ object Games {
     minTime: Option[Timestamp],
     maxTime: Option[Timestamp],
 
+    includeUncounted: Option[Boolean],
+
     limit: Option[Int]
   ) {
     def getLimit : Int = math.min(Games.MAX_SEARCH_LIMIT, math.max(0,limit.getOrElse(Games.DEFAULT_SEARCH_LIMIT)))
@@ -888,15 +890,6 @@ class ActiveGames(val db: Database, val scheduler: Scheduler,
           sequence = data.sequence+1 //Add one because the transition from open -> active is a state change
         )
 
-        //Update statistics for players, but don't wait for the update
-        Future {
-          accounts.updateGameStats(game.users(GOLD).name) { stats =>
-            stats.copy(numGamesGold = stats.numGamesGold+1)
-          }.onFailure { case exn : Throwable => logger.error("Error updating numGamesGold for " + game.users(GOLD).name + " :" + exn) }
-          accounts.updateGameStats(game.users(SILV).name) { stats =>
-            stats.copy(numGamesSilv = stats.numGamesSilv+1)
-          }.onFailure { case exn : Throwable => logger.error("Error updating numGamesSilv for " + game.users(SILV).name + " :" + exn) }
-        }.onFailure { case exn : Throwable => logger.error("Error updating stats for game " + id + " :" + exn) }
         activeGames = activeGames + (id -> game)
       }
     }
@@ -1199,22 +1192,45 @@ class ActiveGame(
   }
 
   private def declareWinner(winner: Player, reason: EndingReason, now: Timestamp): Unit = this.synchronized {
-    meta = meta.copy(result = GameResult(winner = Some(winner), reason = reason, endTime = now))
+    //Only count a game for statistics and ratings if the player who lost made at least one move
+    val countForStats = (winner == GOLD && meta.numPly >= 1) || (winner == SILV && meta.numPly >= 2)
+
+    meta = meta.copy(result = GameResult(winner = Some(winner), reason = reason, endTime = now, countForStats = countForStats))
     timeLossCheckEvent.foreach(_.cancel)
     saveMetaToDB()
 
     //Update statistics for players, but don't wait for the update
-    val loser = winner.flip
-    Future {
-      accounts.updateGameStats2(meta.users(winner).name, meta.users(loser).name) { case (wStats,lStats) =>
-        val (newWRating,newLRating) = Rating.newRatings(wStats.rating,lStats.rating)
-        val newWStats = wStats.copy(numGamesWon = wStats.numGamesWon+1, rating = newWRating)
-        val newLStats = lStats.copy(numGamesLost = lStats.numGamesLost+1, rating = newLRating)
-        (newWStats,newLStats)
-      }.onFailure { case exn =>
-          logger.error("Error updating post-game stats for " + meta.users(winner).name + ", " +meta.users(loser).name  + " :" + exn)
+    if(countForStats) {
+      val loser = winner.flip
+      Future {
+        accounts.updateGameStats2(meta.users(winner).name, meta.users(loser).name) { case (wStats,lStats) =>
+          val (wg,ws,lg,ls) = if(winner == GOLD) (1,0,0,1) else (0,1,1,0)
+          val (newWRating,newLRating) =
+            if(meta.rated)
+              Rating.newRatings(wStats.rating,lStats.rating)
+            else
+              (wStats.rating,lStats.rating)
+
+          val newWStats = wStats.copy(
+            numGamesWon = wStats.numGamesWon+1,
+            rating = newWRating,
+            numGamesGold = wStats.numGamesGold+wg,
+            numGamesSilv = wStats.numGamesSilv+ws
+          )
+          val newLStats = lStats.copy(
+            numGamesLost = lStats.numGamesLost+1,
+            rating = newLRating,
+            numGamesGold = lStats.numGamesGold+lg,
+            numGamesSilv = lStats.numGamesSilv+ls
+          )
+          (newWStats,newLStats)
+
+        }.onFailure { case exn =>
+            logger.error("Error updating post-game stats for " + meta.users(winner).name + ", " +meta.users(loser).name  + " :" + exn)
+        }
       }
     }
+
     ()
   }
 
@@ -1391,6 +1407,11 @@ object GameUtils {
     searchParams.sUser.foreach { sUser => query = query.filter(_.sUser === sUser) }
     searchParams.minTime.foreach { minTime => query = query.filter(_.endTime >= minTime) }
     searchParams.maxTime.foreach { maxTime => query = query.filter(_.endTime <= maxTime) }
+    searchParams.includeUncounted match {
+      case None | Some(false) => query = query.filter(_.countForStats)
+      case Some(true) => ()
+    }
+
     //Filter out games that are active right now. Games active right now are present in the database with ending
     //reason interrupted but were created with this server instance
     query = query.filter { row => row.reason === EndingReason.INTERRUPTED.toString } .filter { row => row.serverInstanceID === serverInstanceID }
@@ -1415,7 +1436,8 @@ object GameUtils {
     GameResult(
       winner = None,
       reason = EndingReason.INTERRUPTED,
-      endTime = now
+      endTime = now,
+      countForStats = false
     )
 }
 
@@ -1491,6 +1513,7 @@ class GameTable(tag: Tag) extends Table[GameMetadata](tag, "gameTable") {
   def winner : Rep[Option[Player]] = column[Option[Player]]("winner")
   def reason : Rep[String] = column[String]("reason")
   def endTime : Rep[Timestamp] = column[Timestamp]("endTime")
+  def countForStats : Rep[Boolean] = column[Boolean]("countForStats")
 
   def position : Rep[String] = column[String]("position")
   def serverInstanceID: Rep[Long] = column[Long]("serverInstanceID")
@@ -1520,7 +1543,7 @@ class GameTable(tag: Tag) extends Table[GameMetadata](tag, "gameTable") {
     (gInitialTime,gIncrement,gDelay,gMaxReserve,gMaxMoveTime,gOvertimeAfter),
     (sInitialTime,sIncrement,sDelay,sMaxReserve,sMaxMoveTime,sOvertimeAfter),
     rated,postal,gameType,tags,
-    (winner,reason,endTime),
+    (winner,reason,endTime,countForStats),
     position,
     serverInstanceID
   ).shaped <> (
@@ -1530,7 +1553,7 @@ class GameTable(tag: Tag) extends Table[GameMetadata](tag, "gameTable") {
       sInfo,
       gTC,
       sTC,rated,postal,gameType,tags,
-      (winner,reason,endTime),
+      (winner,reason,endTime,countForStats),
       position,
       serverInstanceID) =>
       GameMetadata(id,numPly,startTime,
@@ -1543,7 +1566,7 @@ class GameTable(tag: Tag) extends Table[GameMetadata](tag, "gameTable") {
           silv = (TimeControl.apply _).tupled.apply(sTC)
         ),
         rated,postal,GameType.ofString(gameType).get,tags,
-        GameResult.tupled.apply((winner,EndingReason.ofString(reason).get,endTime)),
+        GameResult.tupled.apply((winner,EndingReason.ofString(reason).get,endTime,countForStats)),
         position,
         serverInstanceID
       )
@@ -1557,7 +1580,7 @@ class GameTable(tag: Tag) extends Table[GameMetadata](tag, "gameTable") {
         TimeControl.unapply(g.tcs(GOLD)).get,
         TimeControl.unapply(g.tcs(SILV)).get,
         g.rated,g.postal,g.gameType.toString,g.tags,
-        (g.result.winner,g.result.reason.toString,g.result.endTime),
+        (g.result.winner,g.result.reason.toString,g.result.endTime,g.result.countForStats),
         g.position,
         g.serverInstanceID
       ))
