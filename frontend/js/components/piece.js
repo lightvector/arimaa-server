@@ -12,4 +12,4 @@ var ArimaaPiece = React.createClass({
   }
 });
 
-module.exports = ArimaaPiece
+module.exports = ArimaaPiece;
