@@ -1437,7 +1437,9 @@ object GameUtils {
       winner = None,
       reason = EndingReason.INTERRUPTED,
       endTime = now,
-      countForStats = false
+      //Without a winner, we won't count ratings for this game even if it's rated, and setting this true
+      //makes it more easily noticeable on a user's game history
+      countForStats = true
     )
 }
 
