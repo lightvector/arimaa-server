@@ -44,7 +44,8 @@ object GameServlet {
     case class GameResult(
       winner: String,
       reason: String,
-      endTime: Double
+      endTime: Double,
+      countForStats: Boolean
     )
 
     case class OpenGameData(
@@ -456,7 +457,8 @@ class GameServlet(val accounts: Accounts, val siteLogin: SiteLogin, val games: G
         else Some(IOTypes.GameResult(
           winner = data.meta.result.winner.map(_.toString).getOrElse("n"),
           reason = data.meta.result.reason.toString,
-          endTime = data.meta.result.endTime
+          endTime = data.meta.result.endTime,
+          countForStats = data.meta.result.countForStats
         ))
       },
       position = data.meta.position,
