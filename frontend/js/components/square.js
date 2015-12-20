@@ -29,8 +29,8 @@ var Square = React.createClass({
 
     return (
       <div className={className}>
-        {sqName}
         {this.props.children}
+        <span className={"coordLabel"}> {sqName} </span>
       </div>
     );
   }
