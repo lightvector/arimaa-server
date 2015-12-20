@@ -15,7 +15,7 @@ import akka.actor.{Scheduler,Cancellable}
 object SiteLogin {
 
   object Constants {
-    val INACTIVITY_TIMEOUT: Double = 300 //5 minutes
+    val INACTIVITY_TIMEOUT: Double = 180 //3 minutes (including heartbeats)
     val PASSWORD_RESET_TIMEOUT: Double = 1800 //30 minutes
     val EMAIL_CHANGE_TIMEOUT: Double = 84600 //1 day
 

@@ -16,8 +16,8 @@ import org.playarimaa.server.{LoginTracker,SiteLogin,Timestamp}
 import org.playarimaa.server.Timestamp.Timestamp
 
 object ChatSystem {
-  //Leave chat if it's been this many seconds with no activity
-  val INACTIVITY_TIMEOUT: Double = 120.0
+  //Leave chat if it's been this many seconds with no activity (including heartbeats)
+  val INACTIVITY_TIMEOUT: Double = 240.0
   //Max lines at a time to return in a single query
   val READ_MAX_LINES: Int = 5000
   //Timeout for a single get query for chat messages
