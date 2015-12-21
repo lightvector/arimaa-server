@@ -28,6 +28,7 @@ object GameServlet {
     case class ShortUserInfo(
       name: String,
       rating: Double,
+      ratingStdev: Double,
       isBot: Boolean,
       isGuest: Boolean
     )
@@ -44,7 +45,8 @@ object GameServlet {
     case class GameResult(
       winner: String,
       reason: String,
-      endTime: Double
+      endTime: Double,
+      countForStats: Boolean
     )
 
     case class OpenGameData(
@@ -227,6 +229,8 @@ object GameServlet {
       minDateTime: Option[Timestamp],
       maxDateTime: Option[Timestamp],
 
+      includeUncounted: Option[Boolean],
+
       limit: Option[Int]
     )
     type Reply = List[IOTypes.GameMetadata]
@@ -252,6 +256,7 @@ object GameServlet {
         maxTime = params.get("maxTime").map(_.toFiniteDouble),
         minDateTime = params.get("minDateTime").map(Timestamp.parse),
         maxDateTime = params.get("maxDateTime").map(Timestamp.parse),
+        includeUncounted = params.get("includeUncounted").map(_.toBoolean),
         limit = params.get("limit").map(_.toInt)
       )
     }
@@ -415,7 +420,13 @@ class GameServlet(val accounts: Accounts, val siteLogin: SiteLogin, val games: G
   }
 
   def convUser(user: SimpleUserInfo): IOTypes.ShortUserInfo = {
-    IOTypes.ShortUserInfo(user.name,user.rating.mean,user.isBot,user.isGuest)
+    IOTypes.ShortUserInfo(
+      name = user.name,
+      rating = user.rating.mean,
+      ratingStdev = user.rating.stdev,
+      isBot = user.isBot,
+      isGuest = user.isGuest
+    )
   }
 
   def convMeta(data: Games.GetMetadata): IOTypes.GameMetadata = {
@@ -453,7 +464,8 @@ class GameServlet(val accounts: Accounts, val siteLogin: SiteLogin, val games: G
         else Some(IOTypes.GameResult(
           winner = data.meta.result.winner.map(_.toString).getOrElse("n"),
           reason = data.meta.result.reason.toString,
-          endTime = data.meta.result.endTime
+          endTime = data.meta.result.endTime,
+          countForStats = data.meta.result.countForStats
         ))
       },
       position = data.meta.position,
@@ -502,6 +514,7 @@ class GameServlet(val accounts: Accounts, val siteLogin: SiteLogin, val games: G
       creatorNot = query.creatorNot,
       minTime = (query.minTime ++ query.minDateTime).reduceOption[Double](math.max),
       maxTime = (query.maxTime ++ query.maxDateTime).reduceOption[Double](math.min),
+      includeUncounted = query.includeUncounted,
       limit = query.limit
     )
     games.searchMetadata(searchParams).map { data =>

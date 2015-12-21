@@ -58,8 +58,6 @@ var Board = React.createClass({
     const files = "abcdefgh";
     var squareName =  files.charAt(x)+ranks.charAt(y);
 
-    var black = (x+y) % 2 === 1;
-    var trap = (x === 2 || x === 5) && (y === 2 || y === 5);
     var selected = (this.state.stepFrom === i);
     var piece = (p !== ' ') ? (<Piece pieceName={p}/>) : null;
 
@@ -71,7 +69,7 @@ var Board = React.createClass({
 
     return (
       <div key={i} className="square" onClick={this.squareClicked.bind(this, i, squareName)}>
-        <Square black={black} trap={trap} selected={selected} stepTo={stepTo} sqName={squareName}>
+        <Square selected={selected} stepTo={stepTo} sqName={squareName}>
           {piece}
         </Square>
       </div>

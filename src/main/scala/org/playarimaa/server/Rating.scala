@@ -19,7 +19,13 @@ case class Rating(
 object Rating {
 
   //Initial rating value for new players
-  val initial = new Rating(1500,500)
+  val newPlayerPrior = new Rating(1400,400)
+  def givenRatingPrior(rating: Double) = {
+    //Clamp user-provided ratings to avoid silly numbers
+    val mean = math.min(math.max(rating,1400),2200)
+    val stdev = 150.0
+    new Rating(mean,stdev)
+  }
 
   /* Converts from Elo scale (400 points = 10x odds of winning) to nat scale (1 point = ex odds of winning)
    * where e is the base of the natural log. */
@@ -89,6 +95,7 @@ object Rating {
       val initialError = error(mean)
       val grad = dErrordMean(mean)
       val prec = d2ErrordMean2(mean)
+
       //Solve prec * x = grad, and negate to get the step we should take
       val x = - (prec \ grad)
 
@@ -98,22 +105,23 @@ object Rating {
       //Repeatedly halve until we're happy with the newton step
       def findGoodFactor() : Double = {
         var factor = 1.0
-        for(i <- 1 to 30) {
+        for(i <- 1 to 60) {
           if(errorOf(factor) < initialError)
             return factor
           factor /= 2.0
         }
-        return factor
+        //No factor is good, perform no adjustment
+        return 0.0
       }
       var factor = findGoodFactor()
-      if(errorOf(factor / 2.0) < errorOf(factor))
-        factor /= 2.0
-      mean :+= mean + x * factor
+      //Check if reducing it a little it would be even better
+      if(errorOf(factor * 0.75) < errorOf(factor))
+        factor *= 0.75
+      mean := mean + x * factor
       ()
     }
 
-    //TODO do something smarter?
-    //Perform a few newton steps
+    //Perform a few newton steps, this should be plenty to converge
     for(i <- 1 to 10)
       newtonStep()
 

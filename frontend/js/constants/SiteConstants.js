@@ -37,8 +37,9 @@ const VALUES = {
   GAME_STATE_LOOP_DELAY_ON_ERROR: 5.0,
 
   //Check if we need to go to login page if not logged in this often
+  //This also serves as a heartbeat for the site so it won't log us out
   LOGIN_CHECK_LOOP_DELAY: 20.0,
-  
+
   //Seconds to wait between heartbeats for chatroom
   CHAT_HEARTBEAT_PERIOD: 30.0,
   //Max chat lines to keep in history

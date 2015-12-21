@@ -1,47 +1,50 @@
-.square {
-  width: 12.5%;
-  height: 12.5%;
-}
 
-.black {
-  width: 100%;
-  height: 100%;
-}
+//Css file for the game client
 
-//don't need colors here, delete this later
-.white {
-  width: 100%;
-  height: 100%;
-}
-
-//delete this too, we should just build the traps
-//into the board background image
-.trap {
-  background-color: rgba(50, 20, 20, 0.5);
-}
-
-.sel {
-  background: rgba(20, 20, 70, 0.6);
-}
-
-.step {
-  background: no-repeat center url("../images/green-circle.png");
-}
-
-.trap.step {
-  background-color: rgba(50, 20, 20, 0.5);
-  background-image: no-repeat center url("../images/green-circle.png");
-}
+//Board display----------------------------------------------------------------------
 
 .board {
   width:$board-size;
   height:$board-size;
-  background: no-repeat center url($board-bg); //currently taken from lichess, we'll draw our own later
+  background: no-repeat center url($board-bg);
   background-size: 100%;
   display: flex;
   flex-wrap: wrap;
   float: left;
 }
+
+.square {
+  position:relative;
+  width: 12.5%;
+  height: 12.5%;
+}
+
+.subSquare {
+  width: 100%;
+  height: 100%;
+}
+.subSquare.selected {
+  background: rgba(20, 20, 70, 0.6);
+}
+
+.subSquare.stepTo {
+  background: no-repeat center url($step-to-img);
+}
+
+.coordLabel {
+  position:absolute;
+  top: 0px;
+  left: 0px;
+  width: 100%;
+}
+
+.pieceImg {
+  position:relative;
+  width:100%;
+  height:100%;
+}
+
+//Movelist----------------------------------------------------------------------------
 
 table.moveList {
     /*display: table;*/

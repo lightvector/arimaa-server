@@ -21,6 +21,7 @@ object AccountServlet {
     case class ShortUserInfo(
       name: String,
       rating: Double,
+      ratingStdev: Double,
       isBot: Boolean,
       isGuest: Boolean
     )
@@ -49,7 +50,7 @@ object AccountServlet {
 
   case object Register extends Action {
     val name = "register"
-    case class Query(username: String, email: String, password: String, isBot: Boolean)
+    case class Query(username: String, email: String, password: String, isBot: Boolean, priorRating: String)
     case class Reply(username: String, siteAuth: String)
   }
   case object Login extends Action {
@@ -122,7 +123,7 @@ class AccountServlet(val siteLogin: SiteLogin, val ec: ExecutionContext)
   }
 
   def convUser(user: SimpleUserInfo): IOTypes.ShortUserInfo = {
-    IOTypes.ShortUserInfo(user.name,user.rating.mean,user.isBot,user.isGuest)
+    IOTypes.ShortUserInfo(user.name,user.rating.mean,user.rating.stdev,user.isBot,user.isGuest)
   }
 
   def handleAction(params: Map[String,String]) : AnyRef = {
@@ -131,7 +132,11 @@ class AccountServlet(val siteLogin: SiteLogin, val ec: ExecutionContext)
         pass()
       case Some(Register) =>
         val query = Json.read[Register.Query](request.body)
-        siteLogin.register(query.username, query.email, query.password, query.isBot).map { case (username,siteAuth) =>
+        val priorRating = query.priorRating.trim match {
+          case "" => None
+          case s => Some(s.toFiniteDouble)
+        }
+        siteLogin.register(query.username, query.email, query.password, query.isBot, priorRating).map { case (username,siteAuth) =>
           Json.write(Register.Reply(username, siteAuth))
         }
       case Some(Login) =>

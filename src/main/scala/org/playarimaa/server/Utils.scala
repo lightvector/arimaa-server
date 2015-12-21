@@ -38,4 +38,33 @@ object Utils {
       }
     }
   }
+
+  implicit class DoubleExtended(val x: Double) extends AnyVal {
+    def validateFinite(label:String): Unit = {
+      if(x.isNaN || x.isInfinite)
+        throw new NumberFormatException("Value for " + label + " is infinite or nan: " + x)
+    }
+    def validateNonNegative(label:String): Unit = {
+      validateFinite(label)
+      if(x < 0)
+        throw new NumberFormatException("Value for " + label + " is negative: " + x)
+    }
+    def validatePositive(label:String): Unit = {
+      validateFinite(label)
+      if(x <= 0)
+        throw new NumberFormatException("Value for " + label + " is not positive: " + x)
+    }
+  }
+
+  implicit class IntExtended(val x: Int) extends AnyVal {
+    def validateNonNegative(label:String): Unit = {
+      if(x < 0)
+        throw new NumberFormatException("Value for " + label + " is negative: " + x)
+    }
+    def validatePositive(label:String): Unit = {
+      if(x <= 0)
+        throw new NumberFormatException("Value for " + label + " is not positive: " + x)
+    }
+  }
+
 }

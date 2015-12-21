@@ -66,7 +66,7 @@ function websocketURL(path) {
 }
 
 var APIUtils = {
-  register_bot: function(username, email, password) {
+  register_bot: function(username, email, password, ratingStr, success, error) {
     //TODO: NOT YET IMPLEMENTED!
   },
 
@@ -78,8 +78,8 @@ var APIUtils = {
     POST('/api/accounts/loginGuest', {username:username}, success, error);
   },
 
-  register: function(username, email, password, success, error) {
-    POST('/api/accounts/register', {username:username, email:email, password:password, isBot:false}, success, error);
+  register: function(username, email, password, priorRating, success, error) {
+    POST('/api/accounts/register', {username:username, email:email, password:password, isBot:false, priorRating:priorRating}, success, error);
   },
 
   logout: function(success, error) {

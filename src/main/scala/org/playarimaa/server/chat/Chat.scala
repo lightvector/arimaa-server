@@ -16,8 +16,8 @@ import org.playarimaa.server.{LoginTracker,SiteLogin,Timestamp}
 import org.playarimaa.server.Timestamp.Timestamp
 
 object ChatSystem {
-  //Leave chat if it's been this many seconds with no activity
-  val INACTIVITY_TIMEOUT: Double = 120.0
+  //Leave chat if it's been this many seconds with no activity (including heartbeats)
+  val INACTIVITY_TIMEOUT: Double = 240.0
   //Max lines at a time to return in a single query
   val READ_MAX_LINES: Int = 5000
   //Timeout for a single get query for chat messages
@@ -26,6 +26,8 @@ object ChatSystem {
   val AKKA_TIMEOUT: Timeout = new Timeout(20 seconds)
   //Period for checking timeouts in a chat even if nothing happens
   val CHAT_CHECK_TIMEOUT_PERIOD: Double = 120.0
+  //Max length of text in characters
+  val MAX_TEXT_LENGTH: Int = 4000
 
   val NO_CHANNEL_MESSAGE = "No such chat channel, or not authorized"
   val NO_LOGIN_MESSAGE = "Not logged in, or timed out due to inactivity"
@@ -37,7 +39,37 @@ object ChatSystem {
 
 import ChatSystem.Channel
 
-case class ChatLine(id: Long, channel: Channel, username: Username, text: String, timestamp: Timestamp)
+sealed trait ChatEvent {
+  val name : String
+  override def toString: String = name
+}
+
+object ChatEvent {
+  def ofString(s: String): ChatEvent = {
+    s match {
+      case "msg" => MSG
+      case "join" => JOIN
+      case "leave" => LEAVE
+      case "timeout" => TIMEOUT
+      case _ => throw new Exception("Could not parse string as ChatEvent: " + s)
+    }
+  }
+
+  case object MSG           extends ChatEvent {val name = "msg"}
+  case object JOIN          extends ChatEvent {val name = "join"}
+  case object LEAVE         extends ChatEvent {val name = "leave"}
+  case object TIMEOUT       extends ChatEvent {val name = "timeout"}
+}
+
+
+case class ChatLine(
+  id: Long,
+  channel: Channel,
+  username: Username,
+  timestamp: Timestamp,
+  event: ChatEvent,
+  label: Option[String],
+  text: Option[String])
 
 //---CHAT SYSTEM----------------------------------------------------------------------------------
 
@@ -169,7 +201,7 @@ class ChatChannel(val channel: Channel, val db: Database, val parentLogins: Logi
   var messagesNotYetInDB: Queue[ChatLine] = Queue()
 
   //Tracks who is logged in to this chat channel
-  val logins: LoginTracker = new LoginTracker(Some(parentLogins),ChatSystem.INACTIVITY_TIMEOUT)
+  val logins: LoginTracker = new LoginTracker(Some(parentLogins), ChatSystem.INACTIVITY_TIMEOUT, updateInfosFromParent = true)
   //Most recent time anything happened in this channel
   var lastActive = Timestamp.get
 
@@ -225,7 +257,10 @@ class ChatChannel(val channel: Channel, val db: Database, val parentLogins: Logi
 
     case ChatChannel.Post(chatAuth: ChatAuth, text:String) =>
       val result: Try[Unit] = requiringLogin(chatAuth) { user =>
-        val line = ChatLine(nextId, channel, user.name, text, Timestamp.get)
+        if(text.length > ChatSystem.MAX_TEXT_LENGTH)
+          throw new Exception("Text too long: " + text)
+
+        val line = ChatLine(nextId, channel, user.name, Timestamp.get, ChatEvent.MSG, None, Some(text))
         nextId = nextId + 1
 
         //Add to queue of lines that we will remember until they show up in the db
@@ -331,8 +366,8 @@ class ChatChannel(val channel: Channel, val db: Database, val parentLogins: Logi
     logins.heartbeatAuth(chatAuth,now) match {
       case None => Failure(new Exception(ChatSystem.NO_LOGIN_MESSAGE))
       case Some(user) =>
-      lastActive = now
-      Success(f(user))
+        lastActive = now
+        Try(f(user))
     }
   }
 
@@ -342,9 +377,16 @@ class ChatTable(tag: Tag) extends Table[ChatLine](tag, "chatTable") {
   def id : Rep[Long] = column[Long]("id")
   def channel : Rep[String] = column[String]("channel")
   def username : Rep[String] = column[String]("username")
-  def text : Rep[String] = column[String]("text")
   def timestamp : Rep[Double] = column[Double]("time")
+  def event : Rep[ChatEvent] = column[ChatEvent]("event")
+  def label : Rep[Option[String]] = column[Option[String]]("label")
+  def text : Rep[Option[String]] = column[Option[String]]("text")
+
+  implicit val chatEventMapper = MappedColumnType.base[ChatEvent, String] (
+    { chatEvent => chatEvent.toString },
+    { str => ChatEvent.ofString(str) }
+  )
 
   //The * projection (e.g. select * ...) auto-transforms the tuple to the case class
-  def * : ProvenShape[ChatLine] = (id, channel, username, text, timestamp) <> (ChatLine.tupled, ChatLine.unapply)
+  def * : ProvenShape[ChatLine] = (id, channel, username, timestamp, event, label, text) <> (ChatLine.tupled, ChatLine.unapply)
 }

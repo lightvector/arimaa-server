@@ -152,8 +152,13 @@ var chatBox = React.createClass({
       usersDiv = React.createElement("div", {key: "chatUsersDiv", className:"gameroomUsersDiv"}, usersList);
     }
 
+    var chatLabel =
+      this.props.params.chatChannel == "main" ?
+      React.createElement("h1", {key: "chatLabel"}, "Chat") :
+      React.createElement("h1", {key: "chatLabel"}, "In-game Chat");
+
     var contents = [
-      React.createElement("h1", {key: "chatLabel"}, "Chat"),
+      chatLabel,
       usersDiv,
       React.createElement(
         "table", null,
