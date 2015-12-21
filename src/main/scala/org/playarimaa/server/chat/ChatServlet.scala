@@ -25,7 +25,15 @@ import org.playarimaa.server.game.Games
 object ChatServlet {
   object IOTypes {
     case class SimpleError(error: String)
-    case class ChatLine(id: Long, channel: String, username: String, text: String, timestamp: Double)
+    case class ChatLine(
+      id: Long,
+      channel: String,
+      username: String,
+      timestamp: Double,
+      event: String,
+      label: Option[String],
+      text: Option[String]
+    )
 
     case class ShortUserInfo(
       name: String,
@@ -107,6 +115,18 @@ class ChatServlet(val accounts: Accounts, val siteLogin: SiteLogin, val chat: Ch
     IOTypes.ShortUserInfo(user.name,user.rating.mean,user.rating.stdev,user.isBot,user.isGuest)
   }
 
+  def convLine(line: ChatLine): IOTypes.ChatLine = {
+    IOTypes.ChatLine(
+      id = line.id,
+      channel = line.channel,
+      username = line.username,
+      timestamp = line.timestamp,
+      event = line.event.toString,
+      label = line.label,
+      text = line.text
+    )
+  }
+
   def getAction(action: String): Option[Action] = {
     Action.all.find(_.name == action)
   }
@@ -165,15 +185,7 @@ class ChatServlet(val accounts: Accounts, val siteLogin: SiteLogin, val chat: Ch
         maxTime = None,
         doWait = query.doWait
       ).map { chatLines =>
-        Get.Reply(chatLines.map { line =>
-          IOTypes.ChatLine(
-            id = line.id,
-            channel = line.channel,
-            username = line.username,
-            text = line.text,
-            timestamp = line.timestamp
-          )
-        })
+        Get.Reply(chatLines.map(convLine))
       }
     }
   }
@@ -223,13 +235,7 @@ class ChatServlet(val accounts: Accounts, val siteLogin: SiteLogin, val chat: Ch
                         if(minId.forall(_ <= line.id))
                           minId = Some(line.id+1)
 
-                        val output = IOTypes.ChatLine(
-                          id = line.id,
-                          channel = line.channel,
-                          username = line.username,
-                          text = line.text,
-                          timestamp = line.timestamp
-                        )
+                        val output = convLine(line)
                         send(Json.write(output))
                       }
                   }

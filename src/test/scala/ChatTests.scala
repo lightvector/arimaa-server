@@ -98,14 +98,16 @@ class ChatServletTests(_system: ActorSystem) extends TestKit(_system) with Scala
       lines(0).id should equal (0)
       lines(0).username should equal ("Bob")
       lines(0).channel should equal ("main")
-      lines(0).text should equal ("Hello world")
+      lines(0).event should equal ("msg")
+      lines(0).text should equal (Some("Hello world"))
       lines(0).timestamp >= startTime should be (true)
       lines(0).timestamp <= Timestamp.get should be (true)
 
       lines(1).id should equal (1)
       lines(1).username should equal ("Bob")
       lines(1).channel should equal ("main")
-      lines(1).text should equal ("I am Bob")
+      lines(1).event should equal ("msg")
+      lines(1).text should equal (Some("I am Bob"))
       lines(1).timestamp >= lines(0).timestamp should be (true)
       lines(1).timestamp <= Timestamp.get should be (true)
     }
@@ -119,7 +121,8 @@ class ChatServletTests(_system: ActorSystem) extends TestKit(_system) with Scala
       lines.length should equal (1)
 
       lines(0).id should equal (1)
-      lines(0).text should equal ("I am Bob")
+      lines(0).event should equal ("msg")
+      lines(0).text should equal (Some("I am Bob"))
     }
 
     get("/main", ("minId" -> "2")) {

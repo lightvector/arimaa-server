@@ -18,6 +18,7 @@ var Game = React.createClass({
         <Movelist gameID={this.props.params.gameID}/>
         <GameClock player="g"/>
         <GameClock player="s"/>
+        <Chat params={{chatChannel:"game/"+this.props.params.gameID}}/>
         <DebugComp gameID={this.props.params.gameID}/>
       </div>
     );
