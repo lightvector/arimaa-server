@@ -2,14 +2,17 @@ package org.playarimaa.server
 import org.playarimaa.server.CommonTypes._
 import org.playarimaa.server.Timestamp.Timestamp
 
-/* Implements a basic login system with support for timeouts.
- * [inactivityTimeout] specifies how old to require a login is to time it out
- * when [doTimeouts] is called.
- * [parent] specifies a parent login tracker such that if [parentAuth] is provided to
+/* A basic login system with support for timeouts.
+ *
+ * @param parent a "parent" login tracker such that if parentAuth is provided to
  * login, heartbeats will heartbeat the parent login as well, and doTimeouts will
  * check if the parent is logged in or not.
+ *
+ * @param inactivityTimeout how old to require a login is to time it out when [doTimeouts] is called.
+ *
+ * @param updateInfosFromParent if true, also update SimpleUserInfos if they change in the parent.
  */
-class LoginTracker(val parent: Option[LoginTracker], val inactivityTimeout: Double) {
+class LoginTracker(val parent: Option[LoginTracker], val inactivityTimeout: Double, val updateInfosFromParent: Boolean) {
   class LoginData(var info: SimpleUserInfo) {
     //All auth keys this user has, along with the time they were most recently used
     var auths: Map[Auth,Timestamp] = Map()
@@ -20,7 +23,7 @@ class LoginTracker(val parent: Option[LoginTracker], val inactivityTimeout: Doub
   private var loginData: Map[Username,LoginData] = Map()
   private var lastActive: Timestamp = Timestamp.get
 
-  private var userAndParentAuth: Map[Auth,(SimpleUserInfo,Option[Auth])] = Map()
+  private var userAndParentAuth: Map[Auth,(Username,Option[Auth])] = Map()
 
   private def findOrAddLoginData(user: SimpleUserInfo): LoginData = synchronized {
     val ld = loginData.getOrElse(user.name, new LoginData(user))
@@ -53,7 +56,7 @@ class LoginTracker(val parent: Option[LoginTracker], val inactivityTimeout: Doub
 
       val ld = findOrAddLoginData(user)
       ld.auths = ld.auths + (auth -> now)
-      userAndParentAuth = userAndParentAuth + (auth -> ((user,parentAuth)))
+      userAndParentAuth = userAndParentAuth + (auth -> ((user.name,parentAuth)))
       ld.lastActive = now
       lastActive = now
       auth
@@ -74,7 +77,9 @@ class LoginTracker(val parent: Option[LoginTracker], val inactivityTimeout: Doub
   }
 
   def userOfAuth(auth: Auth): Option[SimpleUserInfo] = synchronized {
-    userAndParentAuth.get(auth).map { case (user,_) => user }
+    userAndParentAuth.get(auth).flatMap { case (username,_) =>
+      loginData.get(username).map(_.info)
+    }
   }
 
   /* Returns the last time that any activity occurred */
@@ -95,15 +100,15 @@ class LoginTracker(val parent: Option[LoginTracker], val inactivityTimeout: Doub
       ld.lastActive = now
       val (user,parentAuth) = userAndParentAuth(auth)
       parentAuth.foreach { parentAuth => parent.get.heartbeat(username, parentAuth, now) }
-      user
+      ld.info
     }
   }
 
   /* Same as [heartbeat], but performs a lookup to find the username using only the auth */
   def heartbeatAuth(auth: Auth, now: Timestamp): Option[SimpleUserInfo] = synchronized {
     lastActive = now
-    userAndParentAuth.get(auth).flatMap { case (user,_) =>
-      heartbeat(user.name, auth, now)
+    userAndParentAuth.get(auth).flatMap { case (username,_) =>
+      heartbeat(username, auth, now)
     }
   }
 
@@ -117,8 +122,8 @@ class LoginTracker(val parent: Option[LoginTracker], val inactivityTimeout: Doub
   /* Log a single auth of a user out */
   def logoutAuth(auth: Auth, now: Timestamp): Unit = synchronized {
     lastActive = now
-    userAndParentAuth.get(auth).foreach { case (user,_) =>
-      logout(user.name, auth, now)
+    userAndParentAuth.get(auth).foreach { case (username,_) =>
+      logout(username, auth, now)
     }
   }
   /* Log all of a user's auths out */
@@ -141,8 +146,24 @@ class LoginTracker(val parent: Option[LoginTracker], val inactivityTimeout: Doub
     var usersTimedOut: List[Username] = List()
     loginData = loginData.filter { case (username,ld) =>
       ld.auths = ld.auths.filter { case (auth,time) =>
-        val shouldKeep = now < time + inactivityTimeout &&
-          userAndParentAuth(auth)._2.forall { parentAuth => parent.get.isAuthLoggedIn(parentAuth) }
+        //Should we keep this auth of this user logged in?
+        val shouldKeep =
+          //Only if it's within the inactivity timeout and...
+          now < time + inactivityTimeout &&
+          userAndParentAuth(auth)._2.forall { parentAuth =>
+            parent.get.userOfAuth(parentAuth) match {
+              case None =>
+                //No, we don't want to keep this auth
+                false
+              case Some(info) =>
+                //Also update our userinfo from the parent if desired
+                if(updateInfosFromParent)
+                  ld.info = info
+                //Yes, we do want to keep.
+                true
+            }
+          }
+
         if(!shouldKeep)
           userAndParentAuth = userAndParentAuth - auth
         shouldKeep

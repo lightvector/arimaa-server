@@ -21,6 +21,7 @@ object AccountServlet {
     case class ShortUserInfo(
       name: String,
       rating: Double,
+      ratingStdev: Double,
       isBot: Boolean,
       isGuest: Boolean
     )
@@ -122,7 +123,7 @@ class AccountServlet(val siteLogin: SiteLogin, val ec: ExecutionContext)
   }
 
   def convUser(user: SimpleUserInfo): IOTypes.ShortUserInfo = {
-    IOTypes.ShortUserInfo(user.name,user.rating.mean,user.isBot,user.isGuest)
+    IOTypes.ShortUserInfo(user.name,user.rating.mean,user.rating.stdev,user.isBot,user.isGuest)
   }
 
   def handleAction(params: Map[String,String]) : AnyRef = {

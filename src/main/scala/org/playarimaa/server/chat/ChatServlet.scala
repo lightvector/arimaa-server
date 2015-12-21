@@ -30,6 +30,7 @@ object ChatServlet {
     case class ShortUserInfo(
       name: String,
       rating: Double,
+      ratingStdev: Double,
       isBot: Boolean,
       isGuest: Boolean
     )
@@ -103,7 +104,7 @@ class ChatServlet(val accounts: Accounts, val siteLogin: SiteLogin, val chat: Ch
   }
 
   def convUser(user: SimpleUserInfo): IOTypes.ShortUserInfo = {
-    IOTypes.ShortUserInfo(user.name,user.rating.mean,user.isBot,user.isGuest)
+    IOTypes.ShortUserInfo(user.name,user.rating.mean,user.rating.stdev,user.isBot,user.isGuest)
   }
 
   def getAction(action: String): Option[Action] = {

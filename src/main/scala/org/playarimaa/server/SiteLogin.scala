@@ -62,7 +62,7 @@ import SiteLogin.Constants._
 
 class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: ExecutionContext, val scheduler: Scheduler)(implicit ec: ExecutionContext) {
 
-  val logins: LoginTracker = new LoginTracker(None,INACTIVITY_TIMEOUT)
+  val logins: LoginTracker = new LoginTracker(None, INACTIVITY_TIMEOUT, updateInfosFromParent = false)
 
   var passResets: Map[Username,AuthTime] = Map()
   val passResetLock = new Object()
