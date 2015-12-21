@@ -130,7 +130,9 @@ var Utils = {
     var ratingStr = "" + Math.round(userInfo.rating);
 
     //TODO think about this threshold and/or other ways of displaying the rating
-    if(userInfo.ratingStdev > 100)
+    if(userInfo.ratingStdev > 140)
+      ratingStr += "?";
+    if(userInfo.ratingStdev > 280)
       ratingStr += "?";
 
     if(userInfo.isGuest)

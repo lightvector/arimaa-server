@@ -1203,30 +1203,40 @@ class ActiveGame(
     if(countForStats) {
       val loser = winner.flip
       Future {
-        accounts.updateGameStats2(meta.users(winner).name, meta.users(loser).name) { case (wStats,lStats) =>
-          val (wg,ws,lg,ls) = if(winner == GOLD) (1,0,0,1) else (0,1,1,0)
-          val (newWRating,newLRating) =
-            if(meta.rated)
-              Rating.newRatings(wStats.rating,lStats.rating)
-            else
-              (wStats.rating,lStats.rating)
-
+        //Do all of these separately to avoid one error preventing other stats from updating
+        accounts.updateGameStats(meta.users(winner).name) { wStats =>
+          val (wg,ws) = if(winner == GOLD) (1,0) else (0,1)
           val newWStats = wStats.copy(
             numGamesWon = wStats.numGamesWon+1,
-            rating = newWRating,
             numGamesGold = wStats.numGamesGold+wg,
             numGamesSilv = wStats.numGamesSilv+ws
           )
+          newWStats
+        }.onFailure { case exn =>
+            logger.error("Error updating post-game stats for " + meta.users(winner).name + " :" + exn)
+        }
+
+        accounts.updateGameStats(meta.users(loser).name) { lStats =>
+          val (lg,ls) = if(loser == GOLD) (1,0) else (0,1)
           val newLStats = lStats.copy(
             numGamesLost = lStats.numGamesLost+1,
-            rating = newLRating,
             numGamesGold = lStats.numGamesGold+lg,
             numGamesSilv = lStats.numGamesSilv+ls
           )
-          (newWStats,newLStats)
-
+          newLStats
         }.onFailure { case exn =>
-            logger.error("Error updating post-game stats for " + meta.users(winner).name + ", " +meta.users(loser).name  + " :" + exn)
+            logger.error("Error updating post-game stats for " + meta.users(loser).name  + " :" + exn)
+        }
+
+        if(meta.rated && !meta.users(winner).isGuest && !meta.users(loser).isGuest) {
+          accounts.updateGameStats2(meta.users(winner).name, meta.users(loser).name) { case (wStats,lStats) =>
+            val (newWRating,newLRating) = Rating.newRatings(wStats.rating,lStats.rating)
+            val newWStats = wStats.copy(rating = newWRating)
+            val newLStats = lStats.copy(rating = newLRating)
+            (newWStats,newLStats)
+          }.onFailure { case exn =>
+              logger.error("Error updating post-game ratings for " + meta.users(winner).name + ", " + meta.users(loser).name  + " :" + exn)
+          }
         }
       }
     }
