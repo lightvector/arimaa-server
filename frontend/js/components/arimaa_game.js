@@ -4,6 +4,7 @@ var Movelist = require('./movelist.js');
 var GameClock = require('./gameClock.js');
 var ArimaaActions = require('../actions/ArimaaActions.js');
 var DebugComp = require('./boardDebugComponent.js');
+var Chat = require('../components/chat.js');
 
 var Game = React.createClass({
 

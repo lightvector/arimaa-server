@@ -59,7 +59,7 @@ var registrationBox = React.createClass({
             <input type="text" name="email" value={this.state.email} onChange={this.handleEmailChange} placeholder="Email"/>
             <input type="password" name="password" value={this.state.pass} onChange={this.handlePasswordChange} placeholder="Password"/>
             <input type="password" name="confirmPassword" value={this.state.confirmPass} onChange={this.handleConfirmPasswordChange} placeholder="Confirm Password"/>
-            <input type="text" name="priorRating" maxlength="4" value={this.state.priorRating} onChange={this.handlePriorRatingChange}
+            <input type="text" name="priorRating" maxLength="4" value={this.state.priorRating} onChange={this.handlePriorRatingChange}
               placeholder="Approx rating (leave blank if new player)"/>
             <input type="submit" className="submit" name="commit" value="Register" onClick={this.submitRegister}/>
           </form>
