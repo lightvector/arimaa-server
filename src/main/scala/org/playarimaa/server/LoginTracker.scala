@@ -20,20 +20,24 @@ class LoginTracker(val parent: Option[LoginTracker], val inactivityTimeout: Doub
     var lastActive: Timestamp = Timestamp.get
   }
 
-  private var loginData: Map[Username,LoginData] = Map()
+  //We use UserID (i.e. lowercaseName) internally for loginData so that we aren't sensitive to the capitalization of a user's name for
+  //methods of LoginTracker.
+  private var loginData: Map[UserID,LoginData] = Map()
   private var lastActive: Timestamp = Timestamp.get
 
   private var userAndParentAuth: Map[Auth,(Username,Option[Auth])] = Map()
 
   private def findOrAddLoginData(user: SimpleUserInfo): LoginData = synchronized {
-    val ld = loginData.getOrElse(user.name, new LoginData(user))
-    loginData = loginData + (user.name -> ld)
+    val lowercaseName = user.name.toLowerCase
+    val ld = loginData.getOrElse(lowercaseName, new LoginData(user))
+    loginData = loginData + (lowercaseName -> ld)
     ld
   }
 
   /* Returns the LoginData for a user if that user is logged in */
   private def getLoginData(username: Username, auth: Auth): Option[LoginData] = synchronized {
-    loginData.get(username).flatMap { ld =>
+    val lowercaseName = username.toLowerCase
+    loginData.get(lowercaseName).flatMap { ld =>
       if(ld.auths.contains(auth))
         Some(ld)
       else
@@ -63,11 +67,13 @@ class LoginTracker(val parent: Option[LoginTracker], val inactivityTimeout: Doub
     }
   }
 
+  //These are not sensitive to capitalization of user's name
   def isLoggedIn(username: Username, auth: Auth): Boolean = synchronized {
     getLoginData(username,auth).nonEmpty
   }
   def isUserLoggedIn(username: Username): Boolean = synchronized {
-    loginData.get(username).nonEmpty
+    val lowercaseName = username.toLowerCase
+    loginData.get(lowercaseName).nonEmpty
   }
   def isAuthLoggedIn(auth: Auth): Boolean = synchronized {
     userAndParentAuth.contains(auth)
@@ -78,7 +84,8 @@ class LoginTracker(val parent: Option[LoginTracker], val inactivityTimeout: Doub
 
   def userOfAuth(auth: Auth): Option[SimpleUserInfo] = synchronized {
     userAndParentAuth.get(auth).flatMap { case (username,_) =>
-      loginData.get(username).map(_.info)
+      val lowercaseName = username.toLowerCase
+      loginData.get(lowercaseName).map(_.info)
     }
   }
 
@@ -98,7 +105,7 @@ class LoginTracker(val parent: Option[LoginTracker], val inactivityTimeout: Doub
     getLoginData(username,auth).map { ld =>
       ld.auths = ld.auths + (auth -> now)
       ld.lastActive = now
-      val (user,parentAuth) = userAndParentAuth(auth)
+      val (_,parentAuth) = userAndParentAuth(auth)
       parentAuth.foreach { parentAuth => parent.get.heartbeat(username, parentAuth, now) }
       ld.info
     }
@@ -129,13 +136,15 @@ class LoginTracker(val parent: Option[LoginTracker], val inactivityTimeout: Doub
   /* Log all of a user's auths out */
   def logoutUser(username: Username, now: Timestamp): Unit = synchronized {
     lastActive = now
-    loginData = loginData - username
+    val lowercaseName = username.toLowerCase
+    loginData = loginData - lowercaseName
   }
 
   /* Log out all users except the list specified */
   def logoutAllExcept(users: List[Username]): Unit = synchronized {
-    loginData = loginData.filter { case (username,_) =>
-      val shouldKeep = users.contains(username)
+    val lowercaseNames = users.map(_.toLowerCase)
+    loginData = loginData.filter { case (lowercaseName,_) =>
+      val shouldKeep = lowercaseNames.contains(lowercaseName)
       shouldKeep
     }
   }
@@ -144,7 +153,7 @@ class LoginTracker(val parent: Option[LoginTracker], val inactivityTimeout: Doub
    * Returns all users all of whose auths were logged out. */
   def doTimeouts(now: Timestamp): List[Username] = synchronized {
     var usersTimedOut: List[Username] = List()
-    loginData = loginData.filter { case (username,ld) =>
+    loginData = loginData.filter { case (_,ld) =>
       ld.auths = ld.auths.filter { case (auth,time) =>
         //Should we keep this auth of this user logged in?
         val shouldKeep =
@@ -170,7 +179,7 @@ class LoginTracker(val parent: Option[LoginTracker], val inactivityTimeout: Doub
       }
       val shouldKeep = ld.auths.nonEmpty
       if(!shouldKeep)
-        usersTimedOut = username :: usersTimedOut
+        usersTimedOut = ld.info.name :: usersTimedOut
       shouldKeep
     }
     usersTimedOut
@@ -179,7 +188,8 @@ class LoginTracker(val parent: Option[LoginTracker], val inactivityTimeout: Doub
 
   /* Updates the SimpleUserInfo for the specified user if that user is logged in */
   def updateInfo(user: SimpleUserInfo): Unit = synchronized {
-    loginData.get(user.name).foreach { ld =>
+    val lowercaseName = user.name.toLowerCase
+    loginData.get(lowercaseName).foreach { ld =>
       ld.info = user
     }
   }

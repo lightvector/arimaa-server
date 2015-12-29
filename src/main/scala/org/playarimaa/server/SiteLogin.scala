@@ -15,7 +15,9 @@ import akka.actor.{Scheduler,Cancellable}
 object SiteLogin {
 
   object Constants {
-    val INACTIVITY_TIMEOUT: Double = 180 //3 minutes (including heartbeats)
+    //TODO maybe add an "inactive" mode where timed out users will auto-log-in if they use their auth within a much longer
+    //time frame, so that 2 minutes of lag doesn't require a re-log-in
+    val INACTIVITY_TIMEOUT: Double = 120 //2 minutes (including heartbeats)
     val PASSWORD_RESET_TIMEOUT: Double = 1800 //30 minutes
     val EMAIL_CHANGE_TIMEOUT: Double = 84600 //1 day
 
@@ -172,7 +174,16 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
           gameStats = AccountGameStats.initial(rating),
           priorRating = rating
         )
+
+        //Note: not sensitive to capitalization of user's name
+        //Slight race condition possible here, but hopefully not a big deal
+        if(logins.isUserLoggedIn(username))
+          throw new Exception(INVALID_USERNAME_ERROR)
+
         accounts.add(account).recover { case _ => throw new Exception(INVALID_USERNAME_ERROR) }.map { case () =>
+          //Mitigate race condition by afterwards logging out anything logged in with this name
+          logins.logoutUser(username,now)
+
           doTimeouts(now)
           val siteAuth = logins.login(account.info, now)
           (account.username,siteAuth)
@@ -235,7 +246,17 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
         gameStats = AccountGameStats.initial(rating),
         priorRating = rating
       )
+
+      //Also only allow guest login if nobody is already logged in with that account.
+      //Note: not sensitive to capitalization of user's name
+      //Slight race condition possible here, but hopefully not a big deal
+      if(logins.isUserLoggedIn(username))
+        throw new Exception(INVALID_USERNAME_ERROR)
+
       accounts.add(account).recover { case _ => throw new Exception(INVALID_USERNAME_ERROR) }.map { case () =>
+        //Mitigate race condition by afterwards logging out anything logged in with this name
+        logins.logoutUser(username,now)
+
         doTimeouts(now)
         val siteAuth = logins.login(account.info, now)
         (account.username,siteAuth)

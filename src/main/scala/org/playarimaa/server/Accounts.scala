@@ -16,8 +16,8 @@ object Accounts {
 }
 
 case class Account(
-  lowercaseName: Username,
-  username: Username,
+  lowercaseName: UserID,
+  username: Username, //Distinct from lowercaseName so that we can remember the username captialization
   email: Email,
   passwordHash: String,
   isBot: Boolean,
@@ -70,6 +70,7 @@ class Accounts(val db: Database, val scheduler: Scheduler)(implicit ec: Executio
   val logger =  LoggerFactory.getLogger(getClass)
 
   //Returns any account with this name
+  //Usernames are not case sensitive, although the case the user specified on registration is remembered
   def getByName(username: Username, excludeGuests: Boolean): Future[Option[Account]] = {
     val lowercaseName = username.toLowerCase
     var query = Accounts.table.filter(_.lowercaseName === lowercaseName)
@@ -78,6 +79,7 @@ class Accounts(val db: Database, val scheduler: Scheduler)(implicit ec: Executio
   }
 
   //Returns all accounts with this name or email
+  //Usernames are not case sensitive, although the case the user specified on registration is remembered
   def getByNameOrEmail(usernameOrEmail: String, excludeGuests: Boolean): Future[List[Account]] = {
     val lowercaseName = usernameOrEmail.toLowerCase
     var query = Accounts.table.filter(_.lowercaseName === lowercaseName)
