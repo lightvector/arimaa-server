@@ -215,9 +215,14 @@ var SiteActions = {
     SiteActions.beginLoginCheckLoopCalled = true;
       
     SiteActions.goLoginPageIfNotLoggedIn();
-    setTimeout(SiteActions.beginLoginCheckLoop, SiteConstants.VALUES.LOGIN_CHECK_LOOP_DELAY * 1000);
+    setTimeout(SiteActions.continueLoginCheckLoop, SiteConstants.VALUES.LOGIN_CHECK_LOOP_DELAY * 1000);
   },
 
+  continueLoginCheckLoop: function() {
+    SiteActions.goLoginPageIfNotLoggedIn();
+    setTimeout(SiteActions.continueLoginCheckLoop, SiteConstants.VALUES.LOGIN_CHECK_LOOP_DELAY * 1000);
+  },
+  
   updateErrorMessage :
   "Error getting gameroom updates, possible network or other connection issues, consider refreshing the page.",
 
