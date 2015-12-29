@@ -75,7 +75,7 @@ var Board = React.createClass({
     }
 
     return (
-      <div key={i} className="square" onClick={this.squareClicked.bind(this, i, squareName)} onMouseOver={this.squareHovered.bind(this,i, squareName)}>
+      <div key={i} className="square unselectable" onClick={this.squareClicked.bind(this, i, squareName)} onMouseOver={this.squareHovered.bind(this,i, squareName)}>
         <Square selected={selected} stepTo={stepTo} sqName={squareName}>
           {piece}
         </Square>
@@ -115,7 +115,7 @@ var Board = React.createClass({
     var squares = position.map(this.renderSquare, this);
 
     return (
-      <div className="board" onMouseLeave={this.hoverAway}>
+      <div className="board unselectable" onMouseLeave={this.hoverAway}>
         {squares}
       </div>
     );
