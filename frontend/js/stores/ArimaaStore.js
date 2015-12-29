@@ -21,8 +21,11 @@ var _gameState = null;
 var _localTimeOffsetFromServer = null;
 var _lastStateReceivedTime = null;
 
-var _setupGold   = ['C','D','H','E','M','H','D','C','R','R','R','R','R','R','R','R']; //a2-h2, a1-h1 //default gold setup
-var _setupSilver = ['r','r','r','r','r','r','r','r','c','d','h','m','e','h','d','c']; //a8-h8, a7-h7 //default silver setup
+//TODO avoid having a default setup and instead go by click-to-place?
+//TODO support handicap setups
+//TODO display captured pieces
+var _setupGold   = ['R','H','C','M','E','C','H','R','R','R','R','D','D','R','R','R']; //a2-h2, a1-h1 //default gold setup
+var _setupSilver = ['r','r','r','d','d','r','r','r','r','h','c','e','m','c','h','r']; //a8-h8, a7-h7 //default silver setup
 var _currentSetup = []; //the current setup the user chooses
 var _setupColor = ArimaaConstants.GAME.NULL_COLOR;
 
