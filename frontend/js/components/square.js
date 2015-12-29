@@ -12,7 +12,7 @@ var Square = React.createClass({
     var stepTo = this.props.stepTo;
     var sqName = this.props.sqName;
 
-    var className = "subSquare";
+    var className = "subSquare unselectable";
     if(selected) {
       className += " " + "selected";
     }
@@ -23,7 +23,7 @@ var Square = React.createClass({
     return (
       <div className={className}>
         {this.props.children}
-        <span className={"coordLabel"}> {sqName} </span>
+        <span className={"coordLabel unselectable"}> {sqName} </span>
       </div>
     );
   }

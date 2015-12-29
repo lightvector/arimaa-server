@@ -53,7 +53,20 @@ const VALUES = {
 };
 
 
+const SETTINGS = {
+  //Movement controls for board gui
+  MOVEMENT_MODE_KEY: "setting_movement_mode",
+  MOVEMENT_MODE: {
+    //Click piece to select, click destination
+    CLICKCLICK: "clickclick",
+    //Hover piece to select, click destination
+    HOVERCLICK: "hoverclick",
+    DEFAULT: "hoverclick"
+  }
+};
+
 module.exports = {
   ACTIONS: ACTIONS,
-  VALUES: VALUES
+  VALUES: VALUES,
+  SETTINGS: SETTINGS
 };

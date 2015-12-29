@@ -26,6 +26,7 @@ var leftCreatedGameIDs = {}; //GameIDs for games that we've left that we created
 var gamesWeAreLeaving = {};  //Games that we initiated the leaving from
 
 var recentHighlightGameIDs = {}; //Games for which something recently changed that should cause them to flash a highlight
+var recentPlayingGameIDs = {};   //Games that we recently started playing
 
 var usersLoggedIn = []; //List of users logged in
 
@@ -115,6 +116,9 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
   getRecentHighlightGames: function() {
     return recentHighlightGameIDs;
   },
+  getRecentPlayingGames: function() {
+    return recentPlayingGameIDs;
+  },
 
   getGame: function(gameID) {
     if(gameID in openGames) return openGames[gameID];
@@ -132,6 +136,26 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
     if(gameID in watchableActiveGames) delete watchableActiveGames[gameID];
   },
 
+  flashHighlight: function(gameID) {
+    recentHighlightGameIDs[gameID] = true;
+    setTimeout(function() {
+      if(gameID in recentHighlightGameIDs) {
+        delete recentHighlightGameIDs[gameID];
+        UserStore.emitChange();
+      }
+    }, SiteConstants.VALUES.HIGHLIGHT_FLASH_TIMEOUT * 1000);
+  },
+  flashPlayingGame: function(gameID) {
+    recentPlayingGameIDs[gameID] = true;
+    setTimeout(function() {
+      if(gameID in recentPlayingGameIDs) {
+        delete recentPlayingGameIDs[gameID];
+        UserStore.emitChange();
+      }
+    }, SiteConstants.VALUES.HIGHLIGHT_FLASH_TIMEOUT * 1000);
+  },
+
+  
   addGame: function(metadata) {
     var username = UserStore.getUsername();
     var gameID = metadata.gameID;
@@ -184,14 +208,8 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
       if(metadata.openGameData.creator.name == username) {
         for(var i = 0; i<newJoined.length; i++) {
           if(newJoined[i] !== username && (prevGameIfOpen === null || !Utils.isUserJoined(prevGameIfOpen,newJoined[i]))) {
-            recentHighlightGameIDs[gameID] = true;
-            setTimeout(function() {
-              if(gameID in recentHighlightGameIDs) {
-                delete recentHighlightGameIDs[gameID];
-                Utils.flashWindowIfNotFocused("User Joined Game");
-                UserStore.emitChange();
-              }
-            }, SiteConstants.VALUES.HIGHLIGHT_FLASH_TIMEOUT * 1000);
+            Utils.flashWindowIfNotFocused("User Joined Game");
+            UserStore.flashHighlight(gameID);
           }
         }
       }
@@ -211,9 +229,13 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
 
     //Game we joined became an active game
     if(prevGameIfOpen !== null && metadata.activeGameData !== undefined && Utils.isUserJoined(metadata,username)) {
+      Utils.flashWindowIfNotFocused("Game Begun");
+      UserStore.flashPlayingGame(gameID);
+      
       //TODO this doesn't quite work, it gets blocked a lot, maybe we just let the user click on the button...?
       var newWindow = window.open("/game/" + gameID);
-      newWindow.focus();
+      if(newWindow)
+        newWindow.focus();
     }
 
 

@@ -8,7 +8,7 @@ function imageNameFromPieceName(p) {
 var ArimaaPiece = React.createClass({
   render: function() {
     var imageName = imageNameFromPieceName(this.props.pieceName);
-    return <img src={"../images/pieces/"+imageName+".png"} alt={imageName} className={"pieceImg"}></img>;
+    return <img src={"../images/pieces/"+imageName+".png"} alt={imageName} className={"pieceImg unselectable"}></img>;
   }
 });
 
