@@ -139,14 +139,7 @@ var ArimaaActions = {
         actionType: ArimaaConstants.ACTIONS.GAME_SETUP_OVER
       });
     }
-
-    if(data.result) {
-      ArimaaDispatcher.dispatch({
-        actionType: ArimaaConstants.ACTIONS.GAME_OVER,
-        result: data.result
-      });
-    }
-
+    
     setTimeout(ArimaaActions.startGameStateLoop, SiteConstants.VALUES.GAME_STATE_LOOP_DELAY * 1000);
   },
   gameStateError: function(gameID,gameAuth,data) {
@@ -165,11 +158,17 @@ var ArimaaActions = {
     });
   },
 
-  clickSquareSetup: function(sqNum, sqName) {
+  hoverSquare: function(sqNum, sqName) {
     ArimaaDispatcher.dispatch({
-      actionType: ArimaaConstants.ACTIONS.GAME_CLICK_SQUARE_SETUP,
+      actionType: ArimaaConstants.ACTIONS.GAME_HOVER_SQUARE,
       squareNum: sqNum,
       squareName: sqName
+    });
+  },
+
+  hoverAway: function() {
+    ArimaaDispatcher.dispatch({
+      actionType: ArimaaConstants.ACTIONS.GAME_HOVERED_AWAY
     });
   },
 

@@ -1,5 +1,7 @@
 var Arimaa = function(options) {
+        //TODO share these with ArimaaConstants
 	//Constants
+        const NULL_COLOR = -1;
 	const GOLD = 0;
 	const SILVER = 1;
 
@@ -708,15 +710,15 @@ var Arimaa = function(options) {
 	function check_victory() {
 		var goal = is_goal();
 		if(goal !== 0) {
-			return {result:goal,reason:'g'}
+			return {result:goal,reason:'g'};
 		}
 		var elim = is_elimination();
 		if(elim !== 0) {
-			return {result:elim,reason:'e'}
+			return {result:elim,reason:'e'};
 		}
 		var imm = is_immobilization();
 		if(imm !== 0) {
-			return {result:imm,reason:'m'}
+			return {result:imm,reason:'m'};
 		}
 		//IMPLEMENT REPETITION CHECK!!!
 		return {result:0};
@@ -726,6 +728,13 @@ var Arimaa = function(options) {
 		if(squareNum & 0x88) return false;
 		return board[squareNum];
 	}
+
+        function get_owner_of_square(squareNum) {
+		if(squareNum & 0x88) return NULL_COLOR;
+                if(board[squareNum] === EMPTY) return NULL_COLOR;
+                return (board[squareNum] & COLOR);
+        }
+          
 
 	function ascii() {
 		var s = ' +-----------------+\n';
@@ -777,7 +786,7 @@ var Arimaa = function(options) {
 			return is_frozen(square);
 		},
 
-		//TEST THIS LOLOLOLOL
+		//TODO TEST THIS LOLOLOLOL
 		is_empty: function(square) {
 			return this.get_piece_on_square(square) === EMPTY;
 		},
@@ -791,7 +800,7 @@ var Arimaa = function(options) {
 			setup(setupString);
 		},
 
-		//this is ugly!!
+		//TODO this is ugly!!
 		add_move_string: function(moveString) {
 			var stepsList = moveString.split(' ');
 
@@ -861,7 +870,7 @@ var Arimaa = function(options) {
 			return can_be_pushed(squareNum);
 		},
 
-		//TEST THIS!!!!
+		//TODO TEST THIS!!!!
 		get_turn_name: function() {
 			var c = halfmoveNumber % 2 ? 's' : 'g';
 			return (1+Math.floor(halfmoveNumber/2)) + c; //casting
@@ -884,7 +893,7 @@ var Arimaa = function(options) {
 				var current_move_string = [];
 				for(var j=0;j<move.length;j++) {
 					var s = move[j];
-					current_move_string.push(s['string'])
+					current_move_string.push(s['string']);
 				}
 				moveStrings.push(current_move_string);
 			}
@@ -913,6 +922,11 @@ var Arimaa = function(options) {
 		get_piece_on_square: function(square) {
 			var squareNum = SQUARES[square];
 			return get_piece_on_square(squareNum);
+		},
+
+                get_owner_of_square: function(square) {
+			var squareNum = SQUARES[square];
+			return get_owner_of_square(squareNum);
 		},
 
 		place_piece: function(piece, square) {

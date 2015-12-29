@@ -13,8 +13,9 @@ var ACTIONS = keyMirror({
   DEBUG_SEND_SETUP_SILVER: null,
   DEBUG_SEND_SETUP_GOLD: null,
 
+  GAME_HOVER_SQUARE: null,
+  GAME_HOVERED_AWAY: null,
   GAME_CLICK_SQUARE: null,
-  GAME_CLICK_SQUARE_SETUP: null,
   GAME_SETUP_GOLD: null,
   GAME_SETUP_SILVER: null,
   GAME_SETUP_OVER: null,
@@ -28,9 +29,7 @@ var ACTIONS = keyMirror({
   GAME_COMPLETE_MOVE: null,
   GAME_ADD_MOVE: null,
   GAME_FLIP_BOARD: null,
-  GAME_SET_COLOR: null,
-  GAME_FORFEIT: null,
-  GAME_OVER: null
+  GAME_SET_COLOR: null
 });
 
 const PIECES = {

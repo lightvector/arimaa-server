@@ -37,13 +37,20 @@ var Board = React.createClass({
     ArimaaStore.removeChangeListener(this._onChange);
   },
 
+  _onChange: function() {
+    this.setState(getGameState());
+  },
+
   squareClicked: function(i, sqName) {
-    if(this.state.setupColor === ArimaaConstants.GAME.NULL_COLOR) {
-      ArimaaActions.clickSquare(i, sqName);
-    } else if(this.state.setupColor === ArimaaConstants.GAME.GOLD ||
-              this.state.setupColor === ArimaaConstants.GAME.SILVER) {
-      ArimaaActions.clickSquareSetup(i, sqName);
-    }
+    ArimaaActions.clickSquare(i, sqName);
+  },
+
+  squareHovered: function(i, sqName) {
+    ArimaaActions.hoverSquare(i, sqName);
+  },
+
+  hoverAway: function() {
+    ArimaaActions.hoverAway();
   },
 
   renderSquare: function(p, i) {
@@ -68,7 +75,7 @@ var Board = React.createClass({
     }
 
     return (
-      <div key={i} className="square" onClick={this.squareClicked.bind(this, i, squareName)}>
+      <div key={i} className="square" onClick={this.squareClicked.bind(this, i, squareName)} onMouseOver={this.squareHovered.bind(this,i, squareName)}>
         <Square selected={selected} stepTo={stepTo} sqName={squareName}>
           {piece}
         </Square>
@@ -108,16 +115,12 @@ var Board = React.createClass({
     var squares = position.map(this.renderSquare, this);
 
     return (
-      <div className="board">
+      <div className="board" onMouseLeave={this.hoverAway}>
         {squares}
       </div>
     );
-  },
-
-  _onChange: function() {
-      this.setState(getGameState());
   }
-
+  
 });
 
 module.exports = Board;

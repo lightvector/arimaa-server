@@ -3,6 +3,7 @@
 var assign = require('object-assign');
 var EventEmitter = require('events').EventEmitter;
 var ArimaaDispatcher = require('../dispatcher/ArimaaDispatcher.js');
+var SiteConstants = require('../constants/SiteConstants.js');
 var ArimaaConstants = require('../constants/ArimaaConstants.js');
 var Arimaa = require('../lib/arimaa.js');
 var APIUtils = require('../utils/WebAPIUtils.js');
@@ -133,6 +134,7 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
 
 
   sendMoveToServer: function(gameID,gameAuth,moveStr,plyNum) {
+    ArimaaStore.setSelectedSquareToNull();
     APIUtils.sendMove(gameID,gameAuth,moveStr,plyNum,ArimaaStore.sendMoveToServerSuccess,ArimaaStore.sendMoveToServerError);
   },
   sendMoveToServerSuccess: function(data) {
@@ -148,18 +150,26 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
     });
   },
 
+  setSelectedSquare: function(square) {
+    _selSquareNum = square.squareNum;
+    _selSquareName = square.squareName;
+    _validSteps = _arimaa.generate_steps_for_piece_on_square(_selSquareName);
+  },
+
+  setSelectedSquareToNull: function() {
+    _selSquareNum = ArimaaConstants.GAME.NULL_SQUARE_NUM; //TODO also move these to a function
+    _selSquareName = "";
+    _validSteps = [];
+  },
+  
   dispatcherIndex: ArimaaDispatcher.register(function(action) {
 
     function _setSelectedSquare(square) {
-      _selSquareNum = square.squareNum;
-      _selSquareName = square.squareName;
-      _validSteps = _arimaa.generate_steps_for_piece_on_square(_selSquareName);
+      ArimaaStore.setSelectedSquare(square);
     }
 
     function _setSelectedSquareToNull() {
-      _selSquareNum = ArimaaConstants.GAME.NULL_SQUARE_NUM; //also move these to a function
-      _selSquareName = "";
-      _validSteps = [];
+      ArimaaStore.setSelectedSquareToNull();
     }
 
     switch(action.actionType) {
@@ -192,13 +202,27 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
       debugMsg = "";
       _gameState = action.data;
 
+      //Logic for trying to sync up server and local clocks as closely as possible from gameroom clock
       _lastStateReceivedTime = Utils.currentTimeSeconds();
       var crazyTimeSpan = 1200; //20 minutes
       var estimatedTimeOffset = _lastStateReceivedTime - _gameState.meta.now;
+      
+      //Figure out the offset we are from the server based by taking a min over all of the time offsets we've seen
+      //so far, except that if the difference is crazy, then forget history and take the new value
       if(_localTimeOffsetFromServer === null
          || _localTimeOffsetFromServer > estimatedTimeOffset
          || _localTimeOffsetFromServer < estimatedTimeOffset - crazyTimeSpan)
         _localTimeOffsetFromServer = estimatedTimeOffset;
+
+      //Figure out whose turn it is and if the game is over
+      if(_gameState.meta.result) {
+        _gameOver = _gameState.meta.result;
+        _colorToMove = ArimaaConstants.GAME.NULL_COLOR;
+      }
+      else if(_gameState.meta.numPly % 2 === 0)
+        _colorToMove = ArimaaConstants.GAME.GOLD;
+      else
+        _colorToMove = ArimaaConstants.GAME.SILVER;
 
       ArimaaStore.emitChange();
       break;
@@ -277,11 +301,47 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
       ArimaaStore.sendMoveToServer(action.gameID, _gameAuth, action.text, 1);
       ArimaaStore.emitChange();
       break;
-    case ArimaaConstants.ACTIONS.GAME_CLICK_SQUARE_SETUP:
-      //there's probably a way to use bitwise operations
-      //to simplify these conditionals, but this will work
-      if(_setupColor === ArimaaConstants.GAME.GOLD) { //gold to setup
-        if(action.squareNum < 48) { //ideally, we wouldn't use theses magic numbers
+
+    case ArimaaConstants.ACTIONS.GAME_HOVER_SQUARE:
+      //Do nothing unless we're one of the players AND it's our turn
+      if(_myColor === ArimaaConstants.GAME.NULL_COLOR || _myColor !== _colorToMove)
+        break;
+      //Do nothing unless we're in hover-click mode
+      if(Utils.getSetting(SiteConstants.SETTINGS.MOVEMENT_MODE_KEY, SiteConstants.SETTINGS.MOVEMENT_MODE.DEFAULT) !== SiteConstants.SETTINGS.MOVEMENT_MODE.HOVERCLICK)
+        break;
+
+      //Only act outside of the setup
+      if(_setupColor === ArimaaConstants.GAME.NULL_COLOR) {
+        if(!_arimaa.is_empty(action.squareName)) {
+          _setSelectedSquare(action);
+          ArimaaStore.emitChange();
+        }        
+      }
+      break;
+
+    case ArimaaConstants.ACTIONS.GAME_HOVERED_AWAY:
+      //Do nothing unless we're one of the players AND it's our turn
+      if(_myColor === ArimaaConstants.GAME.NULL_COLOR || _myColor !== _colorToMove)
+        break;
+
+      //Do nothing unless we're in hover-click mode
+      if(Utils.getSetting(SiteConstants.SETTINGS.MOVEMENT_MODE_KEY, SiteConstants.SETTINGS.MOVEMENT_MODE.DEFAULT) !== SiteConstants.SETTINGS.MOVEMENT_MODE.HOVERCLICK)
+        break;
+      //Only act outside of the setup
+      if(_setupColor === ArimaaConstants.GAME.NULL_COLOR) {
+        _setSelectedSquareToNull();
+        ArimaaStore.emitChange();
+      }
+      break;
+      
+    case ArimaaConstants.ACTIONS.GAME_CLICK_SQUARE:
+      //Do nothing unless we're one of the players AND it's our turn
+      if(_myColor === ArimaaConstants.GAME.NULL_COLOR || _myColor !== _colorToMove)
+        break;
+      
+      //GOLD SETUP----------------------------------------------------------------
+      if(_setupColor === ArimaaConstants.GAME.GOLD) {
+        if(action.squareNum < 48) { //TODO ideally, we wouldn't use these magic numbers
           _setSelectedSquareToNull();
         } else if(_selSquareNum === ArimaaConstants.GAME.NULL_SQUARE_NUM) {
           _setSelectedSquare(action);
@@ -291,7 +351,9 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
           _currentSetup[_selSquareNum-48] = temp;
           _setSelectedSquareToNull();
         }
-      } else { //silver to setup
+      }
+      //SILVER SETUP---------------------------------------------------------------
+      else if(_setupColor === ArimaaConstants.GAME.SILVER) {
         if(action.squareNum > 16) {
           _setSelectedSquareToNull();
         } else if(_selSquareNum === ArimaaConstants.GAME.NULL_SQUARE_NUM) {
@@ -303,38 +365,36 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
           _setSelectedSquareToNull();
         }
       }
-      ArimaaStore.emitChange();
-      break;
-
-    case ArimaaConstants.ACTIONS.GAME_CLICK_SQUARE:
-      //DEFINITELY NEED TO SIMPLIFY THESE CONDITIONALS
-
-      //USE IF_EMPTY FUNCTION AFTER UPDATING ARIMAAJS
-      if(_selSquareNum === ArimaaConstants.GAME.NULL_SQUARE_NUM && !_arimaa.is_empty(action.squareName)) {
-        _setSelectedSquare(action);
-      } else if (_selSquareNum === action.squareNum) {
-        _setSelectedSquareToNull();
-      } else {
-        var stepToAdd = null;
-        _validSteps.forEach(function(s) {
-          if(s.destSquare === action.squareName) stepToAdd = s;
-        });
-        if(stepToAdd) {
-          var k = _arimaa.add_step(stepToAdd.string);
-          _redoSquareStack = []; //can't redo after adding a new step
-          //console.log(k);
-          //USE if_empty function after updating arimaajs!!!!
-          //used if we move into a trap
-          if(!_arimaa.is_empty(stepToAdd.destSquare)) {
-            _selSquareStack.push({squareNum:_selSquareNum,squareName:_selSquareName});
-            _setSelectedSquare(action);
-          } else {
+      //REGULAR GAME---------------------------------------------------------------
+      else {      
+        //TODO USE IF_EMPTY FUNCTION AFTER UPDATING ARIMAAJS
+        if (_selSquareNum === action.squareNum) {
+          //Deselect the current square if we clicked it again and we're in click-click mode
+          if(Utils.getSetting(SiteConstants.SETTINGS.MOVEMENT_MODE_KEY, SiteConstants.SETTINGS.MOVEMENT_MODE.DEFAULT) !== SiteConstants.SETTINGS.MOVEMENT_MODE.CLICKCLICK)
             _setSelectedSquareToNull();
+        }
+        else if(!_arimaa.is_empty(action.squareName)) {
+          _setSelectedSquare(action);
+        }
+        else if(_selSquareNum !== ArimaaConstants.GAME.NULL_SQUARE_NUM) {
+          var stepToAdd = null;
+          _validSteps.forEach(function(s) {
+            if(s.destSquare === action.squareName) stepToAdd = s;
+          });
+          if(stepToAdd) {
+            var k = _arimaa.add_step(stepToAdd.string);
+            _redoSquareStack = []; //can't redo after adding a new step
+            //TODO USE if_empty function after updating arimaajs!!!!
+            //Handle the case where the piece disappears due to a sacrifice
+            if(!_arimaa.is_empty(stepToAdd.destSquare)) {
+              _selSquareStack.push({squareNum:_selSquareNum,squareName:_selSquareName});
+              _setSelectedSquare(action);
+            }
+            else {
+              _setSelectedSquareToNull();
+            }
           }
-        } else {
-          if(!_arimaa.is_empty(action.squareName)) {
-            _setSelectedSquare(action);
-          } else {
+          else {
             _setSelectedSquareToNull();
           }
         }
@@ -373,6 +433,7 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
       var completed = _arimaa.complete_move();
       if(!completed.success) {
         debugMsg = completed.reason;
+        _setSelectedSquareToNull();
         ArimaaStore.emitChange();
       }
       break;
@@ -385,6 +446,8 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
         var lastMove = moves[moves.length-1];
         var lastMoveStr = lastMove.map(function(s) {return s.string;}).join(' ');
 
+        //TODO delete this logic - we shouldn't use the local determination of the winner, but instead trust the server
+        //(for example, what if the server thinks we timed out before submitting the winning move?)
         if(completed.victory.result !== 0) {
           console.log(completed.victory.result);
           var winner = "";
@@ -397,13 +460,13 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
             winner = (_myColor === ArimaaConstants.GAME.GOLD) ? 's' : 'g';
           }
           _gameOver = {winner:winner, reason:completed.victory.reason};
+          _colorToMove = ArimaaConstants.GAME.NULL_COLOR;
         }
 
         //send move to server
         ArimaaStore.sendMoveToServer(action.gameID, _gameAuth, lastMoveStr, _arimaa.get_halfmove_number()+1);
         _redoSquareStack = [];
         _selSquareStack = [];
-        _setSelectedSquareToNull();
       } else {
         //alert "can't complete move because..."
         //undo step?
@@ -413,9 +476,7 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
       break;
     case ArimaaConstants.ACTIONS.GAME_FLIP_BOARD:
       _viewSide = ArimaaConstants.GAME.reverseColor(_viewSide);
-      ArimaaStore.emitChange();
-    case ArimaaConstants.ACTIONS.GAME_OVER:
-      _gameOver = action.result;
+      _setSelectedSquareToNull();
       ArimaaStore.emitChange();
       break;
     default:
