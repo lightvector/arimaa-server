@@ -30,12 +30,12 @@ var Board = React.createClass({
   },
 
   componentDidMount: function() {
-     ArimaaStore.addChangeListener(this._onChange);
-   },
+    ArimaaStore.addChangeListener(this._onChange);
+  },
 
-   componentWillUnmount: function() {
-     ArimaaStore.removeChangeListener(this._onChange);
-   },
+  componentWillUnmount: function() {
+    ArimaaStore.removeChangeListener(this._onChange);
+  },
 
   squareClicked: function(i, sqName) {
     if(this.state.setupColor === ArimaaConstants.GAME.NULL_COLOR) {

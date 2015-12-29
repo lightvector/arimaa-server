@@ -132,14 +132,19 @@ h1 {
   }
 }
 
-.gameroomGameElt.quickHighlight {
+.gameroomGameElt.quickHighlightOrange {
   background: orange;
+  transition:background 0s;
+}
+
+.gameroomGameElt.quickHighlightGreen {
+  background: #00FF00;
   transition:background 0s;
 }
 
 .gameroomGameElt {
   background: $body-bg;
-  transition:background 2s;
+  transition:background 3s;
 }
 
 .gameroomUsersDiv {

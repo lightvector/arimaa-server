@@ -15,6 +15,7 @@ var component = React.createClass({
             ownGames:[], joinableOpenGames:[], watchableGames:[], selectedPlayers:{},
             usersLoggedIn:[],
             recentHighlightGameIDs:{},
+            recentPlayingGameIDs:{},
             createGameDialogOpen:false,
             popupMessage:"",
             popupMessageOpen:false};
@@ -40,6 +41,7 @@ var component = React.createClass({
       joinableOpenGames:UserStore.getJoinableOpenGames(),
       watchableGames:UserStore.getWatchableGames(),
       recentHighlightGameIDs:UserStore.getRecentHighlightGames(),
+      recentPlayingGameIDs:UserStore.getRecentPlayingGames(),
       usersLoggedIn:UserStore.getUsersLoggedIn()
     });
   },
@@ -275,7 +277,8 @@ var component = React.createClass({
 
     var classes = ClassNames({
       "gameroomGameElt": true,
-      "quickHighlight": metadata.gameID in this.state.recentHighlightGameIDs
+      "quickHighlightOrange": metadata.gameID in this.state.recentHighlightGameIDs,
+      "quickHighlightGreen": metadata.gameID in this.state.recentPlayingGameIDs
     });
 
     return React.createElement("div", {key: "main_"+metadata.gameID, className:classes}, elts);
