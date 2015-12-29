@@ -10,7 +10,20 @@ const FUNC_NOP = function(){};
 //Actions for the main site and gameroom
 var SiteActions = {
 
+  checkCookiesEnabled: function() {
+    if(!navigator.cookieEnabled) {
+      ArimaaDispatcher.dispatch({
+        actionType: SiteConstants.ACTIONS.LOGIN_FAILED,
+        reason: "Cookies not enabled - please enable cookies or else the site will not work properly."
+      });
+      return false;
+    }
+    return true;
+  },
+  
   login: function(username, password) {
+    if(!SiteActions.checkCookiesEnabled())
+      return;
     APIUtils.login(username, password, SiteActions.loginSuccess, SiteActions.loginError);
   },
   loginGuest: function(username) {
@@ -23,25 +36,19 @@ var SiteActions = {
     });
   },
   loginSuccess: function(data) {
-    cookie.save('siteAuth',data.siteAuth, {path:'/'});
-    cookie.save('username',data.username, {path:'/'});
-
-    window.location.pathname = "/gameroom"; //TODO we should track where the user was before and then redirect there instead
-    ArimaaDispatcher.dispatch({
-      actionType: SiteConstants.ACTIONS.LOGIN_SUCCESS
-    });
-  },
+    SiteActions.doLogin(data);
+  },  
 
   register: function(username, email, password, priorRating) {
+    if(!SiteActions.checkCookiesEnabled())
+      return;
     APIUtils.register(username, email, password, priorRating, SiteActions.registerSuccess, SiteActions.registerError);
   },
   registerSuccess: function(data) {
-    cookie.save('siteAuth',data.siteAuth, {path:'/'});
-    cookie.save('username',data.username, {path:'/'});
     ArimaaDispatcher.dispatch({
       actionType: SiteConstants.ACTIONS.REGISTRATION_SUCCESS
     });
-    window.location.pathname = "/gameroom";
+    SiteActions.doLogin(data);
   },
   registerError: function(data) {
     ArimaaDispatcher.dispatch({
@@ -50,6 +57,16 @@ var SiteActions = {
     });
   },
 
+  doLogin: function(data) {
+    cookie.save('siteAuth',data.siteAuth, {path:'/'});
+    cookie.save('username',data.username, {path:'/'});
+
+    ArimaaDispatcher.dispatch({
+      actionType: SiteConstants.ACTIONS.LOGIN_SUCCESS
+    });
+    window.location.pathname = "/gameroom"; //TODO we should track where the user was before and then redirect there instead
+  },
+  
   logout: function() {
     APIUtils.logout(SiteActions.logoutSuccess, SiteActions.logoutError);
   },
