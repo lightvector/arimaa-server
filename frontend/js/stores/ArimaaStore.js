@@ -446,23 +446,6 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
         var lastMove = moves[moves.length-1];
         var lastMoveStr = lastMove.map(function(s) {return s.string;}).join(' ');
 
-        //TODO delete this logic - we shouldn't use the local determination of the winner, but instead trust the server
-        //(for example, what if the server thinks we timed out before submitting the winning move?)
-        if(completed.victory.result !== 0) {
-          console.log(completed.victory.result);
-          var winner = "";
-          if(completed.victory.result === 1) {
-            //maybe there should be a better check since _myColor can be null
-            //but if we're completing a move, we should always have a color
-            winner = (_myColor === ArimaaConstants.GAME.GOLD) ? 'g' : 's';
-          } else if(completed.victory.result === -1) {
-            //there's probably a way to combine the two statements better
-            winner = (_myColor === ArimaaConstants.GAME.GOLD) ? 's' : 'g';
-          }
-          _gameOver = {winner:winner, reason:completed.victory.reason};
-          _colorToMove = ArimaaConstants.GAME.NULL_COLOR;
-        }
-
         //send move to server
         ArimaaStore.sendMoveToServer(action.gameID, _gameAuth, lastMoveStr, _arimaa.get_halfmove_number()+1);
         _redoSquareStack = [];
