@@ -184,7 +184,7 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
     }
   }
 
-  //TODO throttle registrations somehow?
+  //TODO throttle registrations and guest logins by IP address
   def register(username: Username, email: Email, password: String, isBot: Boolean, priorRating:Option[Double]): Future[(Username,SiteAuth)] = {
     Future.successful(()).flatMap { case () =>
       validateUsername(username)

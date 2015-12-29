@@ -99,7 +99,6 @@ class Games(val db: Database, val parentLogins: LoginTracker, val scheduler: Sch
   private val activeGames = new ActiveGames(db,scheduler,accounts,serverInstanceID)
   val logger =  LoggerFactory.getLogger(getClass)
 
-  //TODO upon creation, should we load interrupted games from the DB and start them?
   //Maybe only if they're postal games (some heuristic based on tc?). Do we want to credit any time for them?
 
   //Begin timeout loop on initialization
@@ -133,6 +132,7 @@ class Games(val db: Database, val parentLogins: LoginTracker, val scheduler: Sch
     }
   }
 
+  //TODO implement game reopening in the API
   /* Reopen a game that has no winner if the game has any of the specified ending reasons */
   def reopenUnfinishedGame(id: GameID, allowedReasons: Set[EndingReason]): Future[Unit] = {
     //Checking open and then active in this order is important, taking advantage of property #2 above
