@@ -270,7 +270,7 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
           moveStr += _currentSetup[8*i+j]+ArimaaConstants.GAME.FILES[j]+(2-i).toString()+" ";
         }
       }
-      _arimaa.setup_gold(moveStr); //NO ERROR CHECKING YET
+      _arimaa.setup_gold(moveStr); //TODO NO ERROR CHECKING YET
       ArimaaStore.sendMoveToServer(action.gameID, _gameAuth, moveStr, 0);
       break;
     case ArimaaConstants.ACTIONS.GAME_SEND_SETUP_SILVER:
@@ -280,7 +280,7 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
           moveStr += _currentSetup[8*i+j]+ArimaaConstants.GAME.FILES[j]+(8-i).toString()+" ";
         }
       }
-      _arimaa.setup_silver(moveStr); //NO ERROR CHECKING YET
+      _arimaa.setup_silver(moveStr); //TODO NO ERROR CHECKING YET
       ArimaaStore.sendMoveToServer(action.gameID, _gameAuth, moveStr, 1);
       break;
 

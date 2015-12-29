@@ -645,9 +645,9 @@ var Arimaa = function(options) {
 		}
 		if (gGoal || sGoal) {
 			if (colorToMove == SILVER) { //reversed since we check at the beginning of each halfmove for the player who just completed the turn
-				if (sGoal) { return -1 } else { return 1 }
+				if (sGoal) { return -1; } else { return 1; }
 			} else {
-				if (gGoal) { return 1 } else { return -1 }
+				if (gGoal) { return 1; } else { return -1; }
 			}
 		} else {
 			return 0;
