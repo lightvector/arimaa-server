@@ -373,7 +373,7 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
         //TODO USE IF_EMPTY FUNCTION AFTER UPDATING ARIMAAJS
         if (_selSquareNum === action.squareNum) {
           //Deselect the current square if we clicked it again and we're in click-click mode
-          if(Utils.getSetting(SiteConstants.SETTINGS.MOVEMENT_MODE_KEY, SiteConstants.SETTINGS.MOVEMENT_MODE.DEFAULT) !== SiteConstants.SETTINGS.MOVEMENT_MODE.CLICKCLICK)
+          if(Utils.getSetting(SiteConstants.SETTINGS.MOVEMENT_MODE_KEY, SiteConstants.SETTINGS.MOVEMENT_MODE.DEFAULT) === SiteConstants.SETTINGS.MOVEMENT_MODE.CLICKCLICK)
             _setSelectedSquareToNull();
         }
         else if(!_arimaa.is_empty(action.squareName)) {
