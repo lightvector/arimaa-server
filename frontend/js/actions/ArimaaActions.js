@@ -12,7 +12,12 @@ var ArimaaActions = {
 
   //Fire off the initial game state query to get the state to begin with
   //This begins the whole set of update and heartbeat loops and such
+  //TODO maybe support calling this with different gameids in the same window. This requires arimaastore to be able to handle it.
+  startAllLoopsCalled: false,
   startAllLoops: function(gameID) {
+    if(ArimaaActions.startAllLoopsCalled)
+      return;
+    ArimaaActions.startAllLoopsCalled = true;
     APIUtils.gameState(gameID, 0, ArimaaActions.initialStateSuccess, ArimaaActions.initialStateError);
   },
   initialStateSuccess: function(data) {

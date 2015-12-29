@@ -204,9 +204,14 @@ var SiteActions = {
     });
     console.log(data);
   },
-
+  
   //Initiates a loop querying for the list of users logged in every few seconds, continuing forever.
+  beginLoginCheckLoopCalled: false,
   beginLoginCheckLoop: function() {
+    if(SiteActions.beginLoginCheckLoopCalled)
+      return;
+    SiteActions.beginLoginCheckLoopCalled = true;
+      
     SiteActions.goLoginPageIfNotLoggedIn();
     setTimeout(SiteActions.beginLoginCheckLoop, SiteConstants.VALUES.LOGIN_CHECK_LOOP_DELAY * 1000);
   },
@@ -215,7 +220,11 @@ var SiteActions = {
   "Error getting gameroom updates, possible network or other connection issues, consider refreshing the page.",
 
   //Initiates a loop querying for the list of users logged in every few seconds, continuing forever.
+  beginUsersLoggedInLoopCalled: false,
   beginUsersLoggedInLoop: function() {
+    if(SiteActions.beginUsersLoggedInLoopCalled)
+      return;
+    SiteActions.beginUsersLoggedInLoopCalled = true;
     APIUtils.usersLoggedIn(SiteActions.usersLoggedInLoopSuccess, SiteActions.usersLoggedInLoopError);
   },
   usersLoggedInLoopSuccess: function(data) {
@@ -239,7 +248,11 @@ var SiteActions = {
   },
 
   //Initiates a loop querying for the list of open games every few seconds, continuing forever.
+  beginOpenGamesLoopCalled: false,
   beginOpenGamesLoop: function() {
+    if(SiteActions.beginOpenGamesLoopCalled)
+      return;
+    SiteActions.beginOpenGamesLoopCalled = true;    
     APIUtils.getOpenGames(SiteActions.openGamesLoopSuccess, SiteActions.openGamesLoopError);
     UserStore.addNewOpenJoinedGameListener(SiteActions.newOpenJoinedGame);
   },
@@ -272,7 +285,11 @@ var SiteActions = {
   },
 
   //Initiates a loop querying for the list of active games every few seconds, continuing forever.
+  beginActiveGamesLoopCalled: false,
   beginActiveGamesLoop: function() {
+    if(SiteActions.beginActiveGamesLoopCalled)
+      return;
+    SiteActions.beginActiveGamesLoopCalled = true;
     APIUtils.getActiveGames(SiteActions.activeGamesLoopSuccess, SiteActions.activeGamesLoopError);
   },
   activeGamesLoopSuccess: function(data) {
