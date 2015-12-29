@@ -72,14 +72,13 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
 
   val logins: LoginTracker = new LoginTracker(None, INACTIVITY_TIMEOUT, updateInfosFromParent = false)
 
-  var loginBuckets: Map[String,TimeBucket] = Map() //throttle for login attempts
-  val loginBucketsLock = new Object()
+  private val loginBuckets: TimeBuckets[String] = new TimeBuckets(LOGIN_BUCKET_CAPACITY, LOGIN_BUCKET_FILL_PER_SEC) //throttle for login attempts
 
-  var passResets: Map[Username,AuthTime] = Map()
-  val passResetLock = new Object()
+  private var passResets: Map[Username,AuthTime] = Map()
+  private val passResetLock = new Object()
 
-  var emailChanges: Map[Username,(AuthTime,Email)] = Map()
-  val emailChangeLock = new Object()
+  private var emailChanges: Map[Username,(AuthTime,Email)] = Map()
+  private val emailChangeLock = new Object()
 
   val logger =  LoggerFactory.getLogger(getClass)
 
@@ -88,11 +87,6 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
 
   private def upkeepLoop(): Unit = {
     val now = Timestamp.get
-
-    //Clean up old buckets that are full and therefore not useful
-    loginBucketsLock.synchronized {
-      loginBuckets = loginBuckets.filter { case (_,bucket) => !bucket.isFull(now) }
-    }
 
     //Refresh login infos to update ratings and such displayed to users
     refreshLoginInfos().onComplete { result =>
@@ -166,21 +160,6 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
       }
     }
     Future.sequence(futures).map { _ : List[Unit] => () }
-  }
-
-  private def takeFromLoginBucket(usernameOrEmail: String) : Boolean = {
-    val key = usernameOrEmail.toLowerCase
-    loginBucketsLock.synchronized {
-      val bucket =
-        loginBuckets.get(key) match {
-          case None =>
-            val newBucket = new TimeBucket(LOGIN_BUCKET_CAPACITY, LOGIN_BUCKET_FILL_PER_SEC)
-            loginBuckets = loginBuckets + (key -> newBucket)
-            newBucket
-          case Some(x) => x
-        }
-      bucket.takeOne(Timestamp.get)
-    }
   }
 
   def usersLoggedIn: List[SimpleUserInfo] = {
@@ -260,7 +239,7 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
       validateUsernameOrEmail(usernameOrEmail)
 
       //Throttle login attempts roughly by account (more specifically, by lowercase key of email/username)
-      if(!takeFromLoginBucket(usernameOrEmail)) {
+      if(!loginBuckets.takeOne(usernameOrEmail.toLowerCase, Timestamp.get)) {
         logger.warn("Too many login attempts for " + usernameOrEmail)
         throw new Exception("Too many login attempts for account, please wait a few minutes before the next attempt.")
       }

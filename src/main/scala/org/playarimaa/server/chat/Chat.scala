@@ -12,6 +12,7 @@ import slick.lifted.{PrimaryKey,ProvenShape}
 import org.slf4j.{Logger, LoggerFactory}
 import org.playarimaa.server.CommonTypes._
 import org.playarimaa.server.SimpleUserInfo
+import org.playarimaa.server.TimeBuckets
 import org.playarimaa.server.{LoginTracker,SiteLogin,Timestamp}
 import org.playarimaa.server.Timestamp.Timestamp
 
@@ -28,6 +29,24 @@ object ChatSystem {
   val CHAT_CHECK_TIMEOUT_PERIOD: Double = 120.0
   //Max length of text in characters
   val MAX_TEXT_LENGTH: Int = 4000
+  val MAX_TEXT_LENGTH_MESSAGE: String = "Chat text too long (max " + MAX_TEXT_LENGTH + " chars)"
+
+  //Multiplicative factor by which global chat system limits are larger than individual channel limits
+  val CHAT_GLOBAL_BUCKET_FACTOR = 3.0
+
+  //Individual channel limits
+  //Allow 20 chat joins in a row, refilling at a rate of 6 per minute
+  val CHAT_JOIN_BUCKET_CAPACITY: Double = 20
+  val CHAT_JOIN_BUCKET_FILL_PER_SEC: Double = 6.0/60.0
+  val CHAT_JOIN_FAIL_MESSAGE: String = "Too many chat joins in a short period, wait a few seconds before attempting to join again."
+  //Allow 40 chat messages in a row, refilling at a rate of 10 per minute
+  val CHAT_LINE_BUCKET_CAPACITY: Double = 40
+  val CHAT_LINE_BUCKET_FILL_PER_SEC: Double = 10.0/60.0
+  val CHAT_LINE_FAIL_MESSAGE: String = "Sent too many chat messages in a short period, wait a short while before attempting to chat again."
+  //Allow 8000 characters in a row, refilling at a rate of 900 per minute
+  val CHAT_CHAR_BUCKET_CAPACITY: Double = 8000
+  val CHAT_CHAR_BUCKET_FILL_PER_SEC: Double = 900.0/60.0
+  val CHAT_CHAR_FAIL_MESSAGE: String = "Sent too much chat text in a short period, wait a short while before attempting to chat again."
 
   val NO_CHANNEL_MESSAGE = "No such chat channel, or not authorized"
   val NO_LOGIN_MESSAGE = "Not logged in, or timed out due to inactivity"
@@ -55,10 +74,10 @@ object ChatEvent {
     }
   }
 
-  case object MSG           extends ChatEvent {val name = "msg"}
-  case object JOIN          extends ChatEvent {val name = "join"}
-  case object LEAVE         extends ChatEvent {val name = "leave"}
-  case object TIMEOUT       extends ChatEvent {val name = "timeout"}
+  case object MSG     extends ChatEvent {val name = "msg"}
+  case object JOIN    extends ChatEvent {val name = "join"}
+  case object LEAVE   extends ChatEvent {val name = "leave"}
+  case object TIMEOUT extends ChatEvent {val name = "timeout"}
 }
 
 
@@ -79,13 +98,18 @@ class ChatSystem(val db: Database, val parentLogins: LoginTracker, val actorSyst
   private var channelData: Map[Channel,ActorRef] = Map()
   implicit val timeout = ChatSystem.AKKA_TIMEOUT
 
+  private val gf = ChatSystem.CHAT_GLOBAL_BUCKET_FACTOR
+  private val joinBuckets: TimeBuckets[Username] = new TimeBuckets(ChatSystem.CHAT_JOIN_BUCKET_CAPACITY * gf, ChatSystem.CHAT_JOIN_BUCKET_FILL_PER_SEC * gf) 
+  private val lineBuckets: TimeBuckets[Username] = new TimeBuckets(ChatSystem.CHAT_LINE_BUCKET_CAPACITY * gf, ChatSystem.CHAT_LINE_BUCKET_FILL_PER_SEC * gf)
+  private val charBuckets: TimeBuckets[Username] = new TimeBuckets(ChatSystem.CHAT_CHAR_BUCKET_CAPACITY * gf, ChatSystem.CHAT_CHAR_BUCKET_FILL_PER_SEC * gf)
+
   val logger =  LoggerFactory.getLogger(getClass)
 
   private def openChannel(channel: Channel): ActorRef = this.synchronized {
     channelData.get(channel) match {
       case Some(cc) => cc
       case None =>
-        val cc = actorSystem.actorOf(Props(new ChatChannel(channel,db,parentLogins,actorSystem,logger)))
+        val cc = actorSystem.actorOf(Props(new ChatChannel(channel,db,parentLogins,actorSystem,logger,joinBuckets,lineBuckets,charBuckets)))
         channelData = channelData + (channel -> cc)
         cc
     }
@@ -114,8 +138,12 @@ class ChatSystem(val db: Database, val parentLogins: LoginTracker, val actorSyst
 
   /** Post in the specified chat channel. Failed if not logged in. */
   def post(channel: Channel, chatAuth: ChatAuth, text:String): Future[Unit] = {
-    withChannel(channel) { cc =>
-      (cc ? ChatChannel.Post(chatAuth,text)).map(_.asInstanceOf[Unit])
+    if(text.length > ChatSystem.MAX_TEXT_LENGTH)
+      Future.failed(new Exception(ChatSystem.MAX_TEXT_LENGTH_MESSAGE))
+    else {
+      withChannel(channel) { cc =>
+        (cc ? ChatChannel.Post(chatAuth,text)).map(_.asInstanceOf[Unit])
+      }
     }
   }
 
@@ -189,7 +217,16 @@ object ChatChannel {
 }
 
 /** An actor that handles an individual channel that people can chat in */
-class ChatChannel(val channel: Channel, val db: Database, val parentLogins: LoginTracker, val actorSystem: ActorSystem, val logger: Logger) extends Actor with Stash {
+class ChatChannel(
+  val channel: Channel,
+  val db: Database,
+  val parentLogins: LoginTracker,
+  val actorSystem: ActorSystem,
+  val logger: Logger,
+  val globalJoinBuckets: TimeBuckets[Username],
+  val globalLineBuckets: TimeBuckets[Username],
+  val globalCharBuckets: TimeBuckets[Username]
+) extends Actor with Stash {
 
   //Fulfilled and replaced on each message - this is the mechanism by which
   //queries can block and wait for chat activity
@@ -207,6 +244,10 @@ class ChatChannel(val channel: Channel, val db: Database, val parentLogins: Logi
 
   //Whether or not we started the loop that checks timeouts for the chat
   var timeoutCycleStarted = false
+
+  private val joinBuckets: TimeBuckets[Username] = new TimeBuckets(ChatSystem.CHAT_JOIN_BUCKET_CAPACITY, ChatSystem.CHAT_JOIN_BUCKET_FILL_PER_SEC) 
+  private val lineBuckets: TimeBuckets[Username] = new TimeBuckets(ChatSystem.CHAT_LINE_BUCKET_CAPACITY, ChatSystem.CHAT_LINE_BUCKET_FILL_PER_SEC)
+  private val charBuckets: TimeBuckets[Username] = new TimeBuckets(ChatSystem.CHAT_CHAR_BUCKET_CAPACITY, ChatSystem.CHAT_CHAR_BUCKET_FILL_PER_SEC)
 
   case class Initialized(maxId: Try[Long])
   case class DBWritten(upToId: Long)
@@ -243,11 +284,22 @@ class ChatChannel(val channel: Channel, val db: Database, val parentLogins: Logi
 
   def normalReceive: Receive = {
     case ChatChannel.Join(user: SimpleUserInfo, siteAuth: SiteAuth) =>
-      val now = Timestamp.get
-      logins.doTimeouts(now)
-      val chatAuth = logins.login(user, now, Some(siteAuth))
-      lastActive = now
-      sender ! (chatAuth : ChatAuth)
+      val result: Try[ChatAuth] = Try {
+        val now = Timestamp.get
+        if(!joinBuckets.takeOne(user.name,now))
+          throw new Exception(ChatSystem.CHAT_JOIN_FAIL_MESSAGE)
+        else if(!globalJoinBuckets.takeOne(user.name,now)) {
+          joinBuckets.putOne(user.name,now)
+          throw new Exception(ChatSystem.CHAT_JOIN_FAIL_MESSAGE)
+        }
+        else {
+          logins.doTimeouts(now)
+          val chatAuth = logins.login(user, now, Some(siteAuth))
+          lastActive = now
+          chatAuth
+        }
+      }
+      replyWith(sender, result)
 
     case ChatChannel.Leave(chatAuth: ChatAuth) =>
       val result: Try[Unit] = requiringLogin(chatAuth) { user =>
@@ -257,10 +309,30 @@ class ChatChannel(val channel: Channel, val db: Database, val parentLogins: Logi
 
     case ChatChannel.Post(chatAuth: ChatAuth, text:String) =>
       val result: Try[Unit] = requiringLogin(chatAuth) { user =>
-        if(text.length > ChatSystem.MAX_TEXT_LENGTH)
-          throw new Exception("Text too long: " + text)
+        val now = Timestamp.get
 
-        val line = ChatLine(nextId, channel, user.name, Timestamp.get, ChatEvent.MSG, None, Some(text))
+        if(text.length > ChatSystem.MAX_TEXT_LENGTH)
+          throw new Exception(ChatSystem.MAX_TEXT_LENGTH_MESSAGE)
+
+        if(!lineBuckets.takeOne(user.name,now))
+          throw new Exception(ChatSystem.CHAT_LINE_FAIL_MESSAGE)
+        else if(!charBuckets.take(user.name, text.length.toDouble, now)) {
+          lineBuckets.putOne(user.name,now)
+          throw new Exception(ChatSystem.CHAT_CHAR_FAIL_MESSAGE)
+        }
+        else if(!globalLineBuckets.takeOne(user.name,now)) {
+          lineBuckets.putOne(user.name,now)
+          charBuckets.put(user.name, text.length.toDouble, now)
+          throw new Exception(ChatSystem.CHAT_LINE_FAIL_MESSAGE)
+        }
+        else if(!globalCharBuckets.take(user.name, text.length.toDouble, now)) {
+          lineBuckets.putOne(user.name,now)
+          charBuckets.put(user.name, text.length.toDouble, now)
+          globalLineBuckets.putOne(user.name,now)
+          throw new Exception(ChatSystem.CHAT_CHAR_FAIL_MESSAGE)
+        }
+
+        val line = ChatLine(nextId, channel, user.name, now, ChatEvent.MSG, None, Some(text))
         nextId = nextId + 1
 
         //Add to queue of lines that we will remember until they show up in the db
