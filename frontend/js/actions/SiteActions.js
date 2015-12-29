@@ -27,6 +27,8 @@ var SiteActions = {
     APIUtils.login(username, password, SiteActions.loginSuccess, SiteActions.loginError);
   },
   loginGuest: function(username) {
+    if(!SiteActions.checkCookiesEnabled())
+      return;
     APIUtils.loginGuest(username, SiteActions.loginSuccess, SiteActions.loginError);
   },
   loginError: function(data) {
