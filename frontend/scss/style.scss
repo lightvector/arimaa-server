@@ -211,24 +211,32 @@ div.bigError {
 
 .gameroom {
   height:100%;
+  display:-webkit-flex;
   display:flex;
 }
 
 .games {
   width:50%;
+  display:-webkit-flex;
   display:flex;
   flex-flow:column;
   height:100%;
 }
 
 .gamesContents {
+  -webkit-flex:auto;
+  -ms-flex:auto;
   flex:auto;
+  display:-webkit-flex;
   display:flex;
   height: 70%;
 }
 
 .gamesLists {
+  -webkit-flex:auto;
+  -ms-flex:auto;
   flex:auto;
+  display:-webkit-flex;
   display:flex;
   flex-flow:column;
 }
@@ -254,12 +262,15 @@ div.bigError {
 }
 .gameroomLabeledUsersDiv {
   float:right;
+  -webkit-flex:0.15 1 auto;
+  -ms-flex:0.15 1 auto;
   flex: 0.15 1 auto;
   margin-left: 8px;
 }
 
 .chat {
   width:50%;
+  display:-webkit-flex;
   display:flex;
   flex-flow:column;
   height:100%;
@@ -267,7 +278,10 @@ div.bigError {
 }
 
 .chatContents {
+  -webkit-flex:auto;
+  -ms-flex:auto;
   flex:auto;
+  display:-webkit-flex;
   display:flex;
   height: 70%;
 }
@@ -277,12 +291,17 @@ div.bigError {
 }
 .chatLabeledUsersDiv {
   float:right;
+  -webkit-flex:0.15 1 auto;
+  -ms-flex:0.15 1 auto;
   flex: 0.15 1 auto;
   margin-left: 8px;
 }
 
 .chatUI {
+  -webkit-flex:auto;
+  -ms-flex:auto;
   flex:auto;
+  display:-webkit-flex;
   display:flex;
   flex-flow:column;
 }
