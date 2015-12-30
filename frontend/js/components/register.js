@@ -49,10 +49,9 @@ var registrationBox = React.createClass({
       errorText = (<div className="error">{this.state.error}</div>);
     }
 
-    //TODO it's weird to use the "forgotpass" class for the div
     return (
       <div>
-        <div className="login">
+        <div className="uiPanel center">
           <h1>Register</h1>
           <form method="post" action="index.html">
             <input type="text" name="login" value={this.state.user} onChange={this.handleUsernameChange} placeholder="Username"/>
@@ -61,10 +60,10 @@ var registrationBox = React.createClass({
             <input type="password" name="confirmPassword" value={this.state.confirmPass} onChange={this.handleConfirmPasswordChange} placeholder="Confirm Password"/>
             <input type="text" name="priorRating" maxLength="4" value={this.state.priorRating} onChange={this.handlePriorRatingChange}
               placeholder="Approx rating (leave blank if new player)"/>
-            <input type="submit" className="submit" name="commit" value="Register" onClick={this.submitRegister}/>
+            <input type="submit" className="submit majorButton" name="commit" value="Register" onClick={this.submitRegister}/>
           </form>
           {errorText}
-          <div className="forgotpass"><Link to="/">Back to Login</Link></div>
+          <div className="vPadding"><Link to="/">Back to Login</Link></div>
 
         </div>
       </div>

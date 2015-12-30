@@ -1,29 +1,10 @@
-$silver : #A6DED9 !default;
-$gold : #DED9A6 !default;
-
-$highlight: #8b9ae0 !default;
-$selection: #8b9ae0 !default;
-
-$dark-square : #000 !default;
-$light-square : #fff !default;
-$selected-dark-square : #009 !default;
-$selected-light-square : #00f !default;
-$light-trap : #f00 !default;
-$dark-trap : #f00 !default;
-
-//$board-bg : "../images/boards/grey.jpg" !default;
-//$board-bg : "../images/boards/BoardStoneBig.jpg" !default;
-$board-bg : "../images/boards/boardmarbletiled.png" !default;
-
-$board-size : 480px !default;
-$step-to-img : "../images/green-circle.png" !default;
 
 $body-bg : #dddddd !default;
+$panel-bg : #444444 !default;
+$game-bg : #272727 !default;
 
 $font-stack: 'Quattrocento Sans', sans-serif;
 $title-font-stack: 'Dosis', sans-serif;
-
-$main-theme: #51C49C !default;
 
 @import url(http://fonts.googleapis.com/css?family=Quattrocento+Sans:700,400,400italic|Dosis:400,700);
 
@@ -96,18 +77,23 @@ h4 {
   padding: 0px;
 }
 
-.login {
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%,-50%);
-  position: absolute;
-  margin: 0px auto;
-  width: 310px;
+.vPadding {
+  padding-top: 5px;
+  padding-bottom: 5px;
+}
+
+.bMargin {
+  margin-bottom: 10px !important;
+}
+
+.small {
+  font-size: 14px;
+}
+
+.uiPanel {
   padding: 10px 10px 5px 10px;
-  background: #444444;
+  background: $panel-bg;
   border-radius: 5px;
-  font-size: 12px;
-  text-align: center;
   color: white;
   //@include box-shadow(0 0 200px rgba(white, .5), 0 1px 2px rgba(black, .3));
 
@@ -123,38 +109,92 @@ h4 {
     //@include box-shadow(0 1px #f5f5f5);
   }
 
-  input.submit {
-    margin-top: 20px;
-    width: 100%;
+  input.submit, button {
+    margin: 2px;
     background: #51C49C;
     border: none;
-    font-size: 14px;
-    color:white;
-    height: 40px;
+    color: white;
+    height: 34px;
     border-radius: 2px;
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+
+  input.submit:active, button:active {
+    background: #28624E;
+  }
+
+  input.submit.yes, button.yes {
+    margin: 2px 4px 2px 4px;
+    background: #51D470;
+    height: 24px;
+  }
+  input.submit.yes:active, button.yes:active {
+    background: #286A38;
+  }
+
+  input.submit.no, button.no {
+    margin: 2px 4px 2px 4px;
+    background: #D45170;
+    height: 24px;
+  }
+  input.submit.no:active, button.no:active {
+    background: #6A2838;
+  }
+
+  input.submit.gameButton, button.gameButton {
+    margin: 2px 4px 2px 4px;
+    height: 24px;
+  }
+  input.submit.gameButton:active, button.gameButton:active {
+  }
+
+  input.submit.goToOurGame, button.goToOurGame {
+    margin: 2px 4px 2px 4px;
+    background: #5170D4;
+    height: 24px;
+  }
+  input.submit.goToOurGame:active, button.goToOurGame:active {
+    background: #28386A;
   }
 
   input[type=text], input[type=password] {
+    margin: 2px;
     padding-left: 5px;
     padding-right: 5px;
-    background: #777;
-    color: white;
-    width: 100%;
-    height: 40px;
-    box-sizing: border-box; //css is wierd
-    margin-top: 1px;
+    box-sizing: border-box;
     border: 1px solid #555;
-  }
-
-  div.forgotpass {
-    padding-top: 5px;
-    padding-bottom: 5px;
+    height: 34px;
   }
 
   a {
     color: #ccc;
   }
 
+}
+
+.center {
+  margin: 0px auto;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%,-50%);
+  position: absolute;
+  width: 310px;
+  text-align: center;
+
+  input[type=text], input[type=password] {
+    background: #777;
+    color: white;
+    width: 100%;
+    height: 40px;
+  }
+
+  input.submit, button {
+    margin-top: 16px;
+    width: 100%;
+    font-size: 14px;
+    height: 40px;
+  }
 }
 
 div.error {
@@ -202,8 +242,11 @@ div.bigError {
   transition:background 0s;
 }
 .gameroomGameElt {
-  background: $body-bg;
+  background: $game-bg;
   transition:background 3s;
+  margin: 2px;
+  padding: 6px;
+  border-radius:4px;
 }
 
 .gameroomUsersDiv {
@@ -212,6 +255,7 @@ div.bigError {
 .gameroomLabeledUsersDiv {
   float:right;
   flex: 0.15 1 auto;
+  margin-left: 8px;
 }
 
 .chat {
@@ -219,6 +263,7 @@ div.bigError {
   display:flex;
   flex-flow:column;
   height:100%;
+  margin-left: 10px;
 }
 
 .chatContents {
@@ -233,6 +278,7 @@ div.bigError {
 .chatLabeledUsersDiv {
   float:right;
   flex: 0.15 1 auto;
+  margin-left: 8px;
 }
 
 .chatUI {
@@ -244,6 +290,10 @@ div.bigError {
 .chatTable {
   overflow:auto;
   display:block;
+  background:white;
+  color:black;
+  border-radius:1px;
+  margin-bottom:4px;
 }
 
 .unselectable {
