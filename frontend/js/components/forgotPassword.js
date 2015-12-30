@@ -33,22 +33,21 @@ var forgotPasswordBox = React.createClass({
       errorText = (<div className="error">{this.state.error}</div>);
     }
     var messageText = null;
-    //TODO it's weird to use the "forgotpass" class for the div
     if(this.state.message != "") {
-      messageText = (<div className="forgotpass">{this.state.message}</div>);
+      messageText = (<div className="vPadding">{this.state.message}</div>);
     }
 
     return (
       <div>
-        <div className="login">
+        <div className="uiPanel center">
           <h1>Request Password Reset</h1>
           <form method="post" action="index.html">
             <input type="text" name="forgotPassword" value={this.state.user} onChange={this.handleUsernameChange} placeholder="Username/Email"/>
-            <input type="submit" className="submit" name="commit" value="Request Password Reset" onClick={this.submitForgotPassword}/>
+            <input type="submit" className="submit majorButton" name="commit" value="Request Password Reset" onClick={this.submitForgotPassword}/>
           </form>
           {errorText}
           {messageText}
-          <div><Link to="/">Back to Login</Link></div>
+          <div className="vPadding"><Link to="/">Back to Login</Link></div>
         </div>
       </div>
     );

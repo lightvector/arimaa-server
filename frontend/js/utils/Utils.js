@@ -21,7 +21,7 @@ var Utils = {
     if(tc.delay !== undefined && tc.delay > 0) s += "=" + Utils.gameSpanString(tc.delay);
     if(tc.maxReserve !== undefined) s += "(" + Utils.gameSpanString(tc.maxReserve) + ")";
     if(tc.maxMoveTime !== undefined) s += "(" + Utils.gameSpanString(tc.maxMaxMoveTime) + " max/mv)";
-    if(tc.overtimeAfter !== undefined) s += "(max " + tc.overtimeAfter + "t)";
+    if(tc.overtimeAfter !== undefined) s += "(ovt " + tc.overtimeAfter + "t)";
     return s;
   },
 
@@ -158,7 +158,29 @@ var Utils = {
       }, 3000);
     }
   },
+  
+  //Initialize an onFocusHandler for the window
+  onFocusTriggers: [],
+  initWindowOnFocus: function() {
+    var oldFunc = window.onfocus;
+    window.onfocus = function () {
+      var arr = Utils.onFocusTriggers;
+      Utils.onFocusTriggers = [];
+      for(var i = 0; i<arr.length; i++) {
+        arr[i]();
+      }
+      if(oldFunc)
+        oldFunc();
+    };
+  },
 
+  scheduleOnNextFocus: function(f) {
+    if(document.hasFocus()) 
+      setTimeout(f,0);
+    else
+      Utils.onFocusTriggers.push(f);
+  },
+  
   setSetting: function(key,value) {
     localStorage.setItem(key,value);
   },
@@ -168,6 +190,7 @@ var Utils = {
       return defaultValue;
     return result;
   }
+
 };
 
 module.exports = Utils;

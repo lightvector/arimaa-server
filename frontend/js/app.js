@@ -11,17 +11,21 @@ var ResetPassword = require('./components/resetPassword.js');
 var Gameroom = require('./components/gameroom.js');
 var Chat = require('./components/chat.js');
 var DebugComp = require('./components/generalDebugComponent.js');
+var Utils = require('./utils/Utils.js');
 
 var Router = require('react-router').Router;
 var Route = require('react-router').Route;
 var Link = require('react-router').Link;
+
+//Initialize focus handler
+Utils.initWindowOnFocus();
 
 const createBrowserHistory = require('history/lib/createBrowserHistory');
 
 const App = React.createClass({
   render() {
     return (
-      <div>
+      <div className="app" >
         {this.props.children}
       </div>
     );
@@ -43,4 +47,4 @@ const routes = {
   ]
 };
 
-ReactDOM.render(<Router routes={routes} history={createBrowserHistory()} />, document.getElementById('board_container'));
+ReactDOM.render(<Router routes={routes} history={createBrowserHistory()} />, document.getElementById('app_container'));
