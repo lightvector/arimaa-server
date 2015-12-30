@@ -59,7 +59,10 @@ object SiteLogin {
       "user",
       "test",
       "administrator",
-      "moderator"
+      "moderator",
+      "none",
+      "null",
+      "undefined"
     )
   }
 }
