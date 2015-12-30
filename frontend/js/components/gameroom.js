@@ -309,7 +309,7 @@ var component = React.createClass({
 
     var errorDiv = "";
     if(this.state.error != "") {
-      errorDiv = React.createElement("div", {key: "errorDiv", className:"error"}, this.state.error);
+      errorDiv = React.createElement("div", {key: "errorDiv", className:"bigError"}, this.state.error);
     }
 
     var usersDiv = "";
@@ -317,8 +317,11 @@ var component = React.createClass({
       var usersList = this.state.usersLoggedIn.map(function(user) {
         return that.renderUser(user);
       });
-      usersList.unshift(React.createElement("h4", {key: "usersLoggedInLabel"}, "Users Logged In:"));
       usersDiv = React.createElement("div", {key: "usersDiv", className:"gameroomUsersDiv"}, usersList);
+      usersDiv = React.createElement("div", {key: "usersLabeledDiv", className:"gameroomLabeledUsersDiv"}, [
+        React.createElement("h4", {key: "usersLoggedInLabel"}, "Users Logged In:"),
+        usersDiv
+      ]);
     }
 
     var ownGamesDiv = "";
@@ -359,14 +362,16 @@ var component = React.createClass({
 
 
     var contents = [
-      React.createElement("h1", {key:"gameroomTitle"}, "Arimaa Gameroom"),
       createModal,
       popupModal,
-      errorDiv,
-      usersDiv,
-      ownGamesDiv,
-      joinableOpenGamesDiv,
-      watchableGamesDiv,
+      React.createElement("div", {key:"gamesDiv", className:"games"}, [
+        React.createElement("h1", {key:"gameroomTitle"}, "Arimaa Gameroom"),
+        errorDiv,
+        usersDiv,
+        ownGamesDiv,
+        joinableOpenGamesDiv,
+        watchableGamesDiv
+      ]),
       chat
     ];
 

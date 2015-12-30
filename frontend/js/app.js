@@ -21,7 +21,7 @@ const createBrowserHistory = require('history/lib/createBrowserHistory');
 const App = React.createClass({
   render() {
     return (
-      <div>
+      <div className="app" >
         {this.props.children}
       </div>
     );
@@ -43,4 +43,4 @@ const routes = {
   ]
 };
 
-ReactDOM.render(<Router routes={routes} history={createBrowserHistory()} />, document.getElementById('board_container'));
+ReactDOM.render(<Router routes={routes} history={createBrowserHistory()} />, document.getElementById('app_container'));

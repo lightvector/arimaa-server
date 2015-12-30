@@ -41,21 +41,59 @@ input:-webkit-autofill:focus {
     color: #fff !important;
 }
 
+html {
+  height: 100%;
+}
 
 body {
+  height: 100%;
+  box-sizing: border-box;
   font-family: $font-stack;
   background : $body-bg;
+  margin: 0px;
+  padding: 8px 8px 30px 8px;
+}
+
+#app_container {
+  height: 100%;
+}
+
+.app {
+  height: 100%;
 }
 
 footer {
   text-align: center;
   position: absolute;
-  width: 100%;
+  left: 50%;
+  transform: translate(-50%,-50%);  
   bottom: 0px;
+  z-index: -1;
 }
 
 h1 {
   font-family: $title-font-stack;
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+  padding: 0px;
+}
+
+h2 {
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+  padding: 0px;
+}
+
+h3 {
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+  padding: 0px;
+}
+
+h4 {
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+  padding: 0px;
 }
 
 .login {
@@ -108,11 +146,6 @@ h1 {
     border: 1px solid #555;
   }
 
-  div.error {
-    padding-top: 6px;
-    color:red;
-  }
-
   div.forgotpass {
     padding-top: 5px;
     padding-bottom: 5px;
@@ -124,31 +157,77 @@ h1 {
 
 }
 
+div.error {
+  padding-top: 6px;
+  color:red;
+}
+
+div.bigError {
+  padding-top: 6px;
+  font-size: 150%;
+  font-weight: bold;
+  color:red;
+}
+
 .gameroom {
-  div.error {
-    font-size: 150%;
-    font-weight: bold;
-    color:red;
-  }
+  height:100%;
+  display:flex;
+}
+
+.games {
+  width:50%;
 }
 
 .gameroomGameElt.quickHighlightOrange {
   background: orange;
   transition:background 0s;
 }
-
 .gameroomGameElt.quickHighlightGreen {
   background: #00FF00;
   transition:background 0s;
 }
-
 .gameroomGameElt {
   background: $body-bg;
   transition:background 3s;
 }
 
 .gameroomUsersDiv {
+  overflow:auto;
+}
+.gameroomLabeledUsersDiv {
   float:right;
+  flex: 0.15 1 auto;
+}
+
+.chat {
+  width:50%;
+  display:flex;
+  flex-flow:column;
+  height:100%;
+}
+
+.chatContents {
+  flex:auto;
+  display:flex;
+  height: 70%;
+}
+
+.chatUsersDiv {
+  overflow:auto;
+}
+.chatLabeledUsersDiv {
+  float:right;
+}
+
+.chatUI {
+  flex:auto;
+  display:flex;
+  flex-flow:column;
+}
+
+.chatTable {
+  overflow:auto;
+  display:block;
 }
 
 .unselectable {
