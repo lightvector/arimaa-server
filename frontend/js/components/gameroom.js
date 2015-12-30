@@ -367,10 +367,14 @@ var component = React.createClass({
       React.createElement("div", {key:"gamesDiv", className:"games"}, [
         React.createElement("h1", {key:"gameroomTitle"}, "Arimaa Gameroom"),
         errorDiv,
-        usersDiv,
-        ownGamesDiv,
-        joinableOpenGamesDiv,
-        watchableGamesDiv
+        React.createElement("div", {key:"gamesContentsDiv", className:"gamesContents"}, [
+          React.createElement("div", {key:"gamesListsDiv", className:"gamesLists"}, [
+            ownGamesDiv,
+            joinableOpenGamesDiv,
+            watchableGamesDiv
+          ]),
+          usersDiv
+        ]),
       ]),
       chat
     ];

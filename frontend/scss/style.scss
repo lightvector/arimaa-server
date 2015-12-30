@@ -176,6 +176,21 @@ div.bigError {
 
 .games {
   width:50%;
+  display:flex;
+  flex-flow:column;
+  height:100%;
+}
+
+.gamesContents {
+  flex:auto;
+  display:flex;
+  height: 70%;
+}
+
+.gamesLists {
+  flex:auto;
+  display:flex;
+  flex-flow:column;
 }
 
 .gameroomGameElt.quickHighlightOrange {
@@ -217,6 +232,7 @@ div.bigError {
 }
 .chatLabeledUsersDiv {
   float:right;
+  flex: 0.15 1 auto;
 }
 
 .chatUI {
