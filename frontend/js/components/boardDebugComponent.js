@@ -62,6 +62,7 @@ var component = React.createClass({
   },
 
   redoStep: function() {
+    console.log("reoeueou");
     ArimaaActions.redoStep();
   },
 
@@ -70,6 +71,7 @@ var component = React.createClass({
   },
 
   flipBoard: function() {
+    console.log("flippy");
     ArimaaActions.flipBoard();
   },
 
@@ -94,17 +96,22 @@ var component = React.createClass({
       gameOverString = "winner: " + this.state.gameOver.winner + " reason: " + this.state.gameOver.reason;
     }
 
+    /*
+    <input type="text" defaultValue="Ra1 Rb1 Rc1 Rd1 Re1 Rf1 Rg1 Rh1 Ca2 Db2 Hc2 Md2 Ee2 Hf2 Dg2 Ch2" ref="goldSetup"></input>
+    <button onClick={this.goldSetup}>Send gold setup</button>
+    <br />
+    <input type="text" defaultValue="ra8 rb8 rc8 rd8 re8 rf8 rg8 rh8 ca7 db7 hc7 ed7 me7 hf7 dg7 ch7" ref="silverSetup"></input>
+    <button onClick={this.silverSetup}>Send silver setup</button>
+    <br/>
+    */
+
+
     return (
       <div>
         <input type="text" placeholder="enter move.. Ra1n Cb1n ..." ref="move"></input>
         <button onClick={this.moveFromText}>Move from text</button>
         <br/>
-        <input type="text" defaultValue="Ra1 Rb1 Rc1 Rd1 Re1 Rf1 Rg1 Rh1 Ca2 Db2 Hc2 Md2 Ee2 Hf2 Dg2 Ch2" ref="goldSetup"></input>
-        <button onClick={this.goldSetup}>Send gold setup</button>
-        <br />
-        <input type="text" defaultValue="ra8 rb8 rc8 rd8 re8 rf8 rg8 rh8 ca7 db7 hc7 ed7 me7 hf7 dg7 ch7" ref="silverSetup"></input>
-        <button onClick={this.silverSetup}>Send silver setup</button>
-        <br/>
+
         <input type="text" defaultValue="0" ref="statusMinSeq"></input>
         <button onClick={this.gameState}>Game State</button>
         <button onClick={this.completeMove}>Complete Move</button>

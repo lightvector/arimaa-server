@@ -26,11 +26,16 @@ var _currentSetup = []; //the current setup the user chooses
 var _setupColor = ArimaaConstants.GAME.NULL_COLOR;
 
 var _arimaa = new Arimaa();
+
+//TODO: remove these square nums since they're inconsistent with the arimaajs internal square numbers
+//actually the arimaajs square numbers shouldn't be used outside of arimaajs, so
+//switch to only using square names for equality checks, etc
 var _selSquareNum = ArimaaConstants.GAME.NULL_SQUARE_NUM;
 var _selSquareName = "";
 var _validSteps = [];
 var _selSquareStack = []; //previous selected squares for undo/redo
 var _redoSquareStack = []; //used for undo/redo
+
 var _myColor = ArimaaConstants.GAME.NULL_COLOR; //spectators, or before we know what color we are
 var _viewSide = ArimaaConstants.GAME.GOLD; //can only be gold or silver (unless we want east/west views?)
 var _colorToMove = ArimaaConstants.GAME.NULL_COLOR; //in this context, null color === can't move
@@ -69,6 +74,10 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
 
   getArimaa: function() {
     return _arimaa;
+  },
+
+  getOngoingMove: function() {
+    return _arimaa.get_ongoing_move_string();
   },
 
   getBoard: function() {
@@ -344,21 +353,37 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
 
 
     case ArimaaConstants.ACTIONS.GAME_UNDO_STEP:
+      var undo = _arimaa.undo_step();
+      if(undo) {
+        _setSelectedSquare({squareNum:undo.squareNum,squareName:undo.square});
+        ArimaaStore.emitChange();
+      }
+
+      /*
       var s = _selSquareStack.pop();
       _arimaa.undo_step(); //check to see if we have a step to undo
       if(s) {
         _setSelectedSquare(s);
         _redoSquareStack.push(s);
       }
-      ArimaaStore.emitChange();
+      ArimaaStore.emitChange();*/
       break;
     case ArimaaConstants.ACTIONS.GAME_REDO_STEP:
+      var redo = _arimaa.redo_step();
+      if(redo) {
+        _setSelectedSquare({squareNum:redo.destSquareNum,squareName:redo.destSquare});
+        ArimaaStore.emitChange();
+      }
+      /*
       var s = _redoSquareStack.pop();
+      console.log('redo');
+      console.log(s);
+      console.log(_redoSquareStack);
       if(s) {
         _arimaa.redo_step();
         _setSelectedSquare(s);
-        _undoStepStack.push(s);
-      }
+        //_undoStepStack.push(s);
+      }*/
       ArimaaStore.emitChange();
       break;
     case ArimaaConstants.ACTIONS.GAME_REDO_MOVE:

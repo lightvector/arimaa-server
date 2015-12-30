@@ -3,7 +3,7 @@
 var $ = require('jquery');
 var UserStore = require('../stores/UserStore.js');
 
-var PRINT_DATA = true;
+var PRINT_DATA = false;
 
 function POST(url, data, success, error) {
   $.ajax({
@@ -12,7 +12,7 @@ function POST(url, data, success, error) {
     contentType: 'application/json; charset=utf-8',
     data: JSON.stringify(data),
     success: function(received, textStatus, xhr) {
-      if(PRINT_DATA) { console.log("url: " + url + "\ndata: " + data + "\nreceived: ", received);}
+      if(PRINT_DATA) { console.log("url: " + url + "\ndata: " + JSON.stringify(data) + "\nreceived: ", received);}
 
       if('error' in received) {
         error(received);

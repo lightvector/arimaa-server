@@ -142,6 +142,7 @@ var Arimaa = function(options) {
 		}
 
 		stepStack.push(prevStep); //we don't need to push the capture step since that will be automatically added once we redo a step that could lead to capture
+
 		stepsLeft += 1;
 		var currentSquare = prevStep['squareNum'] + DIRECTIONS[prevStep['direction']];
 		remove_piece_from_square(currentSquare); //
@@ -149,9 +150,10 @@ var Arimaa = function(options) {
 		return prevStep;
 	}
 
+	//returns the step object
 	function redo_step() {
 		if(stepStack.length === 0) return null;
-		return add_step(stepStack.pop()['string']);
+    return add_step(stepStack[stepStack.length-1].string).step; //we actually pop the step in the add_step function
 	}
 
 	function undo_ongoing_move() {
@@ -181,7 +183,7 @@ var Arimaa = function(options) {
 		halfmoveNumber += 1;
 
 		//check victory conds???
-		var victory = check_victory(); //???????????
+		var victory = check_victory();
 		return {success: true, victory: victory};
 	}
 
@@ -432,7 +434,7 @@ var Arimaa = function(options) {
 		//do this to prevent rebasing moves onto a changed board state
 		if(stepStack.length > 0) {
 			var s = stepStack.pop();
-			if(s['string'] !== stepString) {
+			if(s.string !== stepString) {
 				stepStack = [];
 			}
 		}
@@ -526,7 +528,7 @@ var Arimaa = function(options) {
 				steps.push(ArimaaStep(piece, squareNum, 'w'));
 				//steps.push({piece:piece,squareNum:squareNum,direction:'w',string:pieceName+location+'w'});
 		} else { //enemy piece
-			if(can_be_pushed(squareNum)) {
+			if(can_be_pushed(squareNum) && stepsLeft > 1) {
 				if ((((squareNum + DIRECTIONS.NORTH) & 0x88) === 0) && (board[squareNum+DIRECTIONS.NORTH] === EMPTY))
 					steps.push(ArimaaStep(piece, squareNum, 'n'));
 					//steps.push({piece:piece,squareNum:squareNum,direction:'n',string:pieceName+location+'n'});
@@ -679,7 +681,7 @@ var Arimaa = function(options) {
 		return 0;
 	}
 
-	//only check for opponent
+  //no checks for self-immobilization as stated in rules
 	function is_immobilization() {
 		if(generate_steps().length == 0) return 1;
 		return 0;
@@ -823,6 +825,14 @@ var Arimaa = function(options) {
 
 		redo_ongoing_move: function() {
 			return redo_ongoing_move();
+		},
+
+		get_ongoing_move: function() {
+			return ongoingMove;
+		},
+
+		get_ongoing_move_string: function() {
+			return ongoingMove.map(function(m) {return m.string;}).join(' ');
 		},
 
 		complete_move: function() {

@@ -31,7 +31,7 @@ const App = React.createClass({
 const routes = {
   path: '/',
   component: App,
-  indexRoute: { component:Login },
+  indexRoute: { component:DebugComp },
   childRoutes: [
     { path: 'debug', component: DebugComp }, //TODO remove this for actual release!!!
     { path: 'register', component: Register },
