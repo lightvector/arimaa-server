@@ -243,11 +243,11 @@ div.bigError {
 
 .gameroomGameElt.quickHighlightOrange {
   background: orange;
-  transition:background 0s;
+  transition:background 0.1s;
 }
 .gameroomGameElt.quickHighlightGreen {
   background: #00FF00;
-  transition:background 0s;
+  transition:background 0.1s;
 }
 .gameroomGameElt {
   background: $game-bg;

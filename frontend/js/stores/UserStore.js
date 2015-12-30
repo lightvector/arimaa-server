@@ -139,19 +139,23 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
   flashHighlight: function(gameID) {
     recentHighlightGameIDs[gameID] = true;
     setTimeout(function() {
-      if(gameID in recentHighlightGameIDs) {
-        delete recentHighlightGameIDs[gameID];
-        UserStore.emitChange();
-      }
+      Utils.scheduleOnNextFocus(function() {
+        if(gameID in recentHighlightGameIDs) {
+          delete recentHighlightGameIDs[gameID];
+          UserStore.emitChange();
+        }
+      });
     }, SiteConstants.VALUES.HIGHLIGHT_FLASH_TIMEOUT * 1000);
   },
   flashPlayingGame: function(gameID) {
     recentPlayingGameIDs[gameID] = true;
     setTimeout(function() {
-      if(gameID in recentPlayingGameIDs) {
-        delete recentPlayingGameIDs[gameID];
-        UserStore.emitChange();
-      }
+      Utils.scheduleOnNextFocus(function() {
+        if(gameID in recentPlayingGameIDs) {
+          delete recentPlayingGameIDs[gameID];
+          UserStore.emitChange();
+        }
+      });
     }, SiteConstants.VALUES.HIGHLIGHT_FLASH_TIMEOUT * 1000);
   },
 

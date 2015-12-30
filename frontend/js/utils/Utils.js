@@ -158,7 +158,29 @@ var Utils = {
       }, 3000);
     }
   },
+  
+  //Initialize an onFocusHandler for the window
+  onFocusTriggers: [],
+  initWindowOnFocus: function() {
+    var oldFunc = window.onfocus;
+    window.onfocus = function () {
+      var arr = Utils.onFocusTriggers;
+      Utils.onFocusTriggers = [];
+      for(var i = 0; i<arr.length; i++) {
+        arr[i]();
+      }
+      if(oldFunc)
+        oldFunc();
+    };
+  },
 
+  scheduleOnNextFocus: function(f) {
+    if(document.hasFocus()) 
+      setTimeout(f,0);
+    else
+      Utils.onFocusTriggers.push(f);
+  },
+  
   setSetting: function(key,value) {
     localStorage.setItem(key,value);
   },
@@ -168,6 +190,7 @@ var Utils = {
       return defaultValue;
     return result;
   }
+
 };
 
 module.exports = Utils;
