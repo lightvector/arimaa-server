@@ -20,9 +20,20 @@ var chatBox = React.createClass({
     this.setState({error:""});
   },
 
+  //Manually reach into the dom and make the chat scroll to the bottom on update if it's at that point just prior to the update
+  componentWillUpdate: function() {
+    var chatTable = ReactDOM.findDOMNode(this.refs.chatTable);
+    chatTable.shouldScrollBottom = chatTable.scrollTop + chatTable.offsetHeight === chatTable.scrollHeight;
+  },
+  componentDidUpdate: function() {
+    var chatTable = ReactDOM.findDOMNode(this.refs.chatTable);
+    if(chatTable.shouldScrollBottom) {
+      chatTable.scrollTop = chatTable.scrollHeight;
+    }
+  },
+  
   handleUserInputChange: function(e) {
     this.setState({userInput: e.target.value});
-    this.clearError();
   },
   submitUserInput: function(event) {
     event.preventDefault();
@@ -38,6 +49,8 @@ var chatBox = React.createClass({
   onSubmitSuccess: function(data) {
     this.setState({userInput:""});
     this.setState({inputDisabled:false});
+    var chatTable = ReactDOM.findDOMNode(this.refs.chatTable);
+    chatTable.scrollTop = chatTable.scrollHeight;
     ReactDOM.findDOMNode(this.refs.text).focus(); 
   },
   onSubmitError: function(data) {
@@ -182,7 +195,7 @@ var chatBox = React.createClass({
       React.createElement("div", {key: "chatContents", className:"chatContents"}, [
         React.createElement("div", {key: "chatUI", className:"chatUI"}, [
           React.createElement(
-            "table", {key: "chatTable", className:"chatTable"},
+            "table", {key: "chatTable", ref:"chatTable", className:"chatTable"},
             React.createElement("tbody", {key: "chatBody", className: "chatBody"}, lines)
           ),
           React.createElement(
