@@ -10,10 +10,25 @@ const FUNC_NOP = function(){};
 //Actions for the main site and gameroom
 var SiteActions = {
 
+  checkCookiesEnabled: function() {
+    if(!navigator.cookieEnabled) {
+      ArimaaDispatcher.dispatch({
+        actionType: SiteConstants.ACTIONS.LOGIN_FAILED,
+        reason: "Cookies not enabled - please enable cookies or else the site will not work properly."
+      });
+      return false;
+    }
+    return true;
+  },
+  
   login: function(username, password) {
+    if(!SiteActions.checkCookiesEnabled())
+      return;
     APIUtils.login(username, password, SiteActions.loginSuccess, SiteActions.loginError);
   },
   loginGuest: function(username) {
+    if(!SiteActions.checkCookiesEnabled())
+      return;
     APIUtils.loginGuest(username, SiteActions.loginSuccess, SiteActions.loginError);
   },
   loginError: function(data) {
@@ -23,25 +38,19 @@ var SiteActions = {
     });
   },
   loginSuccess: function(data) {
-    cookie.save('siteAuth',data.siteAuth, {path:'/'});
-    cookie.save('username',data.username, {path:'/'});
-
-    window.location.pathname = "/gameroom"; //TODO we should track where the user was before and then redirect there instead
-    ArimaaDispatcher.dispatch({
-      actionType: SiteConstants.ACTIONS.LOGIN_SUCCESS
-    });
-  },
+    SiteActions.doLogin(data);
+  },  
 
   register: function(username, email, password, priorRating) {
+    if(!SiteActions.checkCookiesEnabled())
+      return;
     APIUtils.register(username, email, password, priorRating, SiteActions.registerSuccess, SiteActions.registerError);
   },
   registerSuccess: function(data) {
-    cookie.save('siteAuth',data.siteAuth, {path:'/'});
-    cookie.save('username',data.username, {path:'/'});
     ArimaaDispatcher.dispatch({
       actionType: SiteConstants.ACTIONS.REGISTRATION_SUCCESS
     });
-    window.location.pathname = "/gameroom";
+    SiteActions.doLogin(data);
   },
   registerError: function(data) {
     ArimaaDispatcher.dispatch({
@@ -50,6 +59,16 @@ var SiteActions = {
     });
   },
 
+  doLogin: function(data) {
+    cookie.save('siteAuth',data.siteAuth, {path:'/'});
+    cookie.save('username',data.username, {path:'/'});
+
+    ArimaaDispatcher.dispatch({
+      actionType: SiteConstants.ACTIONS.LOGIN_SUCCESS
+    });
+    window.location.pathname = "/gameroom"; //TODO we should track where the user was before and then redirect there instead
+  },
+  
   logout: function() {
     APIUtils.logout(SiteActions.logoutSuccess, SiteActions.logoutError);
   },
@@ -187,18 +206,32 @@ var SiteActions = {
     });
     console.log(data);
   },
-
+  
   //Initiates a loop querying for the list of users logged in every few seconds, continuing forever.
+  beginLoginCheckLoopCalled: false,
   beginLoginCheckLoop: function() {
+    if(SiteActions.beginLoginCheckLoopCalled)
+      return;
+    SiteActions.beginLoginCheckLoopCalled = true;
+      
     SiteActions.goLoginPageIfNotLoggedIn();
-    setTimeout(SiteActions.beginLoginCheckLoop, SiteConstants.VALUES.LOGIN_CHECK_LOOP_DELAY * 1000);
+    setTimeout(SiteActions.continueLoginCheckLoop, SiteConstants.VALUES.LOGIN_CHECK_LOOP_DELAY * 1000);
   },
 
+  continueLoginCheckLoop: function() {
+    SiteActions.goLoginPageIfNotLoggedIn();
+    setTimeout(SiteActions.continueLoginCheckLoop, SiteConstants.VALUES.LOGIN_CHECK_LOOP_DELAY * 1000);
+  },
+  
   updateErrorMessage :
   "Error getting gameroom updates, possible network or other connection issues, consider refreshing the page.",
 
   //Initiates a loop querying for the list of users logged in every few seconds, continuing forever.
+  beginUsersLoggedInLoopCalled: false,
   beginUsersLoggedInLoop: function() {
+    if(SiteActions.beginUsersLoggedInLoopCalled)
+      return;
+    SiteActions.beginUsersLoggedInLoopCalled = true;
     APIUtils.usersLoggedIn(SiteActions.usersLoggedInLoopSuccess, SiteActions.usersLoggedInLoopError);
   },
   usersLoggedInLoopSuccess: function(data) {
@@ -222,7 +255,11 @@ var SiteActions = {
   },
 
   //Initiates a loop querying for the list of open games every few seconds, continuing forever.
+  beginOpenGamesLoopCalled: false,
   beginOpenGamesLoop: function() {
+    if(SiteActions.beginOpenGamesLoopCalled)
+      return;
+    SiteActions.beginOpenGamesLoopCalled = true;    
     APIUtils.getOpenGames(SiteActions.openGamesLoopSuccess, SiteActions.openGamesLoopError);
     UserStore.addNewOpenJoinedGameListener(SiteActions.newOpenJoinedGame);
   },
@@ -255,7 +292,11 @@ var SiteActions = {
   },
 
   //Initiates a loop querying for the list of active games every few seconds, continuing forever.
+  beginActiveGamesLoopCalled: false,
   beginActiveGamesLoop: function() {
+    if(SiteActions.beginActiveGamesLoopCalled)
+      return;
+    SiteActions.beginActiveGamesLoopCalled = true;
     APIUtils.getActiveGames(SiteActions.activeGamesLoopSuccess, SiteActions.activeGamesLoopError);
   },
   activeGamesLoopSuccess: function(data) {

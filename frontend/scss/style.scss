@@ -132,16 +132,30 @@ h1 {
   }
 }
 
-.gameroomGameElt.quickHighlight {
+.gameroomGameElt.quickHighlightOrange {
   background: orange;
+  transition:background 0s;
+}
+
+.gameroomGameElt.quickHighlightGreen {
+  background: #00FF00;
   transition:background 0s;
 }
 
 .gameroomGameElt {
   background: $body-bg;
-  transition:background 2s;
+  transition:background 3s;
 }
 
 .gameroomUsersDiv {
-  float:right
+  float:right;
+}
+
+.unselectable {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  -khtml-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
 }

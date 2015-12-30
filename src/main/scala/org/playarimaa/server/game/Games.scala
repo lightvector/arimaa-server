@@ -10,6 +10,7 @@ import org.playarimaa.server.CommonTypes._
 import org.playarimaa.server.Timestamp
 import org.playarimaa.server.Timestamp.Timestamp
 import org.playarimaa.server.RandGen
+import org.playarimaa.server.TimeBuckets
 import org.playarimaa.server.LoginTracker
 import org.playarimaa.server.Accounts
 import org.playarimaa.server.Rating
@@ -41,6 +42,11 @@ object Games {
 
   //Sequence number that game starts on
   val INITIAL_SEQUENCE = 0L
+
+  //Allow 20 game creations in a row, refilling at a rate of 2 per minute
+  val CREATE_BUCKET_CAPACITY: Double = 20
+  val CREATE_BUCKET_FILL_PER_SEC: Double = 2.0/60.0
+
 
   val gameTable = TableQuery[GameTable]
   val movesTable = TableQuery[MovesTable]
@@ -93,7 +99,6 @@ class Games(val db: Database, val parentLogins: LoginTracker, val scheduler: Sch
   private val activeGames = new ActiveGames(db,scheduler,accounts,serverInstanceID)
   val logger =  LoggerFactory.getLogger(getClass)
 
-  //TODO upon creation, should we load interrupted games from the DB and start them?
   //Maybe only if they're postal games (some heuristic based on tc?). Do we want to credit any time for them?
 
   //Begin timeout loop on initialization
@@ -127,6 +132,7 @@ class Games(val db: Database, val parentLogins: LoginTracker, val scheduler: Sch
     }
   }
 
+  //TODO implement game reopening in the API
   /* Reopen a game that has no winner if the game has any of the specified ending reasons */
   def reopenUnfinishedGame(id: GameID, allowedReasons: Set[EndingReason]): Future[Unit] = {
     //Checking open and then active in this order is important, taking advantage of property #2 above
@@ -389,6 +395,9 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker,
   //Reserving an id prevents new games from being opened OR started that have this id.
   private var reservedGameIDs: Set[GameID] = Set()
 
+  //Throttles the rate that games can be created by a user
+  private val createBuckets: TimeBuckets[Username] = new TimeBuckets(Games.CREATE_BUCKET_CAPACITY, Games.CREATE_BUCKET_FILL_PER_SEC) 
+
   /* Returns true if there is an open game with this id */
   def gameExists(id: GameID): Boolean = this.synchronized {
     openGames.contains(id)
@@ -458,7 +467,11 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker,
     gameType: GameType
   ): GameAuth = this.synchronized {
     assert(reservedGameIDs.contains(reservedID))
+
     val now = Timestamp.get
+    if(!createBuckets.takeOne(creator.name, now))
+      throw new Exception("Created too many games too quickly, please wait a minute or two before creating more games.")
+
     val meta = GameMetadata(
       id = reservedID,
       numPly = 0,

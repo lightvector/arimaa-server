@@ -12,7 +12,12 @@ var ArimaaActions = {
 
   //Fire off the initial game state query to get the state to begin with
   //This begins the whole set of update and heartbeat loops and such
+  //TODO maybe support calling this with different gameids in the same window. This requires arimaastore to be able to handle it.
+  startAllLoopsCalled: false,
   startAllLoops: function(gameID) {
+    if(ArimaaActions.startAllLoopsCalled)
+      return;
+    ArimaaActions.startAllLoopsCalled = true;
     APIUtils.gameState(gameID, 0, ArimaaActions.initialStateSuccess, ArimaaActions.initialStateError);
   },
   initialStateSuccess: function(data) {
@@ -134,14 +139,7 @@ var ArimaaActions = {
         actionType: ArimaaConstants.ACTIONS.GAME_SETUP_OVER
       });
     }
-
-    if(data.result) {
-      ArimaaDispatcher.dispatch({
-        actionType: ArimaaConstants.ACTIONS.GAME_OVER,
-        result: data.result
-      });
-    }
-
+    
     setTimeout(ArimaaActions.startGameStateLoop, SiteConstants.VALUES.GAME_STATE_LOOP_DELAY * 1000);
   },
   gameStateError: function(gameID,gameAuth,data) {
@@ -160,11 +158,17 @@ var ArimaaActions = {
     });
   },
 
-  clickSquareSetup: function(sqNum, sqName) {
+  hoverSquare: function(sqNum, sqName) {
     ArimaaDispatcher.dispatch({
-      actionType: ArimaaConstants.ACTIONS.GAME_CLICK_SQUARE_SETUP,
+      actionType: ArimaaConstants.ACTIONS.GAME_HOVER_SQUARE,
       squareNum: sqNum,
       squareName: sqName
+    });
+  },
+
+  hoverAway: function() {
+    ArimaaDispatcher.dispatch({
+      actionType: ArimaaConstants.ACTIONS.GAME_HOVERED_AWAY
     });
   },
 

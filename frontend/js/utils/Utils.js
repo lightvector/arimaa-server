@@ -157,8 +157,17 @@ var Utils = {
         }, 3000);
       }, 3000);
     }
-  }
+  },
 
+  setSetting: function(key,value) {
+    localStorage.setItem(key,value);
+  },
+  getSetting: function(key,defaultValue) {
+    var result = localStorage.getItem(key);
+    if(result === undefined || result === null)
+      return defaultValue;
+    return result;
+  }
 };
 
 module.exports = Utils;

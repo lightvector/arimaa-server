@@ -163,8 +163,9 @@ class AccountServlet(val siteLogin: SiteLogin, val ec: ExecutionContext)
         Json.write(UsersLoggedIn.Reply(usersLoggedIn))
       case Some(ForgotPassword) =>
         val query = Json.read[ForgotPassword.Query](request.body)
-        siteLogin.forgotPassword(query.username): Unit
-        Json.write(ForgotPassword.Reply("An email with further instructions was sent to the address associated with this account."))
+        siteLogin.forgotPassword(query.username).map { case () =>
+          Json.write(ForgotPassword.Reply("An email with further instructions was sent to the address associated with this account."))
+        }
       case Some(ResetPassword) =>
         val query = Json.read[ResetPassword.Query](request.body)
         siteLogin.resetPassword(query.username, query.resetAuth, query.password).map { case () =>
