@@ -213,6 +213,13 @@ div.bigError {
   height:100%;
   display:-webkit-flex;
   display:flex;
+  flex-flow:column;
+}
+
+.gameroomPanels {
+  height:100%;
+  display:-webkit-flex;
+  display:flex;
 }
 
 .games {

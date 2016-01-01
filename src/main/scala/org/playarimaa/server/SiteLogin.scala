@@ -508,6 +508,7 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
   }
 
   def verifyEmail(username: Username, auth: Auth) : Future[Unit] = {
+    validateUsername(username)
     accounts.getByName(username, excludeGuests=true).flatMap { result =>
       result match {
         case None => throw new IllegalArgumentException("Unknown username/account.")

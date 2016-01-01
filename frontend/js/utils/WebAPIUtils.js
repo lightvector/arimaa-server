@@ -121,6 +121,10 @@ var APIUtils = {
     POST('/api/accounts/changeEmail', {username:username, changeAuth:changeAuth}, success, error);
   },
 
+  getNotifications: function(username, success, error) {
+    GET('/api/accounts/' + username + '/' + UserStore.siteAuthToken() + "/notifications", {}, success, error);
+  },
+  
   createGame: function(options, success, error) {
     console.log('creating game ',options);
     POST('/api/games/actions/create', options, success, error);

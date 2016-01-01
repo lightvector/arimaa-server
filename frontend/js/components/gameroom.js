@@ -14,6 +14,7 @@ var component = React.createClass({
     return {message: "", error:"",
             ownGames:[], joinableOpenGames:[], watchableGames:[], selectedPlayers:{},
             usersLoggedIn:[],
+            notifications:[],
             recentHighlightGameIDs:{},
             recentPlayingGameIDs:{},
             createGameDialogOpen:false,
@@ -26,6 +27,7 @@ var component = React.createClass({
     UserStore.addPopupMessageListener(this.onPopupMessage);
     SiteActions.beginLoginCheckLoop();
     SiteActions.beginUsersLoggedInLoop();
+    SiteActions.beginNotificationsLoop();
     SiteActions.beginOpenGamesLoop();
     SiteActions.beginActiveGamesLoop();
   },
@@ -42,7 +44,8 @@ var component = React.createClass({
       watchableGames:UserStore.getWatchableGames(),
       recentHighlightGameIDs:UserStore.getRecentHighlightGames(),
       recentPlayingGameIDs:UserStore.getRecentPlayingGames(),
-      usersLoggedIn:UserStore.getUsersLoggedIn()
+      usersLoggedIn:UserStore.getUsersLoggedIn(),
+      notifications:UserStore.getNotifications()
     });
   },
 
@@ -119,13 +122,13 @@ var component = React.createClass({
     else if(metadata.sUser !== undefined && hasCreator && metadata.openGameData.creator.name != metadata.sUser.name)
       title = Utils.userDisplayStr(metadata.openGameData.creator) + " (G) vs " + Utils.userDisplayStr(metadata.sUser) + " (S)";
     else if(metadata.gUser !== undefined)
-      title = Utils.userDisplayStr(metadata.gUser) + " (G) vs " + "anyone" + " (S)";
+      title = Utils.userDisplayStr(metadata.gUser) + " (G) vs " + "_" + " (S)";
     else if(metadata.sUser !== undefined)
-      title = "anyone (G)" + " vs " + Utils.userDisplayStr(metadata.sUser) + " (S)";
+      title = "_ (G)" + " vs " + Utils.userDisplayStr(metadata.sUser) + " (S)";
     else if(metadata.openGameData.creator !== undefined)
-      title = Utils.userDisplayStr(metadata.openGameData.creator) + " vs " + "anyone" + " (random color)";
+      title = Utils.userDisplayStr(metadata.openGameData.creator) + " vs " + "_" + " (random color)";
     else
-      title = "anyone" + " vs " + "anyone" + " (random color)";
+      title = "_" + " vs " + "_" + " (random color)";
 
     if(metadata.tags.length > 0)
       title = title + " (" + metadata.tags.join(", ") + ")";
@@ -291,6 +294,10 @@ var component = React.createClass({
     return React.createElement("div", {key: "users_"+userInfo.name}, Utils.userDisplayStr(userInfo));
   },
 
+  renderNotification: function(i,msg) {
+    return React.createElement("li", {key: "notification_"+i}, msg);
+  },
+
   render: function() {
     var that = this;
     var username = UserStore.getUsername();
@@ -363,23 +370,35 @@ var component = React.createClass({
         <Chat params={{chatChannel:"main"}}/>
     );
 
+    var notificationsDiv = "";
+    if(this.state.notifications.length > 0) {
+      var notificationsList = this.state.notifications.map (function (msg,i) {
+        return that.renderNotification(i,msg);
+      });
+      notificationsDiv =
+        React.createElement("div", {key: "notificationsDiv", className:"uiPanel bMargin"},
+          React.createElement("ul", {key: "notificationsList"}, notificationsList));
+    }
 
     var contents = [
       createModal,
       popupModal,
-      React.createElement("div", {key:"gamesDiv", className:"games"}, [
-        React.createElement("h1", {key:"gameroomTitle"}, "Arimaa Gameroom"),
-        errorDiv,
-        React.createElement("div", {key:"gamesContentsDiv", className:"gamesContents"}, [
-          React.createElement("div", {key:"gamesListsDiv", className:"gamesLists"}, [
-            ownGamesDiv,
-            joinableOpenGamesDiv,
-            watchableGamesDiv
+      notificationsDiv,
+      React.createElement("div", {key:"gameroomPanels", className: "gameroomPanels"}, [
+        React.createElement("div", {key:"gamesDiv", className:"games"}, [
+          React.createElement("h1", {key:"gameroomTitle"}, "Arimaa Gameroom"),
+          errorDiv,
+          React.createElement("div", {key:"gamesContentsDiv", className:"gamesContents"}, [
+            React.createElement("div", {key:"gamesListsDiv", className:"gamesLists"}, [
+              ownGamesDiv,
+              joinableOpenGamesDiv,
+              watchableGamesDiv
+            ]),
+            usersDiv
           ]),
-          usersDiv
         ]),
+        chat
       ]),
-      chat
     ];
 
     return React.createElement("div", {key:"gameroomContents", className: "gameroom"}, contents);

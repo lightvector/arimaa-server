@@ -109,11 +109,16 @@ object AccountServlet {
     case class Query(username: String, verifyAuth: String)
     case class Reply(message: String)
   }
+
+  case object GetNotifications {
+    case class Query()
+    type Reply = List[String]
+  }
 }
 
 import org.playarimaa.server.AccountServlet._
 
-class AccountServlet(val siteLogin: SiteLogin, val ec: ExecutionContext)
+class AccountServlet(val accounts: Accounts, val siteLogin: SiteLogin, val ec: ExecutionContext)
     extends WebAppStack with JacksonJsonSupport with FutureSupport {
   //Sets up automatic case class to JSON output serialization
   protected implicit lazy val jsonFormats: Formats = Json.formats
@@ -202,6 +207,21 @@ class AccountServlet(val siteLogin: SiteLogin, val ec: ExecutionContext)
 
   post("/:action") {
     handleAction(params)
+  }
+
+
+  def handleGetNotifications(username: Username, siteAuth: SiteAuth, params: Map[String,String]) : AnyRef = {
+    siteLogin.requiringLogin(siteAuth) { user: SimpleUserInfo =>
+      if(user.name != username)
+        throw new Exception(SiteLogin.Constants.NO_LOGIN_MESSAGE)
+      accounts.getNotifications(username)
+    }.get
+  }
+
+  get("/:username/:siteAuth/notifications") {
+    val username = params("username")
+    val siteAuth = params("siteAuth")
+    handleGetNotifications(username,siteAuth,params)
   }
 
   error {

@@ -270,6 +270,37 @@ var SiteActions = {
     }, SiteConstants.VALUES.GAME_LIST_LOOP_DELAY_ON_ERROR * 1000);
   },
 
+  //Initiates a loop querying for the list of users logged in every few seconds, continuing forever.
+  beginNotificationsLoopCalled: false,
+  beginNotificationsLoop: function() {
+    if(SiteActions.beginNotificationsLoopCalled)
+      return;
+    SiteActions.beginNotificationsLoopCalled = true;
+    var username = UserStore.getUsername();
+    APIUtils.getNotifications(username, SiteActions.notificationsLoopSuccess, SiteActions.notificationsLoopError);
+  },
+  notificationsLoopSuccess: function(data) {
+    ArimaaDispatcher.dispatch({
+      actionType: SiteConstants.ACTIONS.NOTIFICATIONS_LIST,
+      data: data
+    });
+    var username = UserStore.getUsername();
+    setTimeout(function () {
+      APIUtils.getNotifications(username, SiteActions.notificationsLoopSuccess, SiteActions.notificationsLoopError);
+    }, SiteConstants.VALUES.NOTIFICATIONS_LOOP_DELAY * 1000);
+  },
+  notificationsLoopError: function(data) {
+    ArimaaDispatcher.dispatch({
+      actionType: SiteConstants.ACTIONS.GAMEROOM_UPDATE_FAILED,
+      reason: SiteActions.updateErrorMessage
+    });
+    console.log(data);
+    var username = UserStore.getUsername();
+    setTimeout(function () {
+      APIUtils.getNotifications(username, SiteActions.notificationsLoopSuccess, SiteActions.notificationsLoopError);
+    }, SiteConstants.VALUES.NOTIFICATIONS_LOOP_DELAY * 1000);
+  },
+  
   //Initiates a loop querying for the list of open games every few seconds, continuing forever.
   beginOpenGamesLoopCalled: false,
   beginOpenGamesLoop: function() {
