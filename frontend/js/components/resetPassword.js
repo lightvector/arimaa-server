@@ -53,6 +53,7 @@ var resetPasswordBox = React.createClass({
             <input type="submit" className="submit majorButton" name="commit" value="Set New Password" onClick={this.submitResetPassword}/>
           </form>
           {errorText}
+          {messageText}
           <div className="vPadding"><a href="/">Back to Login</a></div>
         </div>
       </div>

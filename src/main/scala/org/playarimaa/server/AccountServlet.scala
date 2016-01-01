@@ -44,7 +44,8 @@ object AccountServlet {
       ResetPassword,
       ChangePassword,
       ChangeEmail,
-      ConfirmChangeEmail
+      ConfirmChangeEmail,
+      VerifyEmail
     )
   }
 
@@ -101,6 +102,11 @@ object AccountServlet {
   case object ConfirmChangeEmail extends Action {
     val name = "confirmChangeEmail"
     case class Query(username: String, changeAuth: String)
+    case class Reply(message: String)
+  }
+  case object VerifyEmail extends Action {
+    val name = "verifyEmail"
+    case class Query(username: String, verifyAuth: String)
     case class Reply(message: String)
   }
 }
@@ -185,6 +191,11 @@ class AccountServlet(val siteLogin: SiteLogin, val ec: ExecutionContext)
         val query = Json.read[ConfirmChangeEmail.Query](request.body)
         siteLogin.confirmChangeEmail(query.username, query.changeAuth).map { case () =>
           Json.write(ConfirmChangeEmail.Reply("New email set."))
+        }
+      case Some(VerifyEmail) =>
+        val query = Json.read[VerifyEmail.Query](request.body)
+        siteLogin.verifyEmail(query.username, query.verifyAuth).map { case () =>
+          Json.write(VerifyEmail.Reply("Account registration complete."))
         }
     }
   }

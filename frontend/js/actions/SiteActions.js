@@ -116,6 +116,22 @@ var SiteActions = {
     });
   },
 
+  verifyEmail: function(username, verifyAuth) {
+    APIUtils.verifyEmail(username, verifyAuth, SiteActions.verifyEmailSuccess, SiteActions.verifyEmailError);
+  },
+  verifyEmailError: function(data) {
+    ArimaaDispatcher.dispatch({
+      actionType: SiteConstants.ACTIONS.VERIFY_EMAIL_FAILED,
+      reason: data.error
+    });
+  },
+  verifyEmailSuccess: function(data) {
+    ArimaaDispatcher.dispatch({
+      actionType: SiteConstants.ACTIONS.VERIFY_EMAIL_SUCCESS,
+      reason: data.message
+    });
+  },
+
   goLoginPageIfNotLoggedIn: function() {
     APIUtils.authLoggedIn(SiteActions.goLoginPageIfNotLoggedInSuccess, FUNC_NOP);
   },

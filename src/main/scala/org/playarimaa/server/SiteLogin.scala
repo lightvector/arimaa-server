@@ -23,6 +23,10 @@ object SiteLogin {
     val LOOP_PERIOD: Double = 10 //10 seconds
     val LOOP_PERIOD_IF_ERROR: Double = 120 //2 minutes
 
+    //Rate of checking and deleting users whose emails are not verified
+    val VERIFY_EMAIL_LOOP_PERIOD: Double = 42300 //12 hours
+    val DELETE_UNVERIFIED_ACCOUNTS_OLDER_THAN: Double = 86400 * 2 //2 days
+
     //Allow 10 login attempts in a row, refilling at a rate of 2 per minute
     val LOGIN_BUCKET_CAPACITY: Double = 10
     val LOGIN_BUCKET_FILL_PER_SEC: Double = 2.0/60.0
@@ -85,8 +89,9 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
 
   val logger =  LoggerFactory.getLogger(getClass)
 
-  //Begin loop on initialization
+  //Begin loops on initialization
   upkeepLoop()
+  verifyLoop()
 
   private def upkeepLoop(): Unit = {
     val now = Timestamp.get
@@ -96,7 +101,7 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
       val nextDelay =
         result match {
           case Failure(exn) =>
-            logger.error("Error in refreshLoginInfosLoop: " + exn)
+            logger.error("Error in upkeepLoop: " + exn)
             LOOP_PERIOD_IF_ERROR
           case Success(()) =>
             LOOP_PERIOD
@@ -110,6 +115,37 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
       }
     }
   }
+
+  private def verifyLoop(): Unit = {
+    val now = Timestamp.get
+
+    //Delete all accounts that have not verified emails that are sufficiently old
+    accounts.getAllUnverified().flatMap { accountList =>
+      val results =
+        accountList.flatMap { account =>
+          if(logins.isUserLoggedIn(account.username) || now > account.createdTime + DELETE_UNVERIFIED_ACCOUNTS_OLDER_THAN)
+            None
+          else
+              Some(accounts.removeIfUnverified(account.username))
+        }
+      Future.sequence(results)
+    }.onComplete { result =>
+      result match {
+        case Failure(exn) =>
+          logger.error("Error in verifyLoop: " + exn)
+        case Success(_ : List[Unit]) =>
+          ()
+      }
+      try {
+        scheduler.scheduleOnce(VERIFY_EMAIL_LOOP_PERIOD seconds) { upkeepLoop() }
+      }
+      catch {
+        //Thrown when the actorsystem shuts down, ignore
+        case _ : IllegalStateException => ()
+      }
+    }
+  }
+
 
   def validateUsername(username: Username): Unit = {
     if(username.length < USERNAME_MIN_LENGTH || username.length > USERNAME_MAX_LENGTH)
@@ -205,10 +241,12 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
 
       hashpw(password).flatMap { passwordHash =>
         val now = Timestamp.get
+        val verifyAuth = RandGen.genAuth
         val account = Account(
           lowercaseName,
           username,
           email,
+          emailVerifyNeeded = Some(verifyAuth),
           passwordHash,
           isBot,
           createdTime = now,
@@ -228,6 +266,7 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
           logins.logoutUser(username,now)
 
           logger.info("Registered new account for " + username)
+          emailer.sendVerifyEmail(email,username,verifyAuth)
 
           doTimeouts(now)
           val siteAuth = logins.login(account.info, now)
@@ -290,6 +329,7 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
         lowercaseName,
         username,
         email = "",
+        emailVerifyNeeded = None,
         passwordHash = "N/A",
         isBot = false,
         createdTime = now,
@@ -322,7 +362,7 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
     doTimeouts(now)
     logins.heartbeatAuth(siteAuth,now) match {
       case None => Failure(new Exception(NO_LOGIN_MESSAGE))
-      case Some(username) => Success(f(username))
+      case Some(user) => Success(f(user))
     }
   }
 
@@ -443,7 +483,7 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
       requiringLogin(siteAuth) { user =>
         accounts.getByName(username, excludeGuests=true).flatMap { result =>
           result match {
-            case None => throw new IllegalArgumentException("Unknown username.")
+            case None => throw new IllegalArgumentException("Unknown username/account.")
             case Some(account) =>
               if(user.name != account.username)
                 throw new Exception("Username does not match login.")
@@ -467,6 +507,23 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
     }
   }
 
+  def verifyEmail(username: Username, auth: Auth) : Future[Unit] = {
+    accounts.getByName(username, excludeGuests=true).flatMap { result =>
+      result match {
+        case None => throw new IllegalArgumentException("Unknown username/account.")
+        case Some(account) =>
+          account.emailVerifyNeeded match {
+            case None => throw new Exception("Account email already verified.")
+            case Some(x) =>
+              if(auth != x)
+                throw new Exception("Invalid key, try logging in and having the email verification re-sent.")
+              else
+                accounts.setEmailVerifyNeeded(username, None)
+          }
+      }
+    }
+  }
+
   def changeEmail(username: Username, password: String, siteAuth: SiteAuth, newEmail: Email) : Future[Unit] = {
     Future.successful(()).flatMap { case () =>
       validateUsername(username)
@@ -474,7 +531,7 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
       requiringLogin(siteAuth) { user =>
         accounts.getByName(username, excludeGuests=true).flatMap { result =>
           result match {
-            case None => throw new IllegalArgumentException("Unknown username.")
+            case None => throw new IllegalArgumentException("Unknown username/account.")
             case Some(account) =>
               if(user.name != account.username)
                 throw new Exception("Username does not match login.")
@@ -514,7 +571,7 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
       validateUsername(username)
       accounts.getByName(username, excludeGuests=true).flatMap { result =>
         result match {
-          case None => throw new IllegalArgumentException("Unknown username.")
+          case None => throw new IllegalArgumentException("Unknown username/account.")
           case Some(account) =>
 
             val authTimeAndNewEmail = emailChangeLock.synchronized { emailChanges.get(account.username) }
@@ -532,11 +589,9 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
                   }
                 }
                 val oldEmail = account.email
-                accounts.setEmail(account.username,newEmail).map { case () =>
+                accounts.setEmail(account.username, newEmail, emailVerifyNeeded = None).map { case () =>
                   //Don't wait for old email to go out
-                  emailer.sendOldEmailChangeNotification(oldEmail,account.username,newEmail).recover {
-                    case exn: Exception => logger.error("Error sending old email change notification: " + exn)
-                  }
+                  emailer.sendOldEmailChangeNotification(oldEmail,account.username,newEmail)
                   logger.info("Email change confirmed for account: " + account.username + " from " + oldEmail + " to " + newEmail)
                 }
             }
