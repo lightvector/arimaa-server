@@ -9,7 +9,7 @@ var verifyEmailBox = React.createClass({
 
   componentDidMount: function() {
     UserStore.addChangeListener(this.onUserStoreChange);
-    SiteActions.verifyEmail(this.props.username, this.props.verifyAuth);
+    SiteActions.verifyEmail(this.props.params.username, this.props.params.verifyAuth);
   },
   componentWillUnmount: function() {
     UserStore.removeChangeListener(this.onUserStoreChange);
