@@ -416,10 +416,6 @@ var SiteActions = {
       });
     }
 
-    //If we should start heartbeating, do so
-    if(startHeartbeats)
-      SiteActions.startOpenJoinedHeartbeatLoop(gameID,gameAuth);
-
     console.log(data);
     setTimeout(function () {
       APIUtils.gameMetadata(gameID, 0,

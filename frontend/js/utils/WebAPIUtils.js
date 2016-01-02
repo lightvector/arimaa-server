@@ -12,7 +12,7 @@ function POST(url, data, success, error) {
     contentType: 'application/json; charset=utf-8',
     data: JSON.stringify(data),
     success: function(received, textStatus, xhr) {
-      if(PRINT_DATA) { console.log("url: " + url + "\ndata: " + data + "\nreceived: ", received);}
+      if(PRINT_DATA) { console.log("timestamp: " + Date.now() + "\nurl: " + url + "\ndata: " + data + "\nreceived: ", received);}
 
       if('error' in received) {
         error(received);
@@ -40,7 +40,7 @@ function GET(url, data, success, error) {
     contentType: 'application/json; charset-utf-8',
     data: data,
     success: function(received, textStatus, xhr) {
-      if(PRINT_DATA) {console.log("url: " + url + "\ndata: " + data + "\nreceived: ", received);}
+      if(PRINT_DATA) {console.log("timestamp: " + Date.now() + "\nurl: " + url + "\ndata: " + data + "\nreceived: ", received);}
       if('error' in received) {
         error(received);
       } else {
