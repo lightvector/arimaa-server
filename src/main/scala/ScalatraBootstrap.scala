@@ -79,7 +79,7 @@ class ScalatraBootstrap extends LifeCycle {
 
     context.mount(new ArimaaServlet(siteLogin), "/*")
     context.mount(new ChatServlet(accounts,siteLogin,chat,games,scheduler,actorEC), "/api/chat/*")
-    context.mount(new AccountServlet(siteLogin,mainEC), "/api/accounts/*")
+    context.mount(new AccountServlet(accounts,siteLogin,mainEC), "/api/accounts/*")
     context.mount(new GameServlet(accounts,siteLogin,games,mainEC), "/api/games/*")
   }
 }

@@ -29,7 +29,7 @@ var resetPasswordBox = React.createClass({
     if(this.state.confirmPass !== this.state.pass)
       this.setState({error:"'Password' and 'Confirm Password' fields do not match"});
     else
-      SiteActions.resetPassword(this.props.username, this.props.resetAuth, this.state.pass);
+      SiteActions.resetPassword(this.props.params.username, this.props.params.resetAuth, this.state.pass);
   },
 
   render: function() {
@@ -53,6 +53,7 @@ var resetPasswordBox = React.createClass({
             <input type="submit" className="submit majorButton" name="commit" value="Set New Password" onClick={this.submitResetPassword}/>
           </form>
           {errorText}
+          {messageText}
           <div className="vPadding"><a href="/">Back to Login</a></div>
         </div>
       </div>

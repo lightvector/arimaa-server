@@ -102,6 +102,10 @@ var APIUtils = {
     POST('/api/accounts/resetPassword', {username:username, resetAuth:resetAuth, password:password}, success, error);
   },
 
+  verifyEmail: function(username, verifyAuth, success, error) {
+    POST('/api/accounts/verifyEmail', {username:username, verifyAuth:verifyAuth}, success, error);
+  },
+
   //TODO use this
   changePassword: function(username, password, siteAuth, newPassword, success, error) {
     POST('/api/accounts/changePassword', {username:username, password:password, siteAuth:UserStore.siteAuthToken(), newPassword:newPassword}, success, error);
@@ -117,6 +121,10 @@ var APIUtils = {
     POST('/api/accounts/changeEmail', {username:username, changeAuth:changeAuth}, success, error);
   },
 
+  getNotifications: function(username, success, error) {
+    GET('/api/accounts/' + username + '/' + UserStore.siteAuthToken() + "/notifications", {}, success, error);
+  },
+  
   createGame: function(options, success, error) {
     console.log('creating game ',options);
     POST('/api/games/actions/create', options, success, error);

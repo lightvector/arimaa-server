@@ -15,6 +15,7 @@ import org.playarimaa.server.LoginTracker
 import org.playarimaa.server.Accounts
 import org.playarimaa.server.Rating
 import org.playarimaa.server.SimpleUserInfo
+import org.playarimaa.server.LogInfo
 import org.playarimaa.server.Utils._
 import org.playarimaa.board.{Player,GOLD,SILV}
 import org.playarimaa.board.{Board,Game,Notation,StandardNotation,GameType}
@@ -110,10 +111,11 @@ class Games(val db: Database, val parentLogins: LoginTracker, val scheduler: Sch
     tc: TimeControl,
     rated: Boolean,
     gUser: Option[SimpleUserInfo],
-    sUser: Option[SimpleUserInfo]
+    sUser: Option[SimpleUserInfo],
+    logInfo: LogInfo
   ): Future[(GameID,GameAuth)] = {
     openGames.reserveNewGameID.map { id =>
-      val gameAuth = openGames.createStandardGame(id,creator,siteAuth,tc,rated,gUser,sUser)
+      val gameAuth = openGames.createStandardGame(id,creator,siteAuth,tc,rated,gUser,sUser,logInfo)
       (id,gameAuth)
     }
   }
@@ -124,10 +126,11 @@ class Games(val db: Database, val parentLogins: LoginTracker, val scheduler: Sch
     gTC: TimeControl,
     sTC: TimeControl,
     gUser: Option[SimpleUserInfo],
-    sUser: Option[SimpleUserInfo]
+    sUser: Option[SimpleUserInfo],
+    logInfo: LogInfo
   ): Future[(GameID,GameAuth)] = {
     openGames.reserveNewGameID.map { id =>
-      val gameAuth = openGames.createHandicapGame(id,creator,siteAuth,gTC,sTC,gUser,sUser)
+      val gameAuth = openGames.createHandicapGame(id,creator,siteAuth,gTC,sTC,gUser,sUser,logInfo)
       (id,gameAuth)
     }
   }
@@ -349,6 +352,8 @@ object OpenGames {
 class OpenGames(val db: Database, val parentLogins: LoginTracker,
   val accounts: Accounts, val serverInstanceID: Long)(implicit ec: ExecutionContext) {
 
+  val logger =  LoggerFactory.getLogger(getClass)
+
   case class OpenGameData(
     val meta: GameMetadata,
     val moves: Vector[MoveInfo],
@@ -464,7 +469,8 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker,
     tcs: PlayerArray[TimeControl],
     users: PlayerArray[Option[SimpleUserInfo]],
     rated: Boolean,
-    gameType: GameType
+    gameType: GameType,
+    logInfo: LogInfo
   ): GameAuth = this.synchronized {
     assert(reservedGameIDs.contains(reservedID))
 
@@ -501,6 +507,7 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker,
     val gameAuth = game.logins.login(creator,now,Some(siteAuth))
     openGames = openGames + (reservedID -> game)
     releaseGameID(reservedID)
+    logger.info(logInfo + " " + creator.name + " created game " + reservedID)
     gameAuth
   }
 
@@ -511,10 +518,11 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker,
     tc: TimeControl,
     rated: Boolean,
     gUser: Option[SimpleUserInfo],
-    sUser: Option[SimpleUserInfo]
+    sUser: Option[SimpleUserInfo],
+    logInfo: LogInfo
   ): GameAuth = {
     val users = PlayerArray(gold = gUser, silv = sUser)
-    createGame(reservedID, creator, siteAuth, PlayerArray(gold = tc, silv = tc), users, rated, GameType.STANDARD)
+    createGame(reservedID, creator, siteAuth, PlayerArray(gold = tc, silv = tc), users, rated, GameType.STANDARD, logInfo)
   }
 
   def createHandicapGame(
@@ -524,10 +532,11 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker,
     gTC: TimeControl,
     sTC: TimeControl,
     gUser: Option[SimpleUserInfo],
-    sUser: Option[SimpleUserInfo]
+    sUser: Option[SimpleUserInfo],
+    logInfo: LogInfo
   ): GameAuth = {
     val users = PlayerArray(gold = gUser, silv = sUser)
-    createGame(reservedID, creator, siteAuth, PlayerArray(gold = gTC, silv = sTC), users, rated = false, GameType.HANDICAP)
+    createGame(reservedID, creator, siteAuth, PlayerArray(gold = gTC, silv = sTC), users, rated = false, GameType.HANDICAP, logInfo)
   }
 
   /* Reopens an existing winnerless game if it has one of the specified reasons, unreserving the id regardless of success or failure */

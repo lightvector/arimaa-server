@@ -136,11 +136,11 @@ var Utils = {
       ratingStr += "?";
 
     if(userInfo.isGuest)
-      displayStr += " (guest)";
+      displayStr += " [guest]";
     else if(userInfo.isBot)
-      displayStr += " (" + ratingStr + ") (bot)";
+      displayStr += " [" + ratingStr + ", bot]";
     else
-      displayStr += " (" + ratingStr + ")";
+      displayStr += " [" + ratingStr + "]";
     return displayStr;
   },
 

@@ -8,6 +8,7 @@ var Login = require('./components/login.js');
 var Register = require('./components/register.js');
 var ForgotPassword = require('./components/forgotPassword.js');
 var ResetPassword = require('./components/resetPassword.js');
+var VerifyEmail = require('./components/verifyEmail.js');
 var Gameroom = require('./components/gameroom.js');
 var Chat = require('./components/chat.js');
 var DebugComp = require('./components/generalDebugComponent.js');
@@ -40,6 +41,7 @@ const routes = {
     { path: 'debug', component: DebugComp }, //TODO remove this for actual release!!!
     { path: 'register', component: Register },
     { path: 'resetPassword/:username/:resetAuth', component: ResetPassword },
+    { path: 'verifyEmail/:username/:verifyAuth', component: VerifyEmail },
     { path: 'forgotPassword', component: ForgotPassword },
     { path: 'gameroom', component: Gameroom },
     { path: 'game/:gameID', component: Game },

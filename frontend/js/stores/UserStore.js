@@ -30,6 +30,10 @@ var recentPlayingGameIDs = {};   //Games that we recently started playing
 
 var usersLoggedIn = []; //List of users logged in
 
+//TODO maybe adapt this for things like private messages, individualized game requests, etc
+//TODO maybe add a way to acknowledge and remove notifications
+var notifications = []; //Current notifications received
+
 var messageText = "";
 var errorText = "";
 
@@ -72,6 +76,10 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
 
   getUsersLoggedIn: function() {
     return usersLoggedIn;
+  },
+
+  getNotifications: function() {
+    return notifications;
   },
 
   getOwnOpenGamesDict: function() {
@@ -265,6 +273,7 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
     case SiteConstants.ACTIONS.LOGOUT_FAILED:
     case SiteConstants.ACTIONS.FORGOT_PASSWORD_FAILED:
     case SiteConstants.ACTIONS.RESET_PASSWORD_FAILED:
+    case SiteConstants.ACTIONS.VERIFY_EMAIL_FAILED:
     case SiteConstants.ACTIONS.GAMEROOM_UPDATE_FAILED:
     case SiteConstants.ACTIONS.CREATE_GAME_FAILED:
       messageText = "";
@@ -279,6 +288,7 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
       break;
     case SiteConstants.ACTIONS.FORGOT_PASSWORD_SUCCESS:
     case SiteConstants.ACTIONS.RESET_PASSWORD_SUCCESS:
+    case SiteConstants.ACTIONS.VERIFY_EMAIL_SUCCESS:
       messageText = action.reason;
       errorText = "";
       UserStore.emitChange();
@@ -286,6 +296,10 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
     case SiteConstants.ACTIONS.USERS_LOGGED_IN_LIST:
       errorText = "";
       usersLoggedIn = action.data.users;
+      UserStore.emitChange();
+      break;
+    case SiteConstants.ACTIONS.NOTIFICATIONS_LIST:
+      notifications = action.data;
       UserStore.emitChange();
       break;
     case SiteConstants.ACTIONS.OPEN_GAMES_LIST:
