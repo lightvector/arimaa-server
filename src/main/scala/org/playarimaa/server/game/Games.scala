@@ -53,6 +53,11 @@ object Games {
   //Limit on all games that a user can be involved in
   val MAX_GAMES_PER_USER: Int = 50 //TODO maybe have a separate limit for postal and non-postal games?
 
+  //TODO find some way to alert when these are hit?
+  //Whole-server limits
+  val MAX_SERVER_OPEN_GAMES: Int = 100
+  val MAX_SERVER_ACTIVE_GAMES: Int = 5000
+
   val gameTable = TableQuery[GameTable]
   val movesTable = TableQuery[MovesTable]
 
@@ -238,6 +243,7 @@ class Games(val db: Database, val parentLogins: LoginTracker, val scheduler: Sch
           activeGames.addGame(initData).onComplete { result =>
             //Now that the game is active (or failed to start), clear out the open game.
             openGames.clearStartedGame(id)
+            result.get
           }
       }
     }
@@ -500,8 +506,15 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker,
     assert(reservedGameIDs.contains(reservedID))
 
     val now = Timestamp.get
-    if(!createBuckets.takeOne(creator.name, now))
+    if(!createBuckets.takeOne(creator.name, now)) {
+      releaseGameID(reservedID)
       throw new Exception("Created too many games too quickly, please wait a minute or two before creating more games.")
+    }
+    if(openGames.size >= Games.MAX_SERVER_OPEN_GAMES) {
+      releaseGameID(reservedID)
+      logger.error("Too many open games on server at once.")
+      throw new Exception("Too many open games on server at once.")
+    }
 
     val meta = GameMetadata(
       id = reservedID,
@@ -905,6 +918,12 @@ class ActiveGames(val db: Database, val scheduler: Scheduler,
 
   def addGame(data: ActiveGames.InitData): Future[Unit] = {
     val id = data.meta.id
+
+    if(activeGames.size >= Games.MAX_SERVER_ACTIVE_GAMES) {
+      logger.error("Too many active games on server at once.")
+      throw new Exception("Too many active games on server at once.")
+    }
+
 
     //Update metadata with new information
     var now = Timestamp.get

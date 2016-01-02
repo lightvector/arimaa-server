@@ -26,6 +26,7 @@ case class Account(
   isBot: Boolean,
   createdTime: Timestamp,
   isGuest: Boolean,
+  isAdmin: Boolean,
 
   lastLogin: Timestamp,
   gameStats: AccountGameStats,
@@ -261,6 +262,7 @@ class AccountTable(tag: Tag) extends Table[Account](tag, "accountTable") {
   def isBot : Rep[Boolean] = column[Boolean]("isBot")
   def createdTime : Rep[Double] = column[Double]("createdTime")
   def isGuest : Rep[Boolean] = column[Boolean]("isGuest")
+  def isAdmin : Rep[Boolean] = column[Boolean]("isAdmin")
   def lastLogin : Rep[Double] = column[Double]("lastLogin")
   def numGamesGold : Rep[Int] = column[Int]("numGamesGold")
   def numGamesSilv : Rep[Int] = column[Int]("numGamesSilv")
@@ -272,19 +274,19 @@ class AccountTable(tag: Tag) extends Table[Account](tag, "accountTable") {
   def priorRatingStdev : Rep[Double] = column[Double]("priorRatingStdev")
 
   def * : ProvenShape[Account] =
-    (lowercaseName, username, email, emailVerifyNeeded, passwordHash, isBot, createdTime, isGuest, lastLogin,
+    (lowercaseName, username, email, emailVerifyNeeded, passwordHash, isBot, createdTime, isGuest, isAdmin, lastLogin,
       (numGamesGold, numGamesSilv, numGamesWon, numGamesLost, rating, ratingStdev),
       priorRating, priorRatingStdev).shaped <> (
     //Database shape -> Scala object
-    { case (lowercaseName, username, email, emailVerifyNeeded, passwordHash, isBot, createdTime, isGuest, lastLogin, gameStats, priorRating, priorRatingStdev) =>
-      Account(lowercaseName, username, email, emailVerifyNeeded, passwordHash, isBot, createdTime, isGuest, lastLogin,
+    { case (lowercaseName, username, email, emailVerifyNeeded, passwordHash, isBot, createdTime, isGuest, isAdmin, lastLogin, gameStats, priorRating, priorRatingStdev) =>
+      Account(lowercaseName, username, email, emailVerifyNeeded, passwordHash, isBot, createdTime, isGuest, isAdmin, lastLogin,
         AccountGameStats.ofDB(gameStats), Rating(priorRating, priorRatingStdev)
       )
     },
     //Scala object -> Database shape
     { a: Account =>
       Some((
-        a.lowercaseName,a.username,a.email,a.emailVerifyNeeded,a.passwordHash,a.isBot,a.createdTime,a.isGuest,a.lastLogin,
+        a.lowercaseName,a.username,a.email,a.emailVerifyNeeded,a.passwordHash,a.isBot,a.createdTime,a.isGuest,a.isAdmin,a.lastLogin,
         AccountGameStats.toDB(a.gameStats), a.priorRating.mean, a.priorRating.stdev
       ))
     }
