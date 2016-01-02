@@ -126,7 +126,9 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
           if(logins.isUserLoggedIn(account.username) || now > account.createdTime + DELETE_UNVERIFIED_ACCOUNTS_OLDER_THAN)
             None
           else
-              Some(accounts.removeIfUnverified(account.username))
+            Some(accounts.removeIfUnverified(account.username).map { case () =>
+              logins.logoutUser(account.username,Timestamp.get)
+            })
         }
       Future.sequence(results)
     }.onComplete { result =>
