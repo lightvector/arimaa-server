@@ -251,6 +251,7 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
           isBot,
           createdTime = now,
           isGuest = false,
+          isAdmin = false,
           lastLogin = now,
           gameStats = AccountGameStats.initial(rating),
           priorRating = rating
@@ -334,6 +335,7 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
         isBot = false,
         createdTime = now,
         isGuest = true,
+        isAdmin = false,
         lastLogin = now,
         gameStats = AccountGameStats.initial(rating),
         priorRating = rating

@@ -48,6 +48,15 @@ object Games {
   val CREATE_BUCKET_CAPACITY: Double = 20
   val CREATE_BUCKET_FILL_PER_SEC: Double = 2.0/60.0
 
+  //Limit on games that a user can have open
+  val MAX_OPEN_GAMES_PER_USER: Int = 10
+  //Limit on all games that a user can be involved in
+  val MAX_GAMES_PER_USER: Int = 50 //TODO maybe have a separate limit for postal and non-postal games?
+
+  //TODO find some way to alert when these are hit?
+  //Whole-server limits
+  val MAX_SERVER_OPEN_GAMES: Int = 100
+  val MAX_SERVER_ACTIVE_GAMES: Int = 5000
 
   val gameTable = TableQuery[GameTable]
   val movesTable = TableQuery[MovesTable]
@@ -100,10 +109,18 @@ class Games(val db: Database, val parentLogins: LoginTracker, val scheduler: Sch
   private val activeGames = new ActiveGames(db,scheduler,accounts,serverInstanceID)
   val logger =  LoggerFactory.getLogger(getClass)
 
-  //Maybe only if they're postal games (some heuristic based on tc?). Do we want to credit any time for them?
-
   //Begin timeout loop on initialization
   checkTimeoutLoop()
+
+  //Not synchronized, slight race condition, but shouldn't be a big deal
+  def failIfAtLimit(username: Username, checkOpenLimit: Boolean): Unit = {
+    val numOpen = openGames.numGamesOfUser(username)
+    val numActive = activeGames.numGamesOfUser(username)
+    if(checkOpenLimit && numOpen >= Games.MAX_OPEN_GAMES_PER_USER)
+      throw new Exception("You have too many open games already - please close a game before starting more.")
+    if(numOpen + numActive >= Games.MAX_GAMES_PER_USER)
+      throw new Exception("You have too many ongoing games already - please close or finish a game before starting more.")
+  }
 
   def createStandardGame(
     creator: SimpleUserInfo,
@@ -114,6 +131,7 @@ class Games(val db: Database, val parentLogins: LoginTracker, val scheduler: Sch
     sUser: Option[SimpleUserInfo],
     logInfo: LogInfo
   ): Future[(GameID,GameAuth)] = {
+    failIfAtLimit(creator.name, checkOpenLimit=true)
     openGames.reserveNewGameID.map { id =>
       val gameAuth = openGames.createStandardGame(id,creator,siteAuth,tc,rated,gUser,sUser,logInfo)
       (id,gameAuth)
@@ -129,12 +147,14 @@ class Games(val db: Database, val parentLogins: LoginTracker, val scheduler: Sch
     sUser: Option[SimpleUserInfo],
     logInfo: LogInfo
   ): Future[(GameID,GameAuth)] = {
+    failIfAtLimit(creator.name, checkOpenLimit=true)
     openGames.reserveNewGameID.map { id =>
       val gameAuth = openGames.createHandicapGame(id,creator,siteAuth,gTC,sTC,gUser,sUser,logInfo)
       (id,gameAuth)
     }
   }
 
+  //TODO check user game limit here?
   //TODO implement game reopening in the API
   /* Reopen a game that has no winner if the game has any of the specified ending reasons */
   def reopenUnfinishedGame(id: GameID, allowedReasons: Set[EndingReason]): Future[Unit] = {
@@ -199,6 +219,7 @@ class Games(val db: Database, val parentLogins: LoginTracker, val scheduler: Sch
 
   /* Attempt to join an open or active game with the specified id */
   def join(user: SimpleUserInfo, siteAuth: SiteAuth, id: GameID): Try[GameAuth] = {
+    failIfAtLimit(user.name, checkOpenLimit=false)
     tryOpenAndActive(id)(_.join(user,siteAuth,id))(_.join(user,siteAuth,id))
   }
 
@@ -222,6 +243,7 @@ class Games(val db: Database, val parentLogins: LoginTracker, val scheduler: Sch
           activeGames.addGame(initData).onComplete { result =>
             //Now that the game is active (or failed to start), clear out the open game.
             openGames.clearStartedGame(id)
+            result.get
           }
       }
     }
@@ -408,6 +430,15 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker,
     openGames.contains(id)
   }
 
+  def numGamesOfUser(username: Username): Int = this.synchronized {
+    var count = 0
+    openGames.foreach { case (id,game) =>
+      if(game.creator.exists(_.name == username) || game.logins.isUserLoggedIn(username))
+        count += 1
+    }
+    count
+  }
+
   /* Try to reserve a game id for a game that is about to be opened, so that nothing else attempts
    * to open a game with this id in the meantime.
    * Returns true and reserves if the id is not already reserved and there is no open game with this id.
@@ -475,8 +506,15 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker,
     assert(reservedGameIDs.contains(reservedID))
 
     val now = Timestamp.get
-    if(!createBuckets.takeOne(creator.name, now))
+    if(!createBuckets.takeOne(creator.name, now)) {
+      releaseGameID(reservedID)
       throw new Exception("Created too many games too quickly, please wait a minute or two before creating more games.")
+    }
+    if(openGames.size >= Games.MAX_SERVER_OPEN_GAMES) {
+      releaseGameID(reservedID)
+      logger.error("Too many open games on server at once.")
+      throw new Exception("Too many open games on server at once.")
+    }
 
     val meta = GameMetadata(
       id = reservedID,
@@ -867,8 +905,25 @@ class ActiveGames(val db: Database, val scheduler: Scheduler,
     activeGames.contains(id)
   }
 
+  def numGamesOfUser(username: Username): Int = {
+    var count = 0
+    //Slight performance hack since the only things we're reading are immutable
+    val games = this.synchronized { activeGames }
+    games.foreach { case (id,game) =>
+      if(game.initMeta.users.exists(_.name == username))
+        count += 1
+    }
+    count
+  }
+
   def addGame(data: ActiveGames.InitData): Future[Unit] = {
     val id = data.meta.id
+
+    if(activeGames.size >= Games.MAX_SERVER_ACTIVE_GAMES) {
+      logger.error("Too many active games on server at once.")
+      throw new Exception("Too many active games on server at once.")
+    }
+
 
     //Update metadata with new information
     var now = Timestamp.get
