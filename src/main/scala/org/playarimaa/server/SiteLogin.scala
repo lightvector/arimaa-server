@@ -224,14 +224,14 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
   }
 
   //TODO throttle registrations and guest logins by IP address
-  def register(username: Username, email: Email, password: String, isBot: Boolean, priorRating:Option[Double]): Future[(Username,SiteAuth)] = {
+  def register(username: Username, email: Email, password: String, isBot: Boolean, priorRating:Option[Double], logInfo: LogInfo): Future[(Username,SiteAuth)] = {
     Future.successful(()).flatMap { case () =>
       validateUsername(username)
       validateEmail(email)
       validatePassword(password)
       priorRating.foreach(_.validateNonNegative("priorRating"))
 
-      logger.info("Attempting to register new account for " + username)
+      logger.info(logInfo + " Attempting to register new account for " + username)
 
       val lowercaseName = username.toLowerCase
       val rating = priorRating match {
@@ -265,7 +265,7 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
           //Mitigate race condition by afterwards logging out anything logged in with this name
           logins.logoutUser(username,now)
 
-          logger.info("Registered new account for " + username)
+          logger.info(logInfo + " Registered new account for " + username)
           emailer.sendVerifyEmail(email,username,verifyAuth)
 
           doTimeouts(now)
@@ -276,13 +276,13 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
     }
   }
 
-  def login(usernameOrEmail: String, password: String): Future[(Username,SiteAuth)] = {
+  def login(usernameOrEmail: String, password: String, logInfo: LogInfo): Future[(Username,SiteAuth)] = {
     Future.successful(()).flatMap { case () =>
       validateUsernameOrEmail(usernameOrEmail)
 
       //Throttle login attempts roughly by account (more specifically, by lowercase key of email/username)
       if(!loginBuckets.takeOne(usernameOrEmail.toLowerCase, Timestamp.get)) {
-        logger.warn("Too many login attempts for " + usernameOrEmail)
+        logger.warn(logInfo + " Too many login attempts for " + usernameOrEmail)
         throw new Exception("Too many login attempts for account, please wait a few minutes before the next attempt.")
       }
 
@@ -306,7 +306,7 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
               val now = Timestamp.get
               doTimeouts(now)
               val siteAuth = logins.login(account.info, now)
-              logger.info("User logged in: " + account.username)
+              logger.info(logInfo + " User logged in: " + account.username)
               (account.username,siteAuth)
             //more matches
             case _ =>
@@ -318,7 +318,7 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
     }
   }
 
-  def loginGuest(username: Username): Future[(Username,SiteAuth)] = {
+  def loginGuest(username: Username, logInfo: LogInfo): Future[(Username,SiteAuth)] = {
     Future.successful(()).flatMap { case () =>
       validateUsername(username)
 
@@ -351,7 +351,7 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
 
         doTimeouts(now)
         val siteAuth = logins.login(account.info, now)
-        logger.info("Guest logged in: " + account.username)
+        logger.info(logInfo + " Guest logged in: " + account.username)
         (account.username,siteAuth)
       }
     }
@@ -366,7 +366,7 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
     }
   }
 
-  def logout(siteAuth: SiteAuth) : Try[Unit] = {
+  def logout(siteAuth: SiteAuth, logInfo: LogInfo) : Try[Unit] = {
     requiringLogin(siteAuth) { _ =>
       val now = Timestamp.get
       logins.userOfAuth(siteAuth) match {
@@ -376,9 +376,9 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
           logins.logoutUser(user.name,now)
           accounts.removeIfGuest(user.name)
           if(user.isGuest)
-            logger.info("Guest logged out: " + user.name)
+            logger.info(logInfo + " Guest logged out: " + user.name)
           else
-            logger.info("User logged out: " + user.name)
+            logger.info(logInfo + " User logged out: " + user.name)
           ()
       }
     }
@@ -397,7 +397,7 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
     logins.isAuthLoggedIn(siteAuth)
   }
 
-  def forgotPassword(usernameOrEmail: String) : Future[Unit] = {
+  def forgotPassword(usernameOrEmail: String, logInfo: LogInfo) : Future[Unit] = {
     Future.successful(()).map { case () =>
       validateUsernameOrEmail(usernameOrEmail)
 
@@ -405,13 +405,13 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
       accounts.getByNameOrEmail(usernameOrEmail, excludeGuests=true).onComplete { result =>
         result match {
           case Failure(exn) =>
-            logger.error("Error when handling password reset request: " + exn)
+            logger.error(logInfo + " Error when handling password reset request: " + exn)
             ()
           case Success(Nil) =>
             //Looks email-like?
             if(usernameOrEmail.contains('@'))
               emailer.sendPasswordResetNoAccount(usernameOrEmail)
-            logger.info("User requested password reset for unknown account/email: " + usernameOrEmail)
+            logger.info(logInfo + " User requested password reset for unknown account/email: " + usernameOrEmail)
           case Success(results) =>
             results.foreach { account =>
               val auth = RandGen.genAuth
@@ -426,14 +426,14 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
               }
               //Send email to user advising about reset
               emailer.sendPasswordResetRequest(account.email,account.username,auth)
-              logger.info("User requested password reset: " + account.username)
+              logger.info(logInfo + " User requested password reset: " + account.username)
             }
         }
       }
     }
   }
 
-  def resetPassword(usernameOrEmail: String, resetAuth: Auth, password: String) : Future[Unit] = {
+  def resetPassword(usernameOrEmail: String, resetAuth: Auth, password: String, logInfo: LogInfo) : Future[Unit] = {
     Future.successful(()).flatMap { case () =>
       validateUsernameOrEmail(usernameOrEmail)
       validatePassword(password)
@@ -459,7 +459,7 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
                 }
                 hashpw(password).flatMap { passwordHash =>
                   accounts.setPasswordHash(account.username,passwordHash).map { result =>
-                    logger.info("Password reset for account: " + account.username)
+                    logger.info(logInfo + " Password reset for account: " + account.username)
                     result
                   }
                 }
@@ -469,14 +469,14 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
             throw new Exception("Multiple users with that email/password combination: " + users.mkString(" "))
         }
       }.recover { case exn: Exception =>
-          logger.info("Password reset for " + usernameOrEmail + " failed with result " + exn)
+          logger.info(logInfo + " Password reset for " + usernameOrEmail + " failed with result " + exn)
           throw exn
       }
     }
   }
 
 
-  def changePassword(username: Username, password: String, siteAuth: SiteAuth, newPassword: String) : Future[Unit] = {
+  def changePassword(username: Username, password: String, siteAuth: SiteAuth, newPassword: String, logInfo: LogInfo) : Future[Unit] = {
     Future.successful(()).flatMap { case () =>
       validateUsername(username)
       validatePassword(newPassword)
@@ -493,21 +493,21 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
                   throw new Exception("Old password did not match.")                
                 hashpw(newPassword).flatMap { passwordHash =>
                   accounts.setPasswordHash(account.username,passwordHash).map { result =>
-                    logger.info("Password changed for account: " + account.username)
+                    logger.info(logInfo + " Password changed for account: " + account.username)
                     result
                   }
                 }
               }
           }
         }.recover { case exn: Exception =>
-            logger.info("Change password for account: " + username + " failed with result " + exn)
+            logger.info(logInfo + " Change password for account: " + username + " failed with result " + exn)
             throw exn
         }
       }.get
     }
   }
 
-  def verifyEmail(username: Username, auth: Auth) : Future[Unit] = {
+  def verifyEmail(username: Username, auth: Auth, logInfo: LogInfo) : Future[Unit] = {
     validateUsername(username)
     accounts.getByName(username, excludeGuests=true).flatMap { result =>
       result match {
@@ -519,13 +519,17 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
               if(auth != x)
                 throw new Exception("Invalid key, try logging in and having the email verification re-sent.")
               else
-                accounts.setEmailVerifyNeeded(username, None)
+                accounts.setEmailVerifyNeeded(username, None).map { result =>
+                  logger.info(logInfo + " Verified email for account: " + username)
+                } .recover { case exn: Exception =>
+                    logger.info(logInfo + " Verify email for account: " + username + " failed with result " + exn)
+                }
           }
       }
     }
   }
 
-  def changeEmail(username: Username, password: String, siteAuth: SiteAuth, newEmail: Email) : Future[Unit] = {
+  def changeEmail(username: Username, password: String, siteAuth: SiteAuth, newEmail: Email, logInfo: LogInfo) : Future[Unit] = {
     Future.successful(()).flatMap { case () =>
       validateUsername(username)
       validateEmail(newEmail)
@@ -555,19 +559,19 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
                 }
                 //Send email to user advising about change
                 emailer.sendEmailChangeRequest(newEmail,account.username,auth,account.email).map { case () =>
-                  logger.info("Email change initated for account: " + account.username + " from " + account.email + " to " + newEmail)
+                  logger.info(logInfo + " Email change initated for account: " + account.username + " from " + account.email + " to " + newEmail)
                 }
               }
           }
         }.recover { case exn: Exception =>
-            logger.info("Change email for account: " + username + " failed with result " + exn)
+            logger.info(logInfo + " Change email for account: " + username + " failed with result " + exn)
             throw exn
         }
       }.get
     }
   }
 
-  def confirmChangeEmail(username: Username, changeAuth: SiteAuth) : Future[Unit] = {
+  def confirmChangeEmail(username: Username, changeAuth: SiteAuth, logInfo: LogInfo) : Future[Unit] = {
     Future.successful(()).flatMap { case () =>
       validateUsername(username)
       accounts.getByName(username, excludeGuests=true).flatMap { result =>
@@ -593,12 +597,12 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
                 accounts.setEmail(account.username, newEmail, emailVerifyNeeded = None).map { case () =>
                   //Don't wait for old email to go out
                   emailer.sendOldEmailChangeNotification(oldEmail,account.username,newEmail)
-                  logger.info("Email change confirmed for account: " + account.username + " from " + oldEmail + " to " + newEmail)
+                  logger.info(logInfo + " Email change confirmed for account: " + account.username + " from " + oldEmail + " to " + newEmail)
                 }
             }
         }      
       }.recover { case exn: Exception =>
-          logger.info("Confirm change email for account: " + username + " failed with result " + exn)
+          logger.info(logInfo + " Confirm change email for account: " + username + " failed with result " + exn)
           throw exn
       }
     }
