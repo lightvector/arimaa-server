@@ -3,7 +3,7 @@
 var $ = require('jquery');
 var UserStore = require('../stores/UserStore.js');
 
-var PRINT_DATA = false;
+var PRINT_DATA = true;
 
 function POST(url, data, success, error) {
   $.ajax({
