@@ -1,15 +1,15 @@
 var React = require('react');
 var SiteActions = require('../actions/SiteActions.js');
 var UserStore = require('../stores/UserStore.js');
-var Link = require('react-router').Link;
 
-var forgotPasswordBox = React.createClass({
+var verifyEmailBox = React.createClass({
   getInitialState: function() {
-    return {user: "", message: "", error: ""};
+    return {message: "", error: ""};
   },
 
   componentDidMount: function() {
     UserStore.addChangeListener(this.onUserStoreChange);
+    SiteActions.verifyEmail(this.props.params.username, this.props.params.verifyAuth);
   },
   componentWillUnmount: function() {
     UserStore.removeChangeListener(this.onUserStoreChange);
@@ -17,14 +17,6 @@ var forgotPasswordBox = React.createClass({
 
   onUserStoreChange: function() {
     this.setState(UserStore.getMessageError());
-  },
-
-  handleUsernameChange: function(event) {
-    this.setState({user: event.target.value});
-  },
-  submitForgotPassword: function(event) {
-    event.preventDefault();
-    SiteActions.forgotPassword(this.state.user);
   },
 
   render: function() {
@@ -40,18 +32,14 @@ var forgotPasswordBox = React.createClass({
     return (
       <div>
         <div className="uiPanel center">
-          <h1>Request Password Reset</h1>
-          <form method="post" action="index.html">
-            <input type="text" name="forgotPassword" value={this.state.user} onChange={this.handleUsernameChange} placeholder="Username/Email"/>
-            <input type="submit" className="submit majorButton" name="commit" value="Request Password Reset" onClick={this.submitForgotPassword}/>
-          </form>
+          <h1>Verifying Account Registration Email</h1>
           {errorText}
           {messageText}
-          <div className="vPadding"><Link to="/">Back to Login</Link></div>
+          <div className="vPadding"><a href="/">Back to Login</a></div>
         </div>
       </div>
     );
   }
 });
 
-module.exports = forgotPasswordBox;
+module.exports = verifyEmailBox;

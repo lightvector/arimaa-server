@@ -14,6 +14,7 @@ var component = React.createClass({
     return {message: "", error:"",
             ownGames:[], joinableOpenGames:[], watchableGames:[], selectedPlayers:{},
             usersLoggedIn:[],
+            notifications:[],
             recentHighlightGameIDs:{},
             recentPlayingGameIDs:{},
             createGameDialogOpen:false,
@@ -26,6 +27,7 @@ var component = React.createClass({
     UserStore.addPopupMessageListener(this.onPopupMessage);
     SiteActions.beginLoginCheckLoop();
     SiteActions.beginUsersLoggedInLoop();
+    SiteActions.beginNotificationsLoop();
     SiteActions.beginOpenGamesLoop();
     SiteActions.beginActiveGamesLoop();
   },
@@ -42,7 +44,8 @@ var component = React.createClass({
       watchableGames:UserStore.getWatchableGames(),
       recentHighlightGameIDs:UserStore.getRecentHighlightGames(),
       recentPlayingGameIDs:UserStore.getRecentPlayingGames(),
-      usersLoggedIn:UserStore.getUsersLoggedIn()
+      usersLoggedIn:UserStore.getUsersLoggedIn(),
+      notifications:UserStore.getNotifications()
     });
   },
 
@@ -119,13 +122,13 @@ var component = React.createClass({
     else if(metadata.sUser !== undefined && hasCreator && metadata.openGameData.creator.name != metadata.sUser.name)
       title = Utils.userDisplayStr(metadata.openGameData.creator) + " (G) vs " + Utils.userDisplayStr(metadata.sUser) + " (S)";
     else if(metadata.gUser !== undefined)
-      title = Utils.userDisplayStr(metadata.gUser) + " (G) vs " + "anyone" + " (S)";
+      title = Utils.userDisplayStr(metadata.gUser) + " (G) vs " + "_" + " (S)";
     else if(metadata.sUser !== undefined)
-      title = "anyone (G)" + " vs " + Utils.userDisplayStr(metadata.sUser) + " (S)";
+      title = "_ (G)" + " vs " + Utils.userDisplayStr(metadata.sUser) + " (S)";
     else if(metadata.openGameData.creator !== undefined)
-      title = Utils.userDisplayStr(metadata.openGameData.creator) + " vs " + "anyone" + " (random color)";
+      title = Utils.userDisplayStr(metadata.openGameData.creator) + " vs " + "_" + " (random color)";
     else
-      title = "anyone" + " vs " + "anyone" + " (random color)";
+      title = "_" + " vs " + "_" + " (random color)";
 
     if(metadata.tags.length > 0)
       title = title + " (" + metadata.tags.join(", ") + ")";
@@ -135,13 +138,13 @@ var component = React.createClass({
   gameInfoString: function(metadata) {
     var infos = [];
 
-    if(metadata.gameType !== undefined && metadata.gameType.length > 0)
+    if(metadata.gameType !== undefined && metadata.gameType.length > 0 && metadata.gameType !== "standard")
       infos.push(metadata.gameType.charAt(0).toUpperCase() + metadata.gameType.slice(1));
 
-    if(metadata.openGameData !== undefined)
-      infos.push("Open");
-    if(metadata.activeGameData !== undefined)
-      infos.push("Active");
+    // if(metadata.openGameData !== undefined)
+    //   infos.push("Open");
+    // if(metadata.activeGameData !== undefined)
+    //   infos.push("Active");
 
     if(metadata.rated)
       infos.push("Rated");
@@ -173,7 +176,6 @@ var component = React.createClass({
     var title = this.gameTitle(metadata);
     var info = this.gameInfoString(metadata);
     var joinAccepts = [];
-    var leaveButton = [];
     var gameButton = [];
 
     var gameAuth = UserStore.getJoinedGameAuth(metadata.gameID);
@@ -190,11 +192,21 @@ var component = React.createClass({
       }
 
       if(!joined)
-        joinAccepts.push(<button onClick={this.joinGameButtonClicked.bind(this, metadata.gameID)}>Play</button>);
-      else if(metadata.openGameData.creator !== undefined && metadata.openGameData.creator.name != username)
+        joinAccepts.push(<button className="gameButton" onClick={this.joinGameButtonClicked.bind(this, metadata.gameID)}>Play</button>);
+      else if(metadata.openGameData.creator !== undefined && metadata.openGameData.creator.name != username) {
         joinAccepts.push(<span>Requested game, waiting for opponent to reply...</span>);
-      else if(joinedNotUs.length <= 0)
+        if(gameAuth !== null)
+          joinAccepts.push(React.createElement("button", {key: "leaveButton_"+metadata.gameID, className: "no", onClick: this.leaveButtonClicked.bind(this,metadata.gameID, gameAuth)}, "Cancel"));
+        else
+          joinAccepts.push(React.createElement("button", {key: "leaveButton_"+metadata.gameID, className: "no", disabled: true, onClick: function() {return false;}}, "Cancel"));
+      }
+      else if(joinedNotUs.length <= 0) {
         joinAccepts.push(<span>Waiting for opponent to join...</span>);
+        if(gameAuth !== null)
+          joinAccepts.push(React.createElement("button", {key: "leaveButton_"+metadata.gameID, className: "no", onClick: this.leaveButtonClicked.bind(this,metadata.gameID, gameAuth)}, "Cancel"));
+        else
+          joinAccepts.push(React.createElement("button", {key: "leaveButton_"+metadata.gameID, className: "no", disabled: true, onClick: function() {return false;}}, "Cancel"));
+      }
       else {
         var selectedPlayer = null;
         if(metadata.gameID in this.state.selectedPlayers) {
@@ -223,46 +235,42 @@ var component = React.createClass({
           selector = React.createElement("select", {key: "joinedPlayerSelect_"+metadata.gameID, size: joinedNotUs.length,
                                                     onchange: this.handleJoinedPlayerSelection.bind(this, metadata.gameID)}, selections);
 
-        joinAccepts.push(<span>Someone has joined your game: </span>);
+        joinAccepts.push(<span>Someone joined your game: </span>);
         joinAccepts.push(selector);
         if(selectedPlayer !== null && gameAuth !== null) {
           joinAccepts.push(React.createElement(
             "button",
-            {key: "acceptButton_"+metadata.gameID, onClick: this.acceptUserButtonClicked.bind(this, metadata.gameID, gameAuth, userinfo.name)},
-            "Accept and play " + selectedPlayer
+            {key: "acceptButton_"+metadata.gameID, className: "yes", onClick: this.acceptUserButtonClicked.bind(this, metadata.gameID, gameAuth, userinfo.name)},
+            "Play " + selectedPlayer
           ));
           joinAccepts.push(React.createElement(
             "button",
-            {key: "declineButton_"+metadata.gameID, onClick: this.declineUserButtonClicked.bind(this, metadata.gameID, gameAuth, userinfo.name)},
+            {key: "declineButton_"+metadata.gameID, className: "no", onClick: this.declineUserButtonClicked.bind(this, metadata.gameID, gameAuth, userinfo.name)},
             "Decline " + selectedPlayer
           ));
         }
         else {
           joinAccepts.push(React.createElement(
             "button",
-            {key: "acceptButton_"+metadata.gameID, disabled: true, onClick: function() {return false;}},
-            "Accept and play"
+            {key: "acceptButton_"+metadata.gameID, className: "yes", disabled: true, onClick: function() {return false;}},
+            "Play"
           ));
           joinAccepts.push(React.createElement(
             "button",
-            {key: "declineButton_"+metadata.gameID, disabled: true, onClick: function() {return false;}},
+            {key: "declineButton_"+metadata.gameID, className: "no", disabled: true, onClick: function() {return false;}},
             "Decline"
           ));
         }
       }
 
       if(joined) {
-        if(gameAuth !== null)
-          leaveButton.push(React.createElement("button", {key: "leaveButton_"+metadata.gameID, onClick: this.leaveButtonClicked.bind(this,metadata.gameID, gameAuth)}, "Cancel"));
-        else
-          leaveButton.push(React.createElement("button", {key: "leaveButton_"+metadata.gameID, disabled: true, onClick: function() {return false;}}, "Cancel"));
       }
     }
     if(metadata.activeGameData !== undefined) {
       if(metadata.gUser.name == username || metadata.sUser.name == username)
-        gameButton.push(React.createElement("button", {key: "gameButton_"+metadata.gameID, onClick: this.gameButtonClicked.bind(this,metadata.gameID)}, "Go to Game"));
+        gameButton.push(React.createElement("button", {key: "gameButton_"+metadata.gameID, className: "goToOurGame", onClick: this.gameButtonClicked.bind(this,metadata.gameID)}, "Go to My Game"));
       else
-        gameButton.push(React.createElement("button", {key: "gameButton_"+metadata.gameID, onClick: this.gameButtonClicked.bind(this,metadata.gameID)}, "Watch Game"));
+        gameButton.push(React.createElement("button", {key: "gameButton_"+metadata.gameID, className: "gameButton", onClick: this.gameButtonClicked.bind(this,metadata.gameID)}, "Watch Game"));
     }
 
     var elts = [];
@@ -270,8 +278,6 @@ var component = React.createClass({
     elts.push(React.createElement("div", {key: "title_"+metadata.gameID}, title));
     elts.push(React.createElement("div", {key: "info_"+metadata.gameID}, info));
     elts.push(React.createElement("div", {key: "joinAccepts_"+metadata.gameID},joinAccepts));
-    if(leaveButton.length > 0)
-      elts.push(React.createElement("div", {key: "leaveButtonDiv_"+metadata.gameID},leaveButton));
     if(gameButton.length > 0)
       elts.push(React.createElement("div", {key: "gameButtonDiv_"+metadata.gameID},gameButton));
 
@@ -286,6 +292,10 @@ var component = React.createClass({
 
   renderUser: function(userInfo) {
     return React.createElement("div", {key: "users_"+userInfo.name}, Utils.userDisplayStr(userInfo));
+  },
+
+  renderNotification: function(i,msg) {
+    return React.createElement("li", {key: "notification_"+i}, msg);
   },
 
   render: function() {
@@ -309,7 +319,7 @@ var component = React.createClass({
 
     var errorDiv = "";
     if(this.state.error != "") {
-      errorDiv = React.createElement("div", {key: "errorDiv", className:"error"}, this.state.error);
+      errorDiv = React.createElement("div", {key: "errorDiv", className:"bigError bMargin"}, this.state.error);
     }
 
     var usersDiv = "";
@@ -317,8 +327,11 @@ var component = React.createClass({
       var usersList = this.state.usersLoggedIn.map(function(user) {
         return that.renderUser(user);
       });
-      usersList.unshift(React.createElement("h4", {key: "usersLoggedInLabel"}, "Users Logged In:"));
       usersDiv = React.createElement("div", {key: "usersDiv", className:"gameroomUsersDiv"}, usersList);
+      usersDiv = React.createElement("div", {key: "usersLabeledDiv", className:"gameroomLabeledUsersDiv uiPanel"}, [
+        React.createElement("h4", {key: "usersLoggedInLabel"}, "Users Logged In:"),
+        usersDiv
+      ]);
     }
 
     var ownGamesDiv = "";
@@ -327,9 +340,9 @@ var component = React.createClass({
         return that.renderGame(metadata);
       });
 
-      ownGamesList.unshift(React.createElement("button", {key: "createGameButton", onClick: this.createButtonClicked}, "Create New Game"));
+      ownGamesList.unshift(React.createElement("button", {key: "createGameButton", className:"bMargin", onClick: this.createButtonClicked}, "Create New Game"));
       ownGamesList.unshift(React.createElement("h3", {key: "myCurrentGamesLabel"}, "My Current Games"));
-      ownGamesDiv = React.createElement("div", {key: "ownDiv"}, ownGamesList);
+      ownGamesDiv = React.createElement("div", {key: "ownDiv", className:"uiPanel bMargin"}, ownGamesList);
     }
 
     var joinableOpenGamesDiv = "";
@@ -339,7 +352,7 @@ var component = React.createClass({
       });
 
       joinableOpenGamesList.unshift(React.createElement("h3", {key: "openGamesLabel"}, "Open Games"));
-      joinableOpenGamesDiv = React.createElement("div", {key: "joinableOpenDiv"}, joinableOpenGamesList);
+      joinableOpenGamesDiv = React.createElement("div", {key: "joinableOpenDiv", className:"uiPanel bMargin" }, joinableOpenGamesList);
     }
 
 
@@ -350,24 +363,42 @@ var component = React.createClass({
       });
 
       watchableGamesList.unshift(React.createElement("h3", {key: "activeGamesLabel"}, "Active Games"));
-      watchableGamesDiv = React.createElement("div", {key: "watchableDiv"}, watchableGamesList);
+      watchableGamesDiv = React.createElement("div", {key: "watchableDiv", className:"uiPanel bMargin"}, watchableGamesList);
     }
 
     var chat = (
         <Chat params={{chatChannel:"main"}}/>
     );
 
+    var notificationsDiv = "";
+    if(this.state.notifications.length > 0) {
+      var notificationsList = this.state.notifications.map (function (msg,i) {
+        return that.renderNotification(i,msg);
+      });
+      notificationsDiv =
+        React.createElement("div", {key: "notificationsDiv", className:"uiPanel bMargin"},
+          React.createElement("ul", {key: "notificationsList"}, notificationsList));
+    }
 
     var contents = [
-      React.createElement("h1", {key:"gameroomTitle"}, "Arimaa Gameroom"),
       createModal,
       popupModal,
-      errorDiv,
-      usersDiv,
-      ownGamesDiv,
-      joinableOpenGamesDiv,
-      watchableGamesDiv,
-      chat
+      notificationsDiv,
+      React.createElement("div", {key:"gameroomPanels", className: "gameroomPanels"}, [
+        React.createElement("div", {key:"gamesDiv", className:"games"}, [
+          React.createElement("h1", {key:"gameroomTitle"}, "Arimaa Gameroom"),
+          errorDiv,
+          React.createElement("div", {key:"gamesContentsDiv", className:"gamesContents"}, [
+            React.createElement("div", {key:"gamesListsDiv", className:"gamesLists"}, [
+              ownGamesDiv,
+              joinableOpenGamesDiv,
+              watchableGamesDiv
+            ]),
+            usersDiv
+          ]),
+        ]),
+        chat
+      ]),
     ];
 
     return React.createElement("div", {key:"gameroomContents", className: "gameroom"}, contents);

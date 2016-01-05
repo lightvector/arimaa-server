@@ -15,6 +15,7 @@ import org.slf4j.{Logger, LoggerFactory}
 import org.playarimaa.server.CommonTypes._
 import org.playarimaa.server.{Accounts,Json,LoginTracker,SimpleUserInfo,SiteLogin,Timestamp,WebAppStack}
 import org.playarimaa.server.Timestamp.Timestamp
+import org.playarimaa.server.LogInfo
 import org.playarimaa.server.Utils._
 
 import org.playarimaa.board.{Player,GOLD,SILV}
@@ -305,7 +306,7 @@ class GameServlet(val accounts: Accounts, val siteLogin: SiteLogin, val games: G
     }
   }
 
-  def handleGameroomAction(params: Map[String,String], requestBody: String) : AnyRef = {
+  def handleGameroomAction(params: Map[String,String], requestBody: String, logInfo: LogInfo) : AnyRef = {
     getGameroomAction(params("action")) match {
       case None =>
         pass()
@@ -323,7 +324,7 @@ class GameServlet(val accounts: Accounts, val siteLogin: SiteLogin, val games: G
               val timeControl = tcOfIOTC(tc)
               maybeGetUser(gUser).flatMap { gUser =>
                 maybeGetUser(sUser).flatMap { sUser =>
-                  games.createStandardGame(username, siteAuth, timeControl, rated, gUser, sUser).map { case (gameID,gameAuth) =>
+                  games.createStandardGame(username, siteAuth, timeControl, rated, gUser, sUser, logInfo).map { case (gameID,gameAuth) =>
                     Create.Reply(gameID,gameAuth)
                   }
                 }
@@ -335,7 +336,7 @@ class GameServlet(val accounts: Accounts, val siteLogin: SiteLogin, val games: G
               val sTimeControl = tcOfIOTC(sTC)
               maybeGetUser(gUser).flatMap { gUser =>
                 maybeGetUser(sUser).flatMap { sUser =>
-                  games.createHandicapGame(username, siteAuth, gTimeControl, sTimeControl, gUser, sUser).map { case (gameID,gameAuth) =>
+                  games.createHandicapGame(username, siteAuth, gTimeControl, sTimeControl, gUser, sUser, logInfo).map { case (gameID,gameAuth) =>
                     Create.Reply(gameID,gameAuth)
                   }
                 }
@@ -349,7 +350,7 @@ class GameServlet(val accounts: Accounts, val siteLogin: SiteLogin, val games: G
     }
   }
 
-  def handleGameAction(id: GameID, params: Map[String,String], requestBody: String) : AnyRef = {
+  def handleGameAction(id: GameID, params: Map[String,String], requestBody: String, logInfo: LogInfo) : AnyRef = {
     getGameAction(params("action")) match {
       case None =>
         pass()
@@ -524,12 +525,16 @@ class GameServlet(val accounts: Accounts, val siteLogin: SiteLogin, val games: G
 
 
   post("/actions/:action") {
-    handleGameroomAction(params,request.body)
+    val remoteHost: String = request.getRemoteHost
+    val logInfo = LogInfo(remoteHost=remoteHost)
+    handleGameroomAction(params,request.body,logInfo)
   }
 
   post("/:gameID/actions/:action") {
+    val remoteHost: String = request.getRemoteHost
+    val logInfo = LogInfo(remoteHost=remoteHost)
     val id = params("gameID")
-    handleGameAction(id,params,request.body)
+    handleGameAction(id,params,request.body,logInfo)
   }
 
   get("/:gameID/state") {

@@ -12,7 +12,10 @@ function POST(url, data, success, error) {
     contentType: 'application/json; charset=utf-8',
     data: JSON.stringify(data),
     success: function(received, textStatus, xhr) {
-      if(PRINT_DATA) { console.log("url: " + url + "\ndata: " + JSON.stringify(data) + "\nreceived: ", received);}
+
+      if(PRINT_DATA) {
+        console.log("timestamp: " + Date.now() + "\nurl: " + url + "\ndata: " + data + "\nreceived: ", received);
+      }
 
       if('error' in received) {
         error(received);
@@ -40,7 +43,7 @@ function GET(url, data, success, error) {
     contentType: 'application/json; charset-utf-8',
     data: data,
     success: function(received, textStatus, xhr) {
-      if(PRINT_DATA) {console.log("url: " + url + "\ndata: " + data + "\nreceived: ", received);}
+      if(PRINT_DATA) {console.log("timestamp: " + Date.now() + "\nurl: " + url + "\ndata: " + data + "\nreceived: ", received);}
       if('error' in received) {
         error(received);
       } else {
@@ -102,6 +105,10 @@ var APIUtils = {
     POST('/api/accounts/resetPassword', {username:username, resetAuth:resetAuth, password:password}, success, error);
   },
 
+  verifyEmail: function(username, verifyAuth, success, error) {
+    POST('/api/accounts/verifyEmail', {username:username, verifyAuth:verifyAuth}, success, error);
+  },
+
   //TODO use this
   changePassword: function(username, password, siteAuth, newPassword, success, error) {
     POST('/api/accounts/changePassword', {username:username, password:password, siteAuth:UserStore.siteAuthToken(), newPassword:newPassword}, success, error);
@@ -115,6 +122,10 @@ var APIUtils = {
   //TODO use this
   confirmChangeEmail: function(username, changeAuth, success, error) {
     POST('/api/accounts/changeEmail', {username:username, changeAuth:changeAuth}, success, error);
+  },
+
+  getNotifications: function(username, success, error) {
+    GET('/api/accounts/' + username + '/' + UserStore.siteAuthToken() + "/notifications", {}, success, error);
   },
 
   createGame: function(options, success, error) {

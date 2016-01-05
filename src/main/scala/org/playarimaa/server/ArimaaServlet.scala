@@ -75,6 +75,12 @@ class ArimaaServlet(val siteLogin: SiteLogin)
     new java.io.File( getServletContext().getResource(path).getFile )
   }
 
+  get("/verifyEmail/:username/:verifyAuth/?") {
+    contentType="text/html"
+    val path = "/board.html"
+    new java.io.File( getServletContext().getResource(path).getFile )
+  }
+
   get("/game/:gameid/?") {
     contentType="text/html"
     val path = "/board.html"

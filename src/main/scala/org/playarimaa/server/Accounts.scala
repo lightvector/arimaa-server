@@ -17,12 +17,16 @@ object Accounts {
 
 case class Account(
   lowercaseName: UserID,
-  username: Username, //Distinct from lowercaseName so that we can remember the username captialization
+  //Distinct from lowercaseName so that we can remember the username captialization
+  username: Username, 
   email: Email,
+  //If Some, the user needs to verify that his/her email address is correct with this auth or else the account will be deleted after some time
+  emailVerifyNeeded: Option[Auth],
   passwordHash: String,
   isBot: Boolean,
   createdTime: Timestamp,
   isGuest: Boolean,
+  isAdmin: Boolean,
 
   lastLogin: Timestamp,
   gameStats: AccountGameStats,
@@ -94,6 +98,19 @@ class Accounts(val db: Database, val scheduler: Scheduler)(implicit ec: Executio
     }
   }
 
+  //Get all accounts whose emails are not verified
+  def getAllUnverified(): Future[List[Account]] = {
+    val query = Accounts.table.filter(_.emailVerifyNeeded.isDefined)
+    db.run(query.result).map(_.toList)
+  }
+
+  //Get all accounts, optionally excluding guests
+  def getAll(excludeGuests: Boolean): Future[List[Account]] = {
+    var query: Query[AccountTable,Account,Seq] = Accounts.table
+    query = if(excludeGuests) query.filter(_.isGuest) else query
+    db.run(query.result).map(_.toList)
+  }
+
   //Add a new account to the table.
   //In the case where there is an existing guest account, replaces the guest account with the new account.
   def add(account: Account): Future[Unit] = {
@@ -119,6 +136,13 @@ class Accounts(val db: Database, val scheduler: Scheduler)(implicit ec: Executio
     db.run(DBIO.seq(query))
   }
 
+  //Remove an account if its email is not verified
+  def removeIfUnverified(username: Username): Future[Unit] = {
+    val lowercaseName = username.toLowerCase
+    val query: DBIO[Int] = Accounts.table.filter(_.lowercaseName === lowercaseName).filter(_.emailVerifyNeeded.isDefined).delete
+    db.run(DBIO.seq(query))
+  }
+
   def setPasswordHash(username: Username, passwordHash: String): Future[Unit] = {
     val lowercaseName = username.toLowerCase
     val query: DBIO[Int] = Accounts.table.filter(_.lowercaseName === lowercaseName).map(_.passwordHash).update(passwordHash)
@@ -129,13 +153,23 @@ class Accounts(val db: Database, val scheduler: Scheduler)(implicit ec: Executio
     }
   }
 
-  def setEmail(username: Username, email: Email): Future[Unit] = {
+  def setEmail(username: Username, email: Email, emailVerifyNeeded: Option[Auth]): Future[Unit] = {
     val lowercaseName = username.toLowerCase
     val query: DBIO[Int] = Accounts.table.filter(_.lowercaseName === lowercaseName).map(_.email).update(email)
-    db.run(query).map {
-      case 1 => ()
+    db.run(query).flatMap {
+      case 1 => setEmailVerifyNeeded(username, emailVerifyNeeded)
       case 0 => throw new Exception("Failed to set new email, account was not found")
       case x => throw new Exception("Failed to set new email, found " + x + " accounts")
+    }
+  }
+
+  def setEmailVerifyNeeded(username: Username, emailVerifyNeeded: Option[Auth]): Future[Unit] = {
+    val lowercaseName = username.toLowerCase
+    val query: DBIO[Int] = Accounts.table.filter(_.lowercaseName === lowercaseName).map(_.emailVerifyNeeded).update(emailVerifyNeeded)
+    db.run(query).map {
+      case 1 => ()
+      case 0 => throw new Exception("Failed to set email verification status, account was not found")
+      case x => throw new Exception("Failed to set email verification status, found " + x + " accounts")
     }
   }
 
@@ -203,16 +237,32 @@ class Accounts(val db: Database, val scheduler: Scheduler)(implicit ec: Executio
     }
   }
 
+  //Returns a list of strings that should be displayed to a user as various notifications
+  def getNotifications(username: Username): Future[List[String]] = {
+    getByName(username, excludeGuests=false).map {
+      case None => throw new Exception("Unknown username/account.")
+      case Some(account) =>
+        account.emailVerifyNeeded match {
+          case None => List()
+          case Some(_) => List("An email was sent to verify the address you provided. Please follow the link provided in the email to complete your registration.")
+        }
+    }
+  }
+
+
+
 }
 
 class AccountTable(tag: Tag) extends Table[Account](tag, "accountTable") {
   def lowercaseName : Rep[String] = column[String]("lowercaseName")
   def username : Rep[String] = column[String]("username")
   def email : Rep[String] = column[String]("email")
+  def emailVerifyNeeded : Rep[Option[String]] = column[Option[String]]("emailVerifyNeeded")
   def passwordHash : Rep[String] = column[String]("passwordHash")
   def isBot : Rep[Boolean] = column[Boolean]("isBot")
   def createdTime : Rep[Double] = column[Double]("createdTime")
   def isGuest : Rep[Boolean] = column[Boolean]("isGuest")
+  def isAdmin : Rep[Boolean] = column[Boolean]("isAdmin")
   def lastLogin : Rep[Double] = column[Double]("lastLogin")
   def numGamesGold : Rep[Int] = column[Int]("numGamesGold")
   def numGamesSilv : Rep[Int] = column[Int]("numGamesSilv")
@@ -224,19 +274,19 @@ class AccountTable(tag: Tag) extends Table[Account](tag, "accountTable") {
   def priorRatingStdev : Rep[Double] = column[Double]("priorRatingStdev")
 
   def * : ProvenShape[Account] =
-    (lowercaseName, username, email, passwordHash, isBot, createdTime, isGuest, lastLogin,
+    (lowercaseName, username, email, emailVerifyNeeded, passwordHash, isBot, createdTime, isGuest, isAdmin, lastLogin,
       (numGamesGold, numGamesSilv, numGamesWon, numGamesLost, rating, ratingStdev),
       priorRating, priorRatingStdev).shaped <> (
     //Database shape -> Scala object
-    { case (lowercaseName, username, email, passwordHash, isBot, createdTime, isGuest, lastLogin, gameStats, priorRating, priorRatingStdev) =>
-      Account(lowercaseName, username, email, passwordHash, isBot, createdTime, isGuest, lastLogin,
+    { case (lowercaseName, username, email, emailVerifyNeeded, passwordHash, isBot, createdTime, isGuest, isAdmin, lastLogin, gameStats, priorRating, priorRatingStdev) =>
+      Account(lowercaseName, username, email, emailVerifyNeeded, passwordHash, isBot, createdTime, isGuest, isAdmin, lastLogin,
         AccountGameStats.ofDB(gameStats), Rating(priorRating, priorRatingStdev)
       )
     },
     //Scala object -> Database shape
     { a: Account =>
       Some((
-        a.lowercaseName,a.username,a.email,a.passwordHash,a.isBot,a.createdTime,a.isGuest,a.lastLogin,
+        a.lowercaseName,a.username,a.email,a.emailVerifyNeeded,a.passwordHash,a.isBot,a.createdTime,a.isGuest,a.isAdmin,a.lastLogin,
         AccountGameStats.toDB(a.gameStats), a.priorRating.mean, a.priorRating.stdev
       ))
     }

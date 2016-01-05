@@ -84,7 +84,7 @@ object ChatEvent {
 case class ChatLine(
   id: Long,
   channel: Channel,
-  username: Username,
+  user: SimpleUserInfo,
   timestamp: Timestamp,
   event: ChatEvent,
   label: Option[String],
@@ -332,7 +332,7 @@ class ChatChannel(
           throw new Exception(ChatSystem.CHAT_CHAR_FAIL_MESSAGE)
         }
 
-        val line = ChatLine(nextId, channel, user.name, now, ChatEvent.MSG, None, Some(text))
+        val line = ChatLine(nextId, channel, user, now, ChatEvent.MSG, None, Some(text))
         nextId = nextId + 1
 
         //Add to queue of lines that we will remember until they show up in the db
@@ -448,7 +448,11 @@ class ChatChannel(
 class ChatTable(tag: Tag) extends Table[ChatLine](tag, "chatTable") {
   def id : Rep[Long] = column[Long]("id")
   def channel : Rep[String] = column[String]("channel")
-  def username : Rep[String] = column[String]("username")
+  def user : Rep[Username] = column[Username]("user")
+  def rating : Rep[Double] = column[Double]("rating")
+  def ratingStdev : Rep[Double] = column[Double]("ratingStdev")
+  def isBot : Rep[Boolean] = column[Boolean]("isBot")
+  def isGuest : Rep[Boolean] = column[Boolean]("isGuest")
   def timestamp : Rep[Double] = column[Double]("time")
   def event : Rep[ChatEvent] = column[ChatEvent]("event")
   def label : Rep[Option[String]] = column[Option[String]]("label")
@@ -460,5 +464,22 @@ class ChatTable(tag: Tag) extends Table[ChatLine](tag, "chatTable") {
   )
 
   //The * projection (e.g. select * ...) auto-transforms the tuple to the case class
-  def * : ProvenShape[ChatLine] = (id, channel, username, timestamp, event, label, text) <> (ChatLine.tupled, ChatLine.unapply)
+  def * : ProvenShape[ChatLine] = (
+    id, channel,
+    (user,rating,ratingStdev,isBot,isGuest),
+    timestamp, event, label, text
+  ).shaped <> (
+    //Database shape -> Scala object
+    { case (id, channel,
+      userInfo,
+      timestamp, event, label, text) =>
+      ChatLine(id,channel,SimpleUserInfo.ofDB(userInfo),timestamp,event,label,text)
+    },
+    //Scala object -> Database shape
+    { c: ChatLine =>
+      Some((c.id, c.channel,
+        SimpleUserInfo.toDB(c.user),
+        c.timestamp, c.event, c.label, c.text))
+    }
+  )
 }

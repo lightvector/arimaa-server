@@ -29,7 +29,7 @@ var resetPasswordBox = React.createClass({
     if(this.state.confirmPass !== this.state.pass)
       this.setState({error:"'Password' and 'Confirm Password' fields do not match"});
     else
-      SiteActions.resetPassword(this.props.username, this.props.resetAuth, this.state.pass);
+      SiteActions.resetPassword(this.props.params.username, this.props.params.resetAuth, this.state.pass);
   },
 
   render: function() {
@@ -38,24 +38,23 @@ var resetPasswordBox = React.createClass({
       errorText = (<div className="error">{this.state.error}</div>);
     }
     var messageText = null;
-    //TODO it's weird to use the "forgotpass" class for the div
     if(this.state.message != "") {
-      messageText = (<div className="forgotpass">{this.state.message}</div>);
+      messageText = (<div className="vPadding">{this.state.message}</div>);
     }
 
     //TODO here and elsewhere, should we be disabling the buttons upon submit so that we don't accidentally get double-sends of requests?
-    //TODO it's weird to use the "forgotpass" class for the div
     return (
       <div>
-        <div className="login">
+        <div className="uiPanel center">
           <h1>Reset Password</h1>
           <form method="post" action="index.html">
             <input type="password" name="password" value={this.state.pass} onChange={this.handlePasswordChange} placeholder="New Password"/>
             <input type="password" name="confirmPassword" value={this.state.confirmPass} onChange={this.handleConfirmPasswordChange} placeholder="Confirm New Password"/>
-            <input type="submit" className="submit" name="commit" value="Set New Password" onClick={this.submitResetPassword}/>
+            <input type="submit" className="submit majorButton" name="commit" value="Set New Password" onClick={this.submitResetPassword}/>
           </form>
           {errorText}
-          <div className="forgotpass"><a href="/">Back to Login</a></div>
+          {messageText}
+          <div className="vPadding"><a href="/">Back to Login</a></div>
         </div>
       </div>
     );

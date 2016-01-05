@@ -1,3 +1,15 @@
+$silver : #A6DED9 !default;
+$gold : #DED9A6 !default;
+
+$highlight: #8b9ae0 !default;
+$selection: #8b9ae0 !default;
+
+//$board-bg : "../images/boards/grey.jpg" !default;
+//$board-bg : "../images/boards/BoardStoneBig.jpg" !default;
+$board-bg : "../images/boards/boardmarbletiled.png" !default;
+
+$board-size : 480px !default;
+$step-to-img : "../images/green-circle.png" !default;
 
 //Css file for the game client
 
@@ -96,6 +108,6 @@ table.moveList td + td{  /* 2nd column */
     font-size: 14px;
 }
 
-table.moveList tr.selected {
+table.moveList tr.selected  {
     background: $selection;
 }

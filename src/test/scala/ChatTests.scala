@@ -49,7 +49,7 @@ class ChatServletTests(_system: ActorSystem) extends TestKit(_system) with Scala
   val siteLogin = new SiteLogin(accounts,emailer,cryptEC,scheduler)(mainEC)
   val games = new Games(db,siteLogin.logins,scheduler,accounts,serverInstanceID)(mainEC)
   val chat = new ChatSystem(db,siteLogin.logins,actorSystem)(actorEC)
-  addServlet(new AccountServlet(siteLogin,mainEC), "/accounts/*")
+  addServlet(new AccountServlet(accounts,siteLogin,mainEC), "/accounts/*")
   addServlet(new ChatServlet(accounts,siteLogin,chat,games,scheduler,actorEC), "/*")
 
   val startTime = Timestamp.get

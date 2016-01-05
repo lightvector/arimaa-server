@@ -119,7 +119,7 @@ class ChatServlet(val accounts: Accounts, val siteLogin: SiteLogin, val chat: Ch
     IOTypes.ChatLine(
       id = line.id,
       channel = line.channel,
-      username = line.username,
+      username = line.user.name,
       timestamp = line.timestamp,
       event = line.event.toString,
       label = line.label,
