@@ -11,16 +11,16 @@ $selected-light-square : #00f !default;
 $light-trap : #f00 !default;
 $dark-trap : #f00 !default;
 
-$board-bg : "../images/boards/grey.jpg" !default;
+//$board-bg : "../images/boards/grey.jpg" !default;
 //$board-bg : "../images/boards/BoardStoneBig.jpg" !default;
-//$board-bg : "../images/boards/boardmarbletiled.png" !default;
+$board-bg : "../images/boards/boardmarbletiled.png" !default;
 
 $board-size : 480px !default;
 $step-to-img : "../images/green-circle.png" !default;
 
 $body-bg : #dddddd !default;
-$panel-bg : #444444 !default;
-$game-bg : #272727 !default;
+$panel-bg : #555555 !default;
+$game-bg : #888888 !default;
 
 $font-stack: 'Quattrocento Sans', sans-serif;
 $title-font-stack: 'Dosis', sans-serif;

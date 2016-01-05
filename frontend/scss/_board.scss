@@ -63,8 +63,8 @@ $step-to-img : "../images/green-circle.png" !default;
 //Movelist----------------------------------------------------------------------------
 
 table.moveList {
-    /*display: table;*/
-    background-color: #000;
+    border-width: 2px;
+    border-color: $panel-bg;
     height: 360px;
     width: 270px;
 }

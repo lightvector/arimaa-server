@@ -54,14 +54,7 @@ var component = React.createClass({
   },
 
   render: function() {
-    var color = "NONE";
-    if(this.state.myColor === ArimaaConstants.GAME.GOLD) {
-      color = "GOLD";
-    } else if(this.state.myColor === ArimaaConstants.GAME.SILVER) {
-      color = "SILVER";
-    }
-
-    var gameOverString = "In progress...";
+    var gameOverString = "";
     if(this.state.gameOver) {
       gameOverString = "winner: " + this.state.gameOver.winner + " reason: " + this.state.gameOver.reason;
     }
@@ -74,7 +67,7 @@ var component = React.createClass({
         <button onClick={this.flipBoard}>Flip Board</button>
         <button onClick={this.forfeit}>Forfeit</button>
         <br/>
-        <p/>{color}<br/>
+        <p/>{gameOverString}<br/>
       </div>
     );
   }

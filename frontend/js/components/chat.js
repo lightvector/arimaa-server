@@ -31,7 +31,7 @@ var chatBox = React.createClass({
       chatTable.scrollTop = chatTable.scrollHeight;
     }
   },
-  
+
   handleUserInputChange: function(e) {
     this.setState({userInput: e.target.value});
   },
@@ -51,12 +51,12 @@ var chatBox = React.createClass({
     this.setState({inputDisabled:false});
     var chatTable = ReactDOM.findDOMNode(this.refs.chatTable);
     chatTable.scrollTop = chatTable.scrollHeight;
-    ReactDOM.findDOMNode(this.refs.text).focus(); 
+    ReactDOM.findDOMNode(this.refs.text).focus();
   },
   onSubmitError: function(data) {
     this.setState({inputDisabled:false});
     this.setState({error:data.error});
-    ReactDOM.findDOMNode(this.refs.text).focus(); 
+    ReactDOM.findDOMNode(this.refs.text).focus();
   },
 
   doJoin: function() {
@@ -182,7 +182,7 @@ var chatBox = React.createClass({
         usersList = this.state.usersLoggedIn.map(function(user) {
           return that.renderUser(user);
         });
-      
+
       usersDiv = React.createElement("div", {key: "chatUsersDiv", className:"chatUsersDiv"}, usersList);
       usersDiv = React.createElement("div", {key: "chatLabeledUsersDiv", className:"chatLabeledUsersDiv uiPanel"}, [
         React.createElement("h4", {key: "chatUsersLoggedInLabel"}, "Users In Chatroom:"),
@@ -192,8 +192,7 @@ var chatBox = React.createClass({
 
     var chatLabel =
       this.props.params.chatChannel == "main" ?
-      React.createElement("h1", {key: "chatLabel"}, "Chat") :
-      React.createElement("h1", {key: "chatLabel"}, "In-game Chat");
+      React.createElement("h1", {key: "chatLabel"}, "Chat") : null;
 
     var contents = [
       chatLabel,
