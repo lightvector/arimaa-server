@@ -37,14 +37,12 @@ var Movelist = React.createClass({
     var currColor = (numMoves % 2 === 0) ? "g" : "s";
 
     return (
-      <div style={{height:'480px'}}>
-        <table className="moveList">
+      <table className="moveList">
         <tbody>
         {cells}
         <tr className={currColor} key="99"><td>{(Math.floor(numMoves/2)+1)+currColor+":"}</td><td>{this.state.ongoingMove}</td></tr>
         </tbody>
-        </table>
-      </div>
+      </table>
     );
   },
 

@@ -41,7 +41,7 @@ var _selSquareStack = []; //previous selected squares for undo/redo
 var _redoSquareStack = []; //used for undo/redo
 
 var _myColor = ArimaaConstants.GAME.NULL_COLOR; //spectators, or before we know what color we are
-var _viewSide = ArimaaConstants.GAME.GOLD; //can only be gold or silver (unless we want east/west views?)
+var _viewSide = ArimaaConstants.GAME.GOLD; //can only be gold or silver (unless we want east/west views?) //color on bottom moving up
 var _colorToMove = ArimaaConstants.GAME.NULL_COLOR; //in this context, null color === can't move
 var _gameOver = null;
 var _sequenceNum = 0;
@@ -94,15 +94,29 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
     return moves;
   },
 
+  getTopUserInfo: function() {
+    if(_gameState === null) return null;
+
+    if(_viewSide === ArimaaConstants.GAME.GOLD) {
+      return _gameState.meta.sUser;
+    } else {
+      return _gameState.meta.gUser;
+    }
+  },
+
+  getBottomUserInfo: function() {
+    if(_gameState === null) return null;
+
+    if(_viewSide === ArimaaConstants.GAME.GOLD) {
+      return _gameState.meta.gUser;
+    } else {
+      return _gameState.meta.sUser;
+    }
+  },
+
   //player should be "g" or "s"
   //wholeGame specifies whether it should be the time left for just this move or it should be the time on the clock for the whole game
   getClockRemaining: function(player,wholeGame) {
-    if(_gameState === null)
-      return null;
-    if(_gameState.meta.activeGameData === undefined)
-      //Doesn't quite work right for the time for the last move
-      //return (player == "g") ? Utils.gClockForEndedGame(_gameState) : Utils.sClockForEndedGame(_gameState);
-      return null;
     var baseClock = (player == "g") ? _gameState.meta.activeGameData.gClockBeforeTurn : _gameState.meta.activeGameData.sClockBeforeTurn;
     if(_gameState.toMove != player)
       return baseClock;
@@ -119,6 +133,28 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
     if(!wholeGame && tc.maxMoveTime !== undefined)
       clock = Math.min(clock, tc.maxMoveTime - timeSpent);
     return clock;
+  },
+
+  getTopClockRemaining: function(wholeGame) {
+    if(_gameState === null) return null;
+    if(_gameState.meta.activeGameData === undefined) return null;
+
+    if(_viewSide === ArimaaConstants.GAME.GOLD) {
+      return this.getClockRemaining("s", wholeGame);
+    } else {
+      return this.getClockRemaining("g", wholeGame);
+    }
+  },
+
+  getBottomClockRemaining: function(wholeGame) {
+    if(_gameState === null) return null;
+    if(_gameState.meta.activeGameData === undefined) return null;
+
+    if(_viewSide === ArimaaConstants.GAME.GOLD) {
+      return this.getClockRemaining("g", wholeGame);
+    } else {
+      return this.getClockRemaining("s", wholeGame);
+    }
   },
 
   getSeletedSquare: function() {
@@ -173,7 +209,7 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
     _selSquareName = "";
     _validSteps = [];
   },
-  
+
   dispatcherIndex: ArimaaDispatcher.register(function(action) {
 
     function _setSelectedSquare(square) {
@@ -218,7 +254,7 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
       _lastStateReceivedTime = Utils.currentTimeSeconds();
       var crazyTimeSpan = 1200; //20 minutes
       var estimatedTimeOffset = _lastStateReceivedTime - _gameState.meta.now;
-      
+
       //Figure out the offset we are from the server based by taking a min over all of the time offsets we've seen
       //so far, except that if the difference is crazy, then forget history and take the new value
       if(_localTimeOffsetFromServer === null
@@ -327,7 +363,7 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
         if(!_arimaa.is_empty(action.squareName)) {
           _setSelectedSquare(action);
           ArimaaStore.emitChange();
-        }        
+        }
       }
       break;
 
@@ -345,12 +381,12 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
         ArimaaStore.emitChange();
       }
       break;
-      
+
     case ArimaaConstants.ACTIONS.GAME_CLICK_SQUARE:
       //Do nothing unless we're one of the players AND it's our turn
       if(_myColor === ArimaaConstants.GAME.NULL_COLOR || _myColor !== _colorToMove)
         break;
-      
+
       //GOLD SETUP----------------------------------------------------------------
       if(_setupColor === ArimaaConstants.GAME.GOLD) {
         if(action.squareNum < 48) { //TODO ideally, we wouldn't use these magic numbers
@@ -378,7 +414,7 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
         }
       }
       //REGULAR GAME---------------------------------------------------------------
-      else {      
+      else {
         //TODO USE IF_EMPTY FUNCTION AFTER UPDATING ARIMAAJS
         if (_selSquareNum === action.squareNum) {
           //Deselect the current square if we clicked it again and we're in click-click mode
@@ -421,15 +457,6 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
         _setSelectedSquare({squareNum:undo.squareNum,squareName:undo.square});
         ArimaaStore.emitChange();
       }
-
-      /*
-      var s = _selSquareStack.pop();
-      _arimaa.undo_step(); //check to see if we have a step to undo
-      if(s) {
-        _setSelectedSquare(s);
-        _redoSquareStack.push(s);
-      }
-      ArimaaStore.emitChange();*/
       break;
     case ArimaaConstants.ACTIONS.GAME_REDO_STEP:
       var redo = _arimaa.redo_step();
@@ -437,16 +464,6 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
         _setSelectedSquare({squareNum:redo.destSquareNum,squareName:redo.destSquare});
         ArimaaStore.emitChange();
       }
-      /*
-      var s = _redoSquareStack.pop();
-      console.log('redo');
-      console.log(s);
-      console.log(_redoSquareStack);
-      if(s) {
-        _arimaa.redo_step();
-        _setSelectedSquare(s);
-        //_undoStepStack.push(s);
-      }*/
       ArimaaStore.emitChange();
       break;
     case ArimaaConstants.ACTIONS.GAME_REDO_MOVE:
@@ -489,6 +506,9 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
       _viewSide = ArimaaConstants.GAME.reverseColor(_viewSide);
       _setSelectedSquareToNull();
       ArimaaStore.emitChange();
+      break;
+    case ArimaaConstants.ACTIONS.GAME_FORFEIT:
+      APIUtils.forfeitGame(action.gameID, _gameAuth,ArimaaStore.sendMoveToServerSuccess,ArimaaStore.sendMoveToServerError);
       break;
     default:
       break;

@@ -1,6 +1,10 @@
 
 //Css file for the game client
 
+.sidepane {
+  float: left;
+}
+
 //Board display----------------------------------------------------------------------
 
 .board {
@@ -48,11 +52,11 @@
 
 table.moveList {
     /*display: table;*/
+    background-color: #000;
     height: 360px;
     width: 270px;
 }
 table.moveList thead, table.moveList tbody {
-	float: left;
 	width: 100%;
 }
 table.moveList tbody {

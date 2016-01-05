@@ -132,6 +132,10 @@ var APIUtils = {
     POST('/api/games/'+gameID+'/actions/leave', {gameAuth:gameAuth}, success, error);
   },
 
+  forfeitGame: function(gameID, gameAuth, success, error) {
+    POST('/games/'+gameID+'/actions/resign', {gameAuth:gameAuth}, success, error);
+  },
+
   gameState: function(gameID, seq, success, error) {
     GET('/api/games/'+gameID+'/state', {minSequence:seq}, success, error);
   },
