@@ -144,7 +144,7 @@ var APIUtils = {
   },
 
   forfeitGame: function(gameID, gameAuth, success, error) {
-    POST('/games/'+gameID+'/actions/resign', {gameAuth:gameAuth}, success, error);
+    POST('/api/games/'+gameID+'/actions/resign', {gameAuth:gameAuth}, success, error);
   },
 
   gameState: function(gameID, seq, success, error) {

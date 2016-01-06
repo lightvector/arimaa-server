@@ -94,29 +94,30 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
     return moves;
   },
 
-  getTopUserInfo: function() {
+
+  getUserInfo: function(player) {
     if(_gameState === null) return null;
 
-    if(_viewSide === ArimaaConstants.GAME.GOLD) {
+    if((player === "top" && _viewSide === ArimaaConstants.GAME.GOLD) ||
+     (player === "bottom" && _viewSide === ArimaaConstants.GAME.SILVER)) {
       return _gameState.meta.sUser;
     } else {
       return _gameState.meta.gUser;
     }
   },
 
-  getBottomUserInfo: function() {
-    if(_gameState === null) return null;
-
-    if(_viewSide === ArimaaConstants.GAME.GOLD) {
-      return _gameState.meta.gUser;
-    } else {
-      return _gameState.meta.sUser;
-    }
-  },
-
-  //player should be "g" or "s"
+  //player should be "top" or "bottom"
   //wholeGame specifies whether it should be the time left for just this move or it should be the time on the clock for the whole game
   getClockRemaining: function(player,wholeGame) {
+    if(_gameState === null) return null;
+
+    if((player === "top" && _viewSide === ArimaaConstants.GAME.GOLD) ||
+     (player === "bottom" && _viewSide === ArimaaConstants.GAME.SILVER)) {
+      player = "s";
+    } else {
+      player = "g";
+    }
+
     var baseClock = (player == "g") ? _gameState.meta.activeGameData.gClockBeforeTurn : _gameState.meta.activeGameData.sClockBeforeTurn;
     if(_gameState.toMove != player)
       return baseClock;
@@ -133,28 +134,6 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
     if(!wholeGame && tc.maxMoveTime !== undefined)
       clock = Math.min(clock, tc.maxMoveTime - timeSpent);
     return clock;
-  },
-
-  getTopClockRemaining: function(wholeGame) {
-    if(_gameState === null) return null;
-    if(_gameState.meta.activeGameData === undefined) return null;
-
-    if(_viewSide === ArimaaConstants.GAME.GOLD) {
-      return this.getClockRemaining("s", wholeGame);
-    } else {
-      return this.getClockRemaining("g", wholeGame);
-    }
-  },
-
-  getBottomClockRemaining: function(wholeGame) {
-    if(_gameState === null) return null;
-    if(_gameState.meta.activeGameData === undefined) return null;
-
-    if(_viewSide === ArimaaConstants.GAME.GOLD) {
-      return this.getClockRemaining("g", wholeGame);
-    } else {
-      return this.getClockRemaining("s", wholeGame);
-    }
   },
 
   getSeletedSquare: function() {

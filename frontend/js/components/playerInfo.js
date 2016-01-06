@@ -9,15 +9,15 @@ var Utils = require('../utils/Utils.js');
 var GameClock = React.createClass({
   getInitialState: function() {
     return {
-      clock: ArimaaStore.getTopClockRemaining(false),
-      playerInfo: ArimaaStore.getTopUserInfo()
+      clock: ArimaaStore.getClockRemaining(this.props.pos, false),
+      playerInfo: ArimaaStore.getUserInfo(this.props.pos)
     };
   },
 
   _onChange: function() {
     this.setState({
-      clock: ArimaaStore.getTopClockRemaining(false),
-      playerInfo: ArimaaStore.getTopUserInfo()
+      clock: ArimaaStore.getClockRemaining(this.props.pos, false),
+      playerInfo: ArimaaStore.getUserInfo(this.props.pos)
     });
   },
 
@@ -32,7 +32,6 @@ var GameClock = React.createClass({
   },
 
   render: function() {
-    //console.log(ArimaaStore.getGameState());
     var clock = this.state.clock;
     var formatted = "-:--";
     if(clock !== null)
@@ -40,13 +39,23 @@ var GameClock = React.createClass({
 
     var userInfoString = Utils.userDisplayStr(this.state.playerInfo);
 
-    return (
-      <div className={"topPlayerInfo"}>
-        {formatted}
-        <br/>
-        {userInfoString}
-      </div>
-    );
+    if(this.props.pos === "top") {
+      return (
+        <div className={"topPlayerInfo"}>
+          {formatted}
+          <br/>
+          {userInfoString}
+        </div>
+      );
+    } else {
+      return (
+        <div className={"bottomPlayerInfo"}>
+          {userInfoString}
+          <br/>
+          {formatted}
+        </div>
+      );
+    }
   }
 
 });
