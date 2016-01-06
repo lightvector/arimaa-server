@@ -139,7 +139,7 @@ var ArimaaActions = {
         actionType: ArimaaConstants.ACTIONS.GAME_SETUP_OVER
       });
     }
-    
+
     setTimeout(ArimaaActions.startGameStateLoop, SiteConstants.VALUES.GAME_STATE_LOOP_DELAY * 1000);
   },
   gameStateError: function(gameID,gameAuth,data) {
@@ -240,6 +240,13 @@ var ArimaaActions = {
   flipBoard: function() {
     ArimaaDispatcher.dispatch({
       actionType: ArimaaConstants.ACTIONS.GAME_FLIP_BOARD
+    });
+  },
+
+  resign: function(gameID) {
+    ArimaaDispatcher.dispatch({
+      actionType: ArimaaConstants.ACTIONS.GAME_RESIGN,
+      gameID: gameID
     });
   },
 

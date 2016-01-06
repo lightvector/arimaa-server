@@ -28,7 +28,8 @@ var component = React.createClass({
     var user = a+a+a;
     var pass = user+user;
     var email = a+'@'+a;
-    SiteActions.register(user, email, pass);
+    var priorRating = "";
+    SiteActions.register(user, email, pass, priorRating);
   },
 
   register: function() {

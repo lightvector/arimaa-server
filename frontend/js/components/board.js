@@ -8,7 +8,7 @@ var ArimaaConstants = require('../constants/ArimaaConstants.js');
 function getGameState() {
   var boardState = {
     fen: ArimaaStore.getArimaa().get_fen(),
-    stepFrom: ArimaaStore.getSeletedSquare().num, //TODO need to change this name
+    stepFrom: ArimaaStore.getSeletedSquare().name, //TODO need to change this name
     steps: ArimaaStore.getValidSteps(),
     viewSide: ArimaaStore.getViewSide(),
     setupColor: ArimaaStore.getSetupColor(),
@@ -21,7 +21,7 @@ var Board = React.createClass({
   getInitialState: function() {
     return {
       fen: ArimaaStore.getArimaa().get_fen(),
-      stepFrom: ArimaaConstants.GAME.NULL_SQUARE_NUM,
+      stepFrom: "",//ArimaaConstants.GAME.NULL_SQUARE_NUM,
       steps: [],
       viewSide: ArimaaStore.getViewSide(),
       setupColor: ArimaaStore.getSetupColor(),
@@ -65,7 +65,7 @@ var Board = React.createClass({
     const files = "abcdefgh";
     var squareName =  files.charAt(x)+ranks.charAt(y);
 
-    var selected = (this.state.stepFrom === i);
+    var selected = (this.state.stepFrom === squareName);
     var piece = (p !== ' ') ? (<Piece pieceName={p}/>) : null;
 
     var stepTo = false;

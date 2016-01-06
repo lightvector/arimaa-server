@@ -126,6 +126,8 @@ var Utils = {
   },
 
   userDisplayStr: function(userInfo) {
+    if(userInfo === null) return "";
+
     var displayStr = userInfo.name;
     var ratingStr = "" + Math.round(userInfo.rating);
 

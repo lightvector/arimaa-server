@@ -5,7 +5,10 @@ var ArimaaActions = require('../actions/ArimaaActions.js');
 var ArimaaConstants = require('../constants/ArimaaConstants.js');
 
 function getGameState() {
-  return {moves: ArimaaStore.getMoveList()};
+  return {
+    moves: ArimaaStore.getMoveList(),
+    ongoingMove: ArimaaStore.getOngoingMove()
+  };
 }
 
 var Movelist = React.createClass({
@@ -30,13 +33,16 @@ var Movelist = React.createClass({
       //var moveStr = m;
       return (<tr className={color} key={i}><td>{plyNum+color+":"}</td><td>{moveStr}</td></tr>);
     });
+    var numMoves = this.state.moves.length;
+    var currColor = (numMoves % 2 === 0) ? "g" : "s";
 
     return (
-      <div style={{height:'480px'}}>
-        <table className="moveList">
+      <table className="moveList">
+        <tbody>
         {cells}
-        </table>
-      </div>
+        <tr className={currColor} key="99"><td>{(Math.floor(numMoves/2)+1)+currColor+":"}</td><td>{this.state.ongoingMove}</td></tr>
+        </tbody>
+      </table>
     );
   },
 

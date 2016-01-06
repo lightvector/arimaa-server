@@ -12,7 +12,10 @@ function POST(url, data, success, error) {
     contentType: 'application/json; charset=utf-8',
     data: JSON.stringify(data),
     success: function(received, textStatus, xhr) {
-      if(PRINT_DATA) { console.log("timestamp: " + Date.now() + "\nurl: " + url + "\ndata: " + data + "\nreceived: ", received);}
+
+      if(PRINT_DATA) {
+        console.log("timestamp: " + Date.now() + "\nurl: " + url + "\ndata: " + data + "\nreceived: ", received);
+      }
 
       if('error' in received) {
         error(received);
@@ -124,7 +127,7 @@ var APIUtils = {
   getNotifications: function(username, success, error) {
     GET('/api/accounts/' + username + '/' + UserStore.siteAuthToken() + "/notifications", {}, success, error);
   },
-  
+
   createGame: function(options, success, error) {
     console.log('creating game ',options);
     POST('/api/games/actions/create', options, success, error);
@@ -138,6 +141,10 @@ var APIUtils = {
   leaveGame: function(gameID, gameAuth, success, error) {
     console.log('leaving game ', gameID);
     POST('/api/games/'+gameID+'/actions/leave', {gameAuth:gameAuth}, success, error);
+  },
+
+  resignGame: function(gameID, gameAuth, success, error) {
+    POST('/api/games/'+gameID+'/actions/resign', {gameAuth:gameAuth}, success, error);
   },
 
   gameState: function(gameID, seq, success, error) {

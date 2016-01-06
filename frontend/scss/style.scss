@@ -1,6 +1,11 @@
+$silver : #A6DED9 !default;
+$gold : #DED9A6 !default;
+
+$highlight: #8b9ae0 !default;
+$selection: #8b9ae0 !default;
 
 $body-bg : #dddddd !default;
-$panel-bg : #444444 !default;
+$panel-bg : #505050 !default;
 $game-bg : #272727 !default;
 
 $font-stack: 'Quattrocento Sans', sans-serif;
@@ -47,7 +52,7 @@ footer {
   text-align: center;
   position: absolute;
   left: 50%;
-  transform: translate(-50%,-50%);  
+  transform: translate(-50%,-50%);
   bottom: 0px;
   z-index: -1;
 }

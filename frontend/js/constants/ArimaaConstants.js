@@ -29,7 +29,8 @@ var ACTIONS = keyMirror({
   GAME_COMPLETE_MOVE: null,
   GAME_ADD_MOVE: null,
   GAME_FLIP_BOARD: null,
-  GAME_SET_COLOR: null
+  GAME_SET_COLOR: null,
+  GAME_RESIGN: null
 });
 
 const PIECES = {

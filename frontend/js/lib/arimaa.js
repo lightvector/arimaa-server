@@ -153,7 +153,7 @@ var Arimaa = function(options) {
 
   function redo_step() {
     if(stepStack.length === 0) return null;
-    return add_step(stepStack.pop()['string']);
+    return add_step(stepStack[stepStack.length-1].string).step; //we actually pop the step in the add_step function
   }
 
   function undo_ongoing_move() {
@@ -528,7 +528,7 @@ var Arimaa = function(options) {
         steps.push(ArimaaStep(piece, squareNum, 'w'));
         //steps.push({piece:piece,squareNum:squareNum,direction:'w',string:pieceName+location+'w'});
     } else { //enemy piece
-      if(can_be_pushed(squareNum)) {
+      if(can_be_pushed(squareNum) && stepsLeft > 1) {
         if ((((squareNum + DIRECTIONS.NORTH) & 0x88) === 0) && (board[squareNum+DIRECTIONS.NORTH] === EMPTY))
           steps.push(ArimaaStep(piece, squareNum, 'n'));
           //steps.push({piece:piece,squareNum:squareNum,direction:'n',string:pieceName+location+'n'});
@@ -734,7 +734,7 @@ var Arimaa = function(options) {
     if(board[squareNum] === EMPTY) return NULL_COLOR;
     return (board[squareNum] & COLOR);
   }
-          
+
 
   function ascii() {
     var s = ' +-----------------+\n';
@@ -870,6 +870,14 @@ var Arimaa = function(options) {
       return can_be_pushed(squareNum);
     },
 
+    get_ongoing_move: function() {
+			return ongoingMove;
+		},
+
+		get_ongoing_move_string: function() {
+			return ongoingMove.map(function(m) {return m.string;}).join(' ');
+		},
+
     //TODO TEST THIS!!!!
     get_turn_name: function() {
       var c = halfmoveNumber % 2 ? 's' : 'g';
@@ -950,6 +958,7 @@ var Arimaa = function(options) {
       console.log(ascii());
     },
 
+    //TODO: Implement this
     clear: function() {
       return null;
     },

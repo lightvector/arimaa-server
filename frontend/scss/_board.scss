@@ -1,6 +1,3 @@
-$silver : #A6DED9 !default;
-$gold : #DED9A6 !default;
-
 $highlight: #8b9ae0 !default;
 $selection: #8b9ae0 !default;
 
@@ -12,6 +9,10 @@ $board-size : 480px !default;
 $step-to-img : "../images/green-circle.png" !default;
 
 //Css file for the game client
+
+.sidepane {
+  float: left;
+}
 
 //Board display----------------------------------------------------------------------
 
@@ -59,12 +60,12 @@ $step-to-img : "../images/green-circle.png" !default;
 //Movelist----------------------------------------------------------------------------
 
 table.moveList {
-    /*display: table;*/
+    border-width: 2px;
+    border-color: $panel-bg;
     height: 360px;
     width: 270px;
 }
 table.moveList thead, table.moveList tbody {
-	float: left;
 	width: 100%;
 }
 table.moveList tbody {

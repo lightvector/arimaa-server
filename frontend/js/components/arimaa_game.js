@@ -5,6 +5,8 @@ var GameClock = require('./gameClock.js');
 var ArimaaActions = require('../actions/ArimaaActions.js');
 var DebugComp = require('./boardDebugComponent.js');
 var Chat = require('../components/chat.js');
+var PlayerInfo = require('../components/playerInfo.js');
+var BoardButtons = require('../components/boardButtons.js');
 
 var Game = React.createClass({
 
@@ -14,14 +16,20 @@ var Game = React.createClass({
 
   render: function() {
     return (
-      <div>
-        <Board gameID={this.props.params.gameID}/>
-        <Movelist gameID={this.props.params.gameID}/>
-        <GameClock player="g"/>
-        <GameClock player="s"/>
-        <Chat params={{chatChannel:"game/"+this.props.params.gameID}}/>
-        <DebugComp gameID={this.props.params.gameID}/>
-      </div>
+
+        <div>
+          <div>
+            <Board gameID={this.props.params.gameID}/>
+
+            <div className="sidepane">
+              <PlayerInfo pos={"top"}/>
+              <Movelist gameID={this.props.params.gameID}/>
+              <PlayerInfo pos={"bottom"}/>
+              <BoardButtons gameID={this.props.params.gameID}/>
+            </div>
+          </div>
+          <Chat params={{chatChannel:"game/"+this.props.params.gameID}}/>
+        </div>
     );
   }
 });
