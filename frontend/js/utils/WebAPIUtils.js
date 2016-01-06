@@ -143,7 +143,7 @@ var APIUtils = {
     POST('/api/games/'+gameID+'/actions/leave', {gameAuth:gameAuth}, success, error);
   },
 
-  forfeitGame: function(gameID, gameAuth, success, error) {
+  resignGame: function(gameID, gameAuth, success, error) {
     POST('/api/games/'+gameID+'/actions/resign', {gameAuth:gameAuth}, success, error);
   },
 

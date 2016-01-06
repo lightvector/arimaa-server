@@ -49,8 +49,8 @@ var component = React.createClass({
     ArimaaActions.flipBoard();
   },
 
-  forfeit: function() {
-    ArimaaActions.forfeit(this.props.gameID);
+  resign: function() {
+    ArimaaActions.resign(this.props.gameID);
   },
 
   render: function() {
@@ -65,7 +65,7 @@ var component = React.createClass({
         <button onClick={this.undoStep}>Undo Step</button>
         <button onClick={this.redoStep}>Redo Step</button>
         <button onClick={this.flipBoard}>Flip Board</button>
-        <button onClick={this.forfeit}>Forfeit</button>
+        <button onClick={this.resign}>Resign</button>
         <br/>
         <p/>{gameOverString}<br/>
       </div>

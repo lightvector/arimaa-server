@@ -243,9 +243,9 @@ var ArimaaActions = {
     });
   },
 
-  forfeit: function(gameID) {
+  resign: function(gameID) {
     ArimaaDispatcher.dispatch({
-      actionType: ArimaaConstants.ACTIONS.GAME_FORFEIT,
+      actionType: ArimaaConstants.ACTIONS.GAME_RESIGN,
       gameID: gameID
     });
   },

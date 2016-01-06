@@ -486,8 +486,8 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
       _setSelectedSquareToNull();
       ArimaaStore.emitChange();
       break;
-    case ArimaaConstants.ACTIONS.GAME_FORFEIT:
-      APIUtils.forfeitGame(action.gameID, _gameAuth,ArimaaStore.sendMoveToServerSuccess,ArimaaStore.sendMoveToServerError);
+    case ArimaaConstants.ACTIONS.GAME_RESIGN:
+      APIUtils.resignGame(action.gameID, _gameAuth,ArimaaStore.sendMoveToServerSuccess,ArimaaStore.sendMoveToServerError);
       break;
     default:
       break;
