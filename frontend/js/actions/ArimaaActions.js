@@ -25,11 +25,13 @@ var ArimaaActions = {
       actionType: ArimaaConstants.ACTIONS.GAME_STATE,
       data:data
     });
-    //Check if we're part of this game. If so, then join the game and begin heartbeating
+    //Check if we're part of this game and the game is not finished. If so, then join the game and begin heartbeating
     var username = UserStore.getUsername();
-    if((data.meta.gUser !== undefined && data.meta.gUser.name == username) ||
-       (data.meta.sUser !== undefined && data.meta.sUser.name == username)) {
-      ArimaaActions.joinAndStartHeartbeatLoop(data.meta.gameID);
+    if(data.meta.result === undefined) {
+      if((data.meta.gUser !== undefined && data.meta.gUser.name == username) ||
+         (data.meta.sUser !== undefined && data.meta.sUser.name == username)) {
+        ArimaaActions.joinAndStartHeartbeatLoop(data.meta.gameID);
+      }
     }
     //Regardless of whether we're a player in this game or not, begin state update loop
     ArimaaActions.startGameStateLoop();
