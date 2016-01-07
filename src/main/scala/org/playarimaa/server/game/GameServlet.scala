@@ -46,6 +46,7 @@ object GameServlet {
     case class GameResult(
       winner: String,
       reason: String,
+      lastMoveStartTime: Double,
       endTime: Double,
       countForStats: Boolean
     )
@@ -465,6 +466,7 @@ class GameServlet(val accounts: Accounts, val siteLogin: SiteLogin, val games: G
         else Some(IOTypes.GameResult(
           winner = data.meta.result.winner.map(_.toString).getOrElse("n"),
           reason = data.meta.result.reason.toString,
+          lastMoveStartTime = data.meta.result.lastMoveStartTime,
           endTime = data.meta.result.endTime,
           countForStats = data.meta.result.countForStats
         ))

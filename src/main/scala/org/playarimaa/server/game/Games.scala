@@ -423,7 +423,7 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker,
   private var reservedGameIDs: Set[GameID] = Set()
 
   //Throttles the rate that games can be created by a user
-  private val createBuckets: TimeBuckets[Username] = new TimeBuckets(Games.CREATE_BUCKET_CAPACITY, Games.CREATE_BUCKET_FILL_PER_SEC) 
+  private val createBuckets: TimeBuckets[Username] = new TimeBuckets(Games.CREATE_BUCKET_CAPACITY, Games.CREATE_BUCKET_FILL_PER_SEC)
 
   /* Returns true if there is an open game with this id */
   def gameExists(id: GameID): Boolean = this.synchronized {
@@ -526,7 +526,7 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker,
       postal = tcs.exists(_.isPostal),
       gameType = gameType,
       tags = List(),
-      result = GameUtils.unfinishedResult(now),
+      result = GameUtils.unfinishedResult(lastMoveStartTime=now,endTime=now),
       position = (new Board()).toStandardString,
       serverInstanceID = serverInstanceID
     )
@@ -592,7 +592,7 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker,
               throw new Exception("Game cannot be restarted because it ended for reason " + meta.result.reason)
             val now = Timestamp.get
             val newMeta = meta.copy(
-              result = GameUtils.unfinishedResult(now),
+              result = GameUtils.unfinishedResult(lastMoveStartTime=now,endTime=now),
               serverInstanceID = serverInstanceID
             )
             val game = OpenGameData (
@@ -930,7 +930,7 @@ class ActiveGames(val db: Database, val scheduler: Scheduler,
     var meta: GameMetadata = data.meta.copy(
       startTime = data.meta.startTime.orElse(Some(now)),
       users = data.users,
-      result = data.meta.result.copy(endTime = now),
+      result = data.meta.result.copy(lastMoveStartTime = now, endTime = now),
       serverInstanceID = serverInstanceID
     )
 
@@ -941,6 +941,7 @@ class ActiveGames(val db: Database, val scheduler: Scheduler,
         now = Timestamp.get
         meta = meta.copy(
           result = meta.result.copy(
+            lastMoveStartTime = now,
             endTime = now
           )
         )
@@ -1268,11 +1269,11 @@ class ActiveGame(
     gameOver && metaSaveFinished.isCompleted && moveSaveFinished.isCompleted
   }
 
-  private def declareWinner(winner: Player, reason: EndingReason, now: Timestamp): Unit = this.synchronized {
+  private def declareWinner(winner: Player, reason: EndingReason, lastMoveStartTime: Timestamp, endTime: Timestamp): Unit = this.synchronized {
     //Only count a game for statistics and ratings if the player who lost made at least one move
     val countForStats = (winner == GOLD && meta.numPly >= 1) || (winner == SILV && meta.numPly >= 2)
 
-    meta = meta.copy(result = GameResult(winner = Some(winner), reason = reason, endTime = now, countForStats = countForStats))
+    meta = meta.copy(result = GameResult(winner = Some(winner), reason = reason, lastMoveStartTime = lastMoveStartTime, endTime = endTime, countForStats = countForStats))
     timeLossCheckEvent.foreach(_.cancel)
     saveMetaToDB()
 
@@ -1337,7 +1338,7 @@ class ActiveGame(
   /* Directly set the game result for a loss by time, unless the game is already ended for another reason. */
   private def doLoseByTime(now: Timestamp): Unit = this.synchronized {
     if(!gameOver) {
-      declareWinner(getNextPlayer.flip, EndingReason.TIME, now)
+      declareWinner(getNextPlayer.flip, EndingReason.TIME, lastMoveStartTime = moveStartTime, endTime = now)
       onTimeLoss()
     }
   }
@@ -1372,7 +1373,7 @@ class ActiveGame(
       if(tryLoseByTime(clock,timeSpent,now))
         Failure(new Exception("Game is over"))
       else {
-        declareWinner(player.flip, EndingReason.RESIGNATION, now)
+        declareWinner(player.flip, EndingReason.RESIGNATION, lastMoveStartTime = moveStartTime, endTime = now)
         Success(())
       }
     }
@@ -1398,7 +1399,7 @@ class ActiveGame(
           else {
             meta = meta.copy(
               numPly = plyNum + 1,
-              result = meta.result.copy(endTime = now),
+              result = meta.result.copy(lastMoveStartTime = now, endTime = now),
               position = newGame.currentBoardString
             )
             moves = moves :+ MoveInfo(
@@ -1423,7 +1424,7 @@ class ActiveGame(
                   case Game.ELIMINATION => EndingReason.ELIMINATION
                   case Game.IMMOBILIZATION => EndingReason.IMMOBILIZATION
                 }
-                declareWinner(winner, reason, now)
+                declareWinner(winner, reason, lastMoveStartTime = moveStartTime, endTime = now)
             }
 
             scheduleNextTimeLossCheck(now)
@@ -1519,11 +1520,12 @@ object GameUtils {
 
   /* The game result entered into the database for any unfinished game so that in case the
    * server goes down, any game active at that time appears this way without a winner. */
-  def unfinishedResult(now: Timestamp): GameResult =
+  def unfinishedResult(lastMoveStartTime: Timestamp, endTime: Timestamp): GameResult =
     GameResult(
       winner = None,
       reason = EndingReason.INTERRUPTED,
-      endTime = now,
+      lastMoveStartTime = lastMoveStartTime,
+      endTime = endTime,
       //Without a winner, we won't count ratings for this game even if it's rated, and setting this true
       //makes it more easily noticeable on a user's game history
       countForStats = true
@@ -1601,6 +1603,7 @@ class GameTable(tag: Tag) extends Table[GameMetadata](tag, "gameTable") {
 
   def winner : Rep[Option[Player]] = column[Option[Player]]("winner")
   def reason : Rep[String] = column[String]("reason")
+  def lastMoveStartTime : Rep[Timestamp] = column[Timestamp]("endMSTime")
   def endTime : Rep[Timestamp] = column[Timestamp]("endTime")
   def countForStats : Rep[Boolean] = column[Boolean]("countForStats")
 
@@ -1632,7 +1635,7 @@ class GameTable(tag: Tag) extends Table[GameMetadata](tag, "gameTable") {
     (gInitialTime,gIncrement,gDelay,gMaxReserve,gMaxMoveTime,gOvertimeAfter),
     (sInitialTime,sIncrement,sDelay,sMaxReserve,sMaxMoveTime,sOvertimeAfter),
     rated,postal,gameType,tags,
-    (winner,reason,endTime,countForStats),
+    (winner,reason,lastMoveStartTime,endTime,countForStats),
     position,
     serverInstanceID
   ).shaped <> (
@@ -1642,7 +1645,7 @@ class GameTable(tag: Tag) extends Table[GameMetadata](tag, "gameTable") {
       sInfo,
       gTC,
       sTC,rated,postal,gameType,tags,
-      (winner,reason,endTime,countForStats),
+      (winner,reason,lastMoveStartTime,endTime,countForStats),
       position,
       serverInstanceID) =>
       GameMetadata(id,numPly,startTime,
@@ -1655,7 +1658,7 @@ class GameTable(tag: Tag) extends Table[GameMetadata](tag, "gameTable") {
           silv = (TimeControl.apply _).tupled.apply(sTC)
         ),
         rated,postal,GameType.ofString(gameType).get,tags,
-        GameResult.tupled.apply((winner,EndingReason.ofString(reason).get,endTime,countForStats)),
+        GameResult.tupled.apply((winner,EndingReason.ofString(reason).get,lastMoveStartTime,endTime,countForStats)),
         position,
         serverInstanceID
       )
@@ -1669,7 +1672,7 @@ class GameTable(tag: Tag) extends Table[GameMetadata](tag, "gameTable") {
         TimeControl.unapply(g.tcs(GOLD)).get,
         TimeControl.unapply(g.tcs(SILV)).get,
         g.rated,g.postal,g.gameType.toString,g.tags,
-        (g.result.winner,g.result.reason.toString,g.result.endTime,g.result.countForStats),
+        (g.result.winner,g.result.reason.toString,g.result.lastMoveStartTime,g.result.endTime,g.result.countForStats),
         g.position,
         g.serverInstanceID
       ))
