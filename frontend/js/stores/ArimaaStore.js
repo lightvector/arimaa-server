@@ -118,6 +118,15 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
       player = "g";
     }
 
+    if(_gameState.meta.activeGameData === undefined) {
+      //An open game - don't display any clocks
+      if(_gameState.meta.result === undefined)
+        return null;
+      //An ended game - display the ended time
+      else
+        return Utils.clockRecomputeDirectly(player,_gameState);
+    }
+
     var baseClock = (player == "g") ? _gameState.meta.activeGameData.gClockBeforeTurn : _gameState.meta.activeGameData.sClockBeforeTurn;
     if(_gameState.toMove != player)
       return baseClock;

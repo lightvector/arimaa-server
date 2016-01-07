@@ -38,11 +38,22 @@ var Utils = {
     return clock;
   },
 
-  gClockForEndedGame: function(gameState) {
-    var tc = gameState.meta.gTC;
+  //Recompute the current clock of the specified player as of the snapshot of the gameState from
+  //scratch based on all the times recorded in the gameState
+  clockRecomputeDirectly: function(player,gameState) {
+    var tc = player == "g" ? gameState.meta.gTC : gameState.meta.sTC;
     var clock = tc.initialTime;
-    for(var i = 0; i < gameState.moveTimes.length; i += 2) {
+    var i = (player == "g" ? 0 : 1);
+    for(; i < gameState.moveTimes.length; i += 2) {
       var timeSpent = gameState.moveTimes[i].time - gameState.moveTimes[i].start;
+      clock = Utils.clockAfterTurn(clock,timeSpent,i/2,tc);
+    }
+    if(gameState.toMove == player) {
+      var timeSpent = 0;
+      if(gameState.meta.activeGameData !== undefined)
+        timeSpent = gameState.meta.activeGameData.timeSpent;
+      else if(gameState.meta.result !== undefined)
+        timeSpent = gameState.meta.result.endTime - gameState.meta.result.lastMoveStartTime;
       clock = Utils.clockAfterTurn(clock,timeSpent,i/2,tc);
     }
     return clock;
@@ -160,7 +171,7 @@ var Utils = {
       }, 3000);
     }
   },
-  
+
   //Initialize an onFocusHandler for the window
   onFocusTriggers: [],
   initWindowOnFocus: function() {
@@ -177,12 +188,12 @@ var Utils = {
   },
 
   scheduleOnNextFocus: function(f) {
-    if(document.hasFocus()) 
+    if(document.hasFocus())
       setTimeout(f,0);
     else
       Utils.onFocusTriggers.push(f);
   },
-  
+
   setSetting: function(key,value) {
     localStorage.setItem(key,value);
   },

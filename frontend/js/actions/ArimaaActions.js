@@ -21,15 +21,14 @@ var ArimaaActions = {
     APIUtils.gameState(gameID, 0, ArimaaActions.initialStateSuccess, ArimaaActions.initialStateError);
   },
   initialStateSuccess: function(data) {
-    ArimaaDispatcher.dispatch({
-      actionType: ArimaaConstants.ACTIONS.GAME_STATE,
-      data:data
-    });
-    //Check if we're part of this game. If so, then join the game and begin heartbeating
+    ArimaaActions.dispatchGameState(data);
+    //Check if we're part of this game and the game is not finished. If so, then join the game and begin heartbeating
     var username = UserStore.getUsername();
-    if((data.meta.gUser !== undefined && data.meta.gUser.name == username) ||
-       (data.meta.sUser !== undefined && data.meta.sUser.name == username)) {
-      ArimaaActions.joinAndStartHeartbeatLoop(data.meta.gameID);
+    if(data.meta.result === undefined) {
+      if((data.meta.gUser !== undefined && data.meta.gUser.name == username) ||
+         (data.meta.sUser !== undefined && data.meta.sUser.name == username)) {
+        ArimaaActions.joinAndStartHeartbeatLoop(data.meta.gameID);
+      }
     }
     //Regardless of whether we're a player in this game or not, begin state update loop
     ArimaaActions.startGameStateLoop();
@@ -97,7 +96,8 @@ var ArimaaActions = {
       return;
     APIUtils.gameState(game.meta.gameID, game.meta.sequence+1, ArimaaActions.gameStateSuccess, ArimaaActions.gameStateError);
   },
-  gameStateSuccess: function(data) {
+
+  dispatchGameState: function(data) {
     //TODO delete all the other stuff and just leave this action
     ArimaaDispatcher.dispatch({
       actionType: ArimaaConstants.ACTIONS.GAME_STATE,
@@ -139,7 +139,9 @@ var ArimaaActions = {
         actionType: ArimaaConstants.ACTIONS.GAME_SETUP_OVER
       });
     }
-
+  },
+  gameStateSuccess: function(data) {
+    ArimaaActions.dispatchGameState(data);
     setTimeout(ArimaaActions.startGameStateLoop, SiteConstants.VALUES.GAME_STATE_LOOP_DELAY * 1000);
   },
   gameStateError: function(gameID,gameAuth,data) {
