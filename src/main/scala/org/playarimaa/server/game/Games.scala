@@ -1463,7 +1463,7 @@ object GameUtils {
   /* Returns true if this game exists in the database */
   def gameExists(db: Database, id: GameID)(implicit ec: ExecutionContext): Future[Boolean] = {
     val query: Rep[Boolean] = Games.gameTable.filter(_.id === id).exists
-    db.run(query.result).map { x => !x }
+    db.run(query.result)
   }
 
   /* Load the metadata for a game from the database */
