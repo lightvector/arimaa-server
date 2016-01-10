@@ -1612,7 +1612,7 @@ class GameTable(tag: Tag) extends Table[GameMetadata](tag, "gameTable") {
 
   implicit val listStringMapper = MappedColumnType.base[List[String], String] (
     { list => list.mkString(",") },
-    { str => str.split(",").toList }
+    { str => str.split(",").toList match { case List("") => List() case x => x } }
   )
   implicit val playerMapper = MappedColumnType.base[Player, String] (
     { player => player.toString },

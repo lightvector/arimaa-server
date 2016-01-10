@@ -21,9 +21,9 @@ var Utils = {
     s += Utils.gameSpanString(tc.initialTime);
     if(tc.increment !== undefined && tc.increment > 0) s += "+" + Utils.gameSpanString(tc.increment);
     if(tc.delay !== undefined && tc.delay > 0) s += "=" + Utils.gameSpanString(tc.delay);
-    if(tc.maxReserve !== undefined) s += "(" + Utils.gameSpanString(tc.maxReserve) + ")";
-    if(tc.maxMoveTime !== undefined) s += "(" + Utils.gameSpanString(tc.maxMaxMoveTime) + " max/mv)";
-    if(tc.overtimeAfter !== undefined) s += "(ovt " + tc.overtimeAfter + "t)";
+    if(tc.maxReserve !== undefined) s += " (" + Utils.gameSpanString(tc.maxReserve) + " maxresv)";
+    if(tc.maxMoveTime !== undefined) s += " (" + Utils.gameSpanString(tc.maxMaxMoveTime) + " max/mv)";
+    if(tc.overtimeAfter !== undefined) s += " (ovt " + tc.overtimeAfter + "t)";
     return s;
   },
 
