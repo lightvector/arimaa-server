@@ -84,7 +84,8 @@ var ArimaaActions = {
   onHeartbeatError: function(gameID,data) {
     ArimaaDispatcher.dispatch({
       actionType: ArimaaConstants.ACTIONS.HEARTBEAT_FAILED,
-      gameID: gameID
+      gameID: gameID,
+      data: data
     });
   },
 
@@ -144,7 +145,7 @@ var ArimaaActions = {
     ArimaaActions.dispatchGameState(data);
     setTimeout(ArimaaActions.startGameStateLoop, SiteConstants.VALUES.GAME_STATE_LOOP_DELAY * 1000);
   },
-  gameStateError: function(gameID,gameAuth,data) {
+  gameStateError: function(data) {
     ArimaaDispatcher.dispatch({
       actionType: ArimaaConstants.ACTIONS.GAME_STATE_FAILED,
       data: data

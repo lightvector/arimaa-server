@@ -63,7 +63,7 @@ var Board = React.createClass({
 
     const ranks = "87654321";
     const files = "abcdefgh";
-    var squareName =  files.charAt(x)+ranks.charAt(y);
+    var squareName = files.charAt(x)+ranks.charAt(y);
 
     var selected = (this.state.stepFrom === squareName);
     var piece = (p !== ' ') ? (<Piece pieceName={p}/>) : null;

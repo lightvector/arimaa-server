@@ -10,8 +10,73 @@ $step-to-img : "../images/green-circle.png" !default;
 
 //Css file for the game client
 
-.sidepane {
+.boardPane {
+  display: flex;
+  flex-flow: column;
   float: left;
+}
+
+.sidePane {
+  display: flex;
+  flex-flow: column;
+  height: $board-size;
+  float: left;
+  margin-left:10px;
+  margin-bottom:10px;
+  margin-right:10px;
+}
+
+.topPlayerInfo {
+  flex: initial;
+  margin-bottom:10px;
+}
+
+.bottomPlayerInfo {
+  flex: initial;
+  margin-top:10px;
+}
+
+.boardButtons {
+  margin-top:10px;
+  margin-bottom:10px;
+  button {
+    min-height: 25px;
+    margin-right: 5px;
+  }
+}
+
+.goldPlayerPanel {
+  padding: 10px 10px 5px 10px;
+  background: $gold;
+  border-radius: 5px;
+}
+
+.silverPlayerPanel {
+  padding: 10px 10px 5px 10px;
+  background: $silver;
+  border-radius: 5px;
+}
+
+.playerName {
+  font-weight: bold;
+}
+
+.clockSpan {
+}
+.clockLowTime {
+  color:#770000;
+}
+.clockVeryLowTime {
+  font-weight: bold;
+  color:red;
+}
+
+.tcSpan {
+  margin-left: 20px;
+}
+.tcOvertime {
+  font-weight:bold;
+  color:orange;
 }
 
 //Board display----------------------------------------------------------------------
@@ -60,16 +125,18 @@ $step-to-img : "../images/green-circle.png" !default;
 //Movelist----------------------------------------------------------------------------
 
 table.moveList {
-    border-width: 2px;
-    border-color: $panel-bg;
-    height: 360px;
-    width: 270px;
+  border-width: 2px;
+  border-color: $panel-bg;
+  flex: auto;
+  width: 270px;
+  display: block;
+  overflow:auto;
 }
 table.moveList thead, table.moveList tbody {
-	width: 100%;
+  width: 100%;
 }
 table.moveList tbody {
-    overflow: auto;
+  overflow: auto;
 }
 
 table.moveList tr.g {
