@@ -14,7 +14,8 @@ var Game = React.createClass({
 
   getInitialState: function() {
     return {
-      gameState: ArimaaStore.getGameState()
+      gameState: ArimaaStore.getGameState(),
+      debugMsg: ArimaaStore.getDebugMsg()
     };
   },
 
@@ -25,10 +26,11 @@ var Game = React.createClass({
   componentWillUnmount: function() {
     ArimaaStore.removeChangeListener(this._onChange);
   },
-  
+
   _onChange: function() {
     this.setState({
-      gameState: ArimaaStore.getGameState()
+      gameState: ArimaaStore.getGameState(),
+      debugMsg: ArimaaStore.getDebugMsg()
     });
   },
 
@@ -55,11 +57,18 @@ var Game = React.createClass({
     else if(this.state.gameState) {
       titleString += " - Turn " + Utils.turnStr(this.state.gameState.meta.numPly);
     }
+
+    var errorDiv = "";
+    if(this.state.debugMsg != "") {
+      errorDiv = React.createElement("div", {key: "gameErrorDiv", className:"bigError bMargin"}, this.state.debugMsg);
+    }
+
     return (
         <div>
           <div className="boardTitle">
             <h3> {titleString} </h3>
           </div>
+          {errorDiv}
           <div>
             <div className="boardPane">
               <Board gameID={this.props.params.gameID}/>

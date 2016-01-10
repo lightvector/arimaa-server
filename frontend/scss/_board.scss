@@ -57,14 +57,18 @@ $step-to-img : "../images/green-circle.png" !default;
   border-radius: 5px;
 }
 
-.clockSpan { 
+.playerName {
+  font-weight: bold;
+}
+
+.clockSpan {
 }
 .clockLowTime {
   color:#770000;
 }
 .clockVeryLowTime {
   font-weight: bold;
-  color:red;  
+  color:red;
 }
 
 .tcSpan {

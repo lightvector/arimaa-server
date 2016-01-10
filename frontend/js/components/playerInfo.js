@@ -44,18 +44,25 @@ var GameClock = React.createClass({
       clockFormatted = Utils.timeSpanToString(Math.max(0,clock));
 
     var userInfoString = Utils.userDisplayStr(this.state.playerInfo);
+    if(this.state.gameState && this.state.gameState.meta.activeGameData) {
+      var activeGameData = this.state.gameState.meta.activeGameData;
+      var present = this.state.player == ArimaaConstants.GAME.GOLD ? activeGameData.gPresent : activeGameData.sPresent;
+      if(!present)
+        userInfoString += " (disconnected)";
+    }
+
     var panelColor = (this.state.player == ArimaaConstants.GAME.GOLD ? "goldPlayerPanel" : "silverPlayerPanel");
 
     var clockClass = "clockSpan";
     if(clock < 10)
       clockClass += " clockVeryLowTime";
-    else if(clock < 60) 
+    else if(clock < 60)
       clockClass += " clockLowTime";
 
     var tcFormatted = "";
     var tcClass = "tcSpan";
     if(this.state.tc && this.state.gameState) {
-      
+
       var overtimeTC = Utils.overtimeTC(this.state.tc, this.state.gameState.meta.numPly);
       if(overtimeTC) {
         tcClass = "tcOvertime";
@@ -71,13 +78,13 @@ var GameClock = React.createClass({
         <div className={"topPlayerInfo " + panelColor}>
           <span className={clockClass}> {clockFormatted} </span> <span className={tcClass}> {tcFormatted} </span>
           <br/>
-          {userInfoString}
+          <span className="playerName"> {userInfoString} </span>
         </div>
       );
     } else {
       return (
         <div className={"bottomPlayerInfo " + panelColor}>
-          {userInfoString}
+          <span className="playerName"> {userInfoString} </span>
           <br/>
           <span className={clockClass}> {clockFormatted} </span> <span className={tcClass}> {tcFormatted} </span>
         </div>
