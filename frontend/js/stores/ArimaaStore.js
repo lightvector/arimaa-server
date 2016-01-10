@@ -227,23 +227,23 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
 
     switch(action.actionType) {
     case ArimaaConstants.ACTIONS.INITIAL_STATE_FAILED:
-      debugMsg = "Failed to get initial game state, try refreshing page: " + action.data;
+      debugMsg = "Failed to get initial game state, try refreshing page: " + action.data.error;
       ArimaaStore.emitChange();
       break;
     case ArimaaConstants.ACTIONS.GAME_JOIN_FAILED:
-      debugMsg = "Failed to join game, try refreshing page: " + action.data;
+      debugMsg = "Failed to join game, try refreshing page: " + action.data.error;
       ArimaaStore.emitChange();
       break;
-    case ArimaaConstants.ACTIONS.LOGOUT_FAILED:
-      debugMsg = "Failed to heartbeat game, try refreshing page: " + action.data;
+    case ArimaaConstants.ACTIONS.HEARTBEAT_FAILED:
+      debugMsg = "Failed to heartbeat game, try refreshing page: " + action.data.error;
       ArimaaStore.emitChange();
       break;
     case ArimaaConstants.ACTIONS.SENT_MOVE_TO_SERVER_FAILED:
-      debugMsg = "Failed to send move, try refreshing page: " + action.data;
+      debugMsg = "Failed to send move, try refreshing page: " + action.data.error;
       ArimaaStore.emitChange();
       break;
     case ArimaaConstants.ACTIONS.GAME_STATE_FAILED:
-      debugMsg = "Failed to get game state, try refreshing page: " + action.data;
+      debugMsg = "Failed to get game state, try refreshing page: " + action.data.error;
       ArimaaStore.emitChange();
       break;
     case ArimaaConstants.ACTIONS.SENT_MOVE_TO_SERVER:
@@ -252,7 +252,6 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
       break;
 
     case ArimaaConstants.ACTIONS.GAME_STATE:
-      debugMsg = "";
       _gameState = action.data;
 
       //Logic for trying to sync up server and local clocks as closely as possible from gameroom clock
