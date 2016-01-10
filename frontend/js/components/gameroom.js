@@ -111,30 +111,6 @@ var component = React.createClass({
     this.setState({popupMessageOpen:false});
   },
 
-  gameTitle: function(metadata) {
-    var title = "";
-    var hasCreator = metadata.openGameData !== undefined && metadata.openGameData.creator !== undefined;
-
-    if(metadata.gUser !== undefined && metadata.sUser !== undefined)
-      title = Utils.userDisplayStr(metadata.gUser) + " (G) vs " + Utils.userDisplayStr(metadata.sUser) + " (S)";
-    else if(metadata.gUser !== undefined && hasCreator && metadata.openGameData.creator.name != metadata.gUser.name)
-      title = Utils.userDisplayStr(metadata.gUser) + " (G) vs " + Utils.userDisplayStr(metadata.openGameData.creator) + " (S)";
-    else if(metadata.sUser !== undefined && hasCreator && metadata.openGameData.creator.name != metadata.sUser.name)
-      title = Utils.userDisplayStr(metadata.openGameData.creator) + " (G) vs " + Utils.userDisplayStr(metadata.sUser) + " (S)";
-    else if(metadata.gUser !== undefined)
-      title = Utils.userDisplayStr(metadata.gUser) + " (G) vs " + "_" + " (S)";
-    else if(metadata.sUser !== undefined)
-      title = "_ (G)" + " vs " + Utils.userDisplayStr(metadata.sUser) + " (S)";
-    else if(metadata.openGameData.creator !== undefined)
-      title = Utils.userDisplayStr(metadata.openGameData.creator) + " vs " + "_" + " (random color)";
-    else
-      title = "_" + " vs " + "_" + " (random color)";
-
-    if(metadata.tags.length > 0)
-      title = title + " (" + metadata.tags.join(", ") + ")";
-    return title;
-  },
-
   gameInfoString: function(metadata) {
     var infos = [];
 
@@ -173,7 +149,7 @@ var component = React.createClass({
   },
 
   renderGame: function(metadata) {
-    var title = this.gameTitle(metadata);
+    var title = Utils.gameTitle(metadata);
     var info = this.gameInfoString(metadata);
     var joinAccepts = [];
     var gameButton = [];

@@ -43,7 +43,6 @@ var _redoSquareStack = []; //used for undo/redo
 var _myColor = ArimaaConstants.GAME.NULL_COLOR; //spectators, or before we know what color we are
 var _viewSide = ArimaaConstants.GAME.GOLD; //can only be gold or silver (unless we want east/west views?) //color on bottom moving up
 var _colorToMove = ArimaaConstants.GAME.NULL_COLOR; //in this context, null color === can't move
-var _gameOver = null;
 var _sequenceNum = 0;
 setInitialState();
 
@@ -68,10 +67,6 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
     return _viewSide;
   },
 
-  getGameOver: function() {
-    return _gameOver;
-  },
-
   getDebugMsg: function() {
     return debugMsg;
   },
@@ -94,25 +89,47 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
     return moves;
   },
 
+  getPlayerOfPos: function(pos) {
+    if(_gameState === null) return (pos === "top" ? ArimaaConstants.GAME.SILVER : ArimaaConstants.GAME.GOLD);
 
-  getUserInfo: function(player) {
+    if((pos === "top" && _viewSide === ArimaaConstants.GAME.GOLD) ||
+     (pos === "bottom" && _viewSide === ArimaaConstants.GAME.SILVER)) {
+      return ArimaaConstants.GAME.SILVER;
+    } else {
+      return ArimaaConstants.GAME.GOLD;
+    }
+  },
+
+  getUserInfo: function(pos) {
     if(_gameState === null) return null;
 
-    if((player === "top" && _viewSide === ArimaaConstants.GAME.GOLD) ||
-     (player === "bottom" && _viewSide === ArimaaConstants.GAME.SILVER)) {
+    if((pos === "top" && _viewSide === ArimaaConstants.GAME.GOLD) ||
+     (pos === "bottom" && _viewSide === ArimaaConstants.GAME.SILVER)) {
       return _gameState.meta.sUser;
     } else {
       return _gameState.meta.gUser;
     }
   },
 
-  //player should be "top" or "bottom"
-  //wholeGame specifies whether it should be the time left for just this move or it should be the time on the clock for the whole game
-  getClockRemaining: function(player,wholeGame) {
+  getTCOfPos: function(pos) {
     if(_gameState === null) return null;
 
-    if((player === "top" && _viewSide === ArimaaConstants.GAME.GOLD) ||
-     (player === "bottom" && _viewSide === ArimaaConstants.GAME.SILVER)) {
+    if((pos === "top" && _viewSide === ArimaaConstants.GAME.GOLD) ||
+     (pos === "bottom" && _viewSide === ArimaaConstants.GAME.SILVER)) {
+      return _gameState.meta.sTC;
+    } else {
+      return _gameState.meta.gTC;
+    }
+  },
+
+  //pos should be "top" or "bottom"
+  //wholeGame specifies whether it should be the time left for just this move or it should be the time on the clock for the whole game
+  getClockRemaining: function(pos,wholeGame) {
+    if(_gameState === null) return null;
+
+    var player;
+    if((pos === "top" && _viewSide === ArimaaConstants.GAME.GOLD) ||
+     (pos === "bottom" && _viewSide === ArimaaConstants.GAME.SILVER)) {
       player = "s";
     } else {
       player = "g";
@@ -252,7 +269,6 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
 
       //Figure out whose turn it is and if the game is over
       if(_gameState.meta.result) {
-        _gameOver = _gameState.meta.result;
         _colorToMove = ArimaaConstants.GAME.NULL_COLOR;
       }
       else if(_gameState.meta.numPly % 2 === 0)

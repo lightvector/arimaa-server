@@ -20,10 +20,13 @@ var Square = React.createClass({
       className += " " + "stepTo";
     }
 
+    var showSquareNames = false; //TODO make this controlled by something?
+    var displayedName = showSquareNames ? sqName : "";
+    
     return (
       <div className={className}>
         {this.props.children}
-        <span className={"coordLabel unselectable"}> {sqName} </span>
+        <span className={"coordLabel unselectable"}> {displayedName} </span>
       </div>
     );
   }

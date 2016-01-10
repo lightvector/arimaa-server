@@ -8,7 +8,6 @@ var component = React.createClass({
   getInitialState: function() {
     return {
       myColor: ArimaaStore.getMyColor(),
-      gameOver: ArimaaStore.getGameOver(),
       arimaa: ArimaaStore.getArimaa()
     };
   },
@@ -22,7 +21,6 @@ var component = React.createClass({
   _onChange: function() {
     this.setState({
       myColor:ArimaaStore.getMyColor(),
-      gameOver:ArimaaStore.getGameOver(),
       arimaa:ArimaaStore.getArimaa()
     });
   },
@@ -54,20 +52,13 @@ var component = React.createClass({
   },
 
   render: function() {
-    var gameOverString = "";
-    if(this.state.gameOver) {
-      gameOverString = "winner: " + this.state.gameOver.winner + " reason: " + this.state.gameOver.reason;
-    }
-
     return (
-      <div>
+      <div className="boardButtons">
         <button onClick={this.completeMove}>Send Move</button>
         <button onClick={this.undoStep}>Undo Step</button>
         <button onClick={this.redoStep}>Redo Step</button>
         <button onClick={this.flipBoard}>Flip Board</button>
         <button onClick={this.resign}>Resign</button>
-        <br/>
-        <p/>{gameOverString}<br/>
       </div>
     );
   }

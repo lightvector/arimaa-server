@@ -1,4 +1,6 @@
 
+var $ = require('jquery');
+
 //Some miscellaneous useful functions
 var inMiddleOfFlash = false;
 
@@ -25,6 +27,24 @@ var Utils = {
     return s;
   },
 
+  //If not overtime, returns null
+  //If overtime, adjusts the TC to reflect the overtime factor
+  overtimeTC: function(tc, turn) {
+    var overtimeFactor = 1.0;
+    var overtimeFactorPerTurn = 1.0 - 1.0 / 30.0;
+    if(tc.overtimeAfter !== undefined && turn >= tc.overtimeAfter)
+      overtimeFactor = Math.pow(overtimeFactorPerTurn, turn - tc.overtimeAfter + 1);
+    else
+      return null;
+    
+    var newTC = $.extend(true, {}, tc);    
+    if(newTC.increment !== undefined) 
+      newTC.increment *= overtimeFactor;
+    if(newTC.delay !== undefined) 
+      newTC.delay *= overtimeFactor;
+    return newTC;
+  },
+  
   clockAfterTurn: function(clockBeforeTurn, timeSpent, turn, tc){
     var overtimeFactor = 1.0;
     var overtimeFactorPerTurn = 1.0 - 1.0 / 30.0;
@@ -136,6 +156,31 @@ var Utils = {
     return false;
   },
 
+  gameTitle: function(metadata) {
+    var title = "";
+    var hasCreator = metadata.openGameData !== undefined && metadata.openGameData.creator !== undefined;
+
+    if(metadata.gUser !== undefined && metadata.sUser !== undefined)
+      title = Utils.userDisplayStr(metadata.gUser) + " (G) vs " + Utils.userDisplayStr(metadata.sUser) + " (S)";
+    else if(metadata.gUser !== undefined && hasCreator && metadata.openGameData.creator.name != metadata.gUser.name)
+      title = Utils.userDisplayStr(metadata.gUser) + " (G) vs " + Utils.userDisplayStr(metadata.openGameData.creator) + " (S)";
+    else if(metadata.sUser !== undefined && hasCreator && metadata.openGameData.creator.name != metadata.sUser.name)
+      title = Utils.userDisplayStr(metadata.openGameData.creator) + " (G) vs " + Utils.userDisplayStr(metadata.sUser) + " (S)";
+    else if(metadata.gUser !== undefined)
+      title = Utils.userDisplayStr(metadata.gUser) + " (G) vs " + "_" + " (S)";
+    else if(metadata.sUser !== undefined)
+      title = "_ (G)" + " vs " + Utils.userDisplayStr(metadata.sUser) + " (S)";
+    else if(metadata.openGameData.creator !== undefined)
+      title = Utils.userDisplayStr(metadata.openGameData.creator) + " vs " + "_" + " (random color)";
+    else
+      title = "_" + " vs " + "_" + " (random color)";
+
+    if(metadata.tags.length > 0)
+      title = title + " (" + metadata.tags.join(", ") + ")";
+    return title;
+  },
+
+  
   userDisplayStr: function(userInfo) {
     if(userInfo === null) return "";
 
@@ -157,6 +202,12 @@ var Utils = {
     return displayStr;
   },
 
+  turnStr: function(plyNum) {
+    var turn = Math.floor(plyNum/2)+1;
+    var color = (plyNum%2===0) ? "g" : "s";
+    return turn + color;
+  },
+  
   flashWindowIfNotFocused: function(reasonTitle) {
     var title = document.title;
     if(!document.hasFocus() && !inMiddleOfFlash) {

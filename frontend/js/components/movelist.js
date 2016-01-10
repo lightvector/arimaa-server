@@ -1,5 +1,6 @@
 var React = require('react');
 
+var Utils = require('../utils/Utils.js');
 var ArimaaStore = require('../stores/ArimaaStore.js');
 var ArimaaActions = require('../actions/ArimaaActions.js');
 var ArimaaConstants = require('../constants/ArimaaConstants.js');
@@ -26,12 +27,9 @@ var Movelist = React.createClass({
 
   render: function() {
     var cells = this.state.moves.map(function(m, i) {
-      var plyNum = Math.floor(i/2)+1;
       var color = (i%2===0) ? "g" : "s";
       var moveStr = m.map(function(s) {return s.string;}).join(" ");
-      //console.log(m);
-      //var moveStr = m;
-      return (<tr className={color} key={i}><td>{plyNum+color+":"}</td><td>{moveStr}</td></tr>);
+      return (<tr className={color} key={i}><td>{Utils.turnStr(i)+":"}</td><td>{moveStr}</td></tr>);
     });
     var numMoves = this.state.moves.length;
     var currColor = (numMoves % 2 === 0) ? "g" : "s";
