@@ -1,6 +1,7 @@
 var React = require('react');
 var ReactDOM = require('react-dom');
 var Modal = require('react-modal');
+var Linkify = require('react-linkify');
 var ClassNames = require('classnames');
 var SiteActions = require('../actions/SiteActions.js');
 var UserStore = require('../stores/UserStore.js');
@@ -271,7 +272,9 @@ var component = React.createClass({
   },
 
   renderNotification: function(i,msg) {
-    return React.createElement("li", {key: "notification_"+i}, msg);
+    return React.createElement("li", {key: "notification_"+i}, (
+        <Linkify> {msg} </Linkify>
+    ));
   },
 
   render: function() {

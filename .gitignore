@@ -3,6 +3,9 @@
 *~
 tmp/
 
+# Setup-specific
+src/main/resources/application.conf
+
 # sbt specific
 .cache
 .history

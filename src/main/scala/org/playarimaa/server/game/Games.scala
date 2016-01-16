@@ -261,7 +261,7 @@ class Games(val db: Database, val parentLogins: LoginTracker, val scheduler: Sch
 
   /* Make a move in a game */
   def move(id: GameID, gameAuth: GameAuth, moveStr: String, plyNum: Int): Try[Unit] = {
-    activeGames.move(id,gameAuth, moveStr, plyNum: Int)
+    activeGames.move(id,gameAuth, moveStr, plyNum)
   }
 
   /* Get the full state of a game */
@@ -1058,16 +1058,16 @@ class ActiveGames(val db: Database, val scheduler: Scheduler,
   }
 
   /* Performs [f] not synchronized with the ActiveGames. */
-  private def gameActionUnsynced[T](id: GameID, gameAuth: GameAuth)(f: (ActiveGame,Player) => Try[T]): Try[T] = {
+  private def gameActionUnsynced[T](id: GameID, gameAuth: GameAuth)(f: (ActiveGame,Player,SimpleUserInfo) => Try[T]): Try[T] = {
     val result =
       this.synchronized {
         ifLoggedIn(id,gameAuth) { case (user,game) =>
           val player = lookupPlayer(game,user.name)
-          Success((game,player))
+          Success((game,player,user))
         }
       }
-    result.flatMap { case (game,player) =>
-      f(game.game,player).map { x =>
+    result.flatMap { case (game,player,user) =>
+      f(game.game,player,user).map { x =>
         this.synchronized {
           game.advanceSequence()
         }
@@ -1078,15 +1078,15 @@ class ActiveGames(val db: Database, val scheduler: Scheduler,
 
   /* Resign a game */
   def resign(id: GameID, gameAuth: GameAuth): Try[Unit] = {
-    gameActionUnsynced(id,gameAuth) { case (game,player) =>
+    gameActionUnsynced(id,gameAuth) { case (game,player,user) =>
       game.resign(player)
     }
   }
 
   /* Make a move in a game */
   def move(id: GameID, gameAuth: GameAuth, moveStr: String, plyNum: Int): Try[Unit] = this.synchronized {
-    gameActionUnsynced(id,gameAuth) { case (game,player) =>
-      game.move(moveStr,player,plyNum)
+    gameActionUnsynced(id,gameAuth) { case (game,player,user) =>
+      game.move(moveStr,player,plyNum,user)
     }
   }
 
@@ -1379,7 +1379,14 @@ class ActiveGame(
     }
   }
 
-  def move(moveStr: String, player: Player, plyNum: Int): Try[Unit] = this.synchronized {
+  def illegalMove(player: Player): Unit = this.synchronized {
+    if(!gameOver) {
+      val now = Timestamp.get
+      declareWinner(player.flip, EndingReason.ILLEGAL_MOVE, lastMoveStartTime = moveStartTime, endTime = now)
+    }
+  }
+
+  def move(moveStr: String, player: Player, plyNum: Int, user: SimpleUserInfo): Try[Unit] = this.synchronized {
     if(gameOver)
       Failure(new Exception("Game is over"))
     else if(player != getNextPlayer)
@@ -1391,7 +1398,13 @@ class ActiveGame(
       if(moveStr.toLowerCase == "resign" || moveStr.toLowerCase == "resigns")
         resign(player)
       else {
-        game.parseAndMakeMove(moveStr, notation).flatMap { newGame =>
+        game.parseAndMakeMove(moveStr, notation).recoverWith {
+          case exn: Exception =>
+            //Bots lose the game when they make an illegal move
+            if(user.isBot)
+              illegalMove(player)
+            Failure(exn)
+        }.flatMap { newGame =>
           val now = Timestamp.get
           val (clock,timeSpent) = clockAndSpent(now)
           if(tryLoseByTime(clock,timeSpent,now))

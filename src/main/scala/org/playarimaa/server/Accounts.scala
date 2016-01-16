@@ -69,7 +69,7 @@ case object AccountGameStats {
   }
 }
 
-class Accounts(val db: Database, val scheduler: Scheduler)(implicit ec: ExecutionContext) {
+class Accounts(val domainName: String, val db: Database, val scheduler: Scheduler)(implicit ec: ExecutionContext) {
 
   val logger =  LoggerFactory.getLogger(getClass)
 
@@ -87,10 +87,11 @@ class Accounts(val db: Database, val scheduler: Scheduler)(implicit ec: Executio
   def getByNameOrEmail(usernameOrEmail: String, excludeGuests: Boolean): Future[List[Account]] = {
     val lowercaseName = usernameOrEmail.toLowerCase
     var query = Accounts.table.filter(_.lowercaseName === lowercaseName)
-    query = if(excludeGuests) query.filter(_.isGuest) else query
+    query = if(excludeGuests) query.filter(_.isGuest === false) else query
     db.run(query.result).flatMap { result =>
       result.headOption match {
-        case Some(account) => Future.successful(List(account))
+        case Some(account) =>
+          Future.successful(List(account))
         case None =>
           val query = Accounts.table.filter(_.email === usernameOrEmail)
           db.run(query.result).map(_.toList)
@@ -107,14 +108,14 @@ class Accounts(val db: Database, val scheduler: Scheduler)(implicit ec: Executio
   //Get all accounts, optionally excluding guests
   def getAll(excludeGuests: Boolean): Future[List[Account]] = {
     var query: Query[AccountTable,Account,Seq] = Accounts.table
-    query = if(excludeGuests) query.filter(_.isGuest) else query
+    query = if(excludeGuests) query.filter(_.isGuest === false) else query
     db.run(query.result).map(_.toList)
   }
 
   //Add a new account to the table.
   //In the case where there is an existing guest account, replaces the guest account with the new account.
   def add(account: Account): Future[Unit] = {
-    getByName(account.username, excludeGuests=true).flatMap {
+    getByName(account.username, excludeGuests=false).flatMap {
       case Some(acct) =>
         if(acct.isGuest) {
           val lowercaseName = account.username.toLowerCase
@@ -244,7 +245,7 @@ class Accounts(val db: Database, val scheduler: Scheduler)(implicit ec: Executio
       case Some(account) =>
         account.emailVerifyNeeded match {
           case None => List()
-          case Some(_) => List("An email was sent to verify the address you provided. Please follow the link provided in the email to complete your registration.")
+          case Some(_) => List("An email was sent to verify the address you provided. Please follow the link provided in the email to complete your registration. Otherwise, your account may be dropped after a few days. See " + domainName + "/resendVerifyEmail" + " to resend this email.")
         }
     }
   }

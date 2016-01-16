@@ -274,6 +274,7 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
     case SiteConstants.ACTIONS.FORGOT_PASSWORD_FAILED:
     case SiteConstants.ACTIONS.RESET_PASSWORD_FAILED:
     case SiteConstants.ACTIONS.VERIFY_EMAIL_FAILED:
+    case SiteConstants.ACTIONS.RESEND_VERIFY_EMAIL_FAILED:
     case SiteConstants.ACTIONS.GAMEROOM_UPDATE_FAILED:
     case SiteConstants.ACTIONS.CREATE_GAME_FAILED:
       messageText = "";
@@ -289,6 +290,7 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
     case SiteConstants.ACTIONS.FORGOT_PASSWORD_SUCCESS:
     case SiteConstants.ACTIONS.RESET_PASSWORD_SUCCESS:
     case SiteConstants.ACTIONS.VERIFY_EMAIL_SUCCESS:
+    case SiteConstants.ACTIONS.RESEND_VERIFY_EMAIL_SUCCESS:
       messageText = action.reason;
       errorText = "";
       UserStore.emitChange();

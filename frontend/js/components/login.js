@@ -2,6 +2,7 @@ var React = require('react');
 var SiteActions = require('../actions/SiteActions.js');
 var UserStore = require('../stores/UserStore.js');
 var Link = require('react-router').Link;
+var TitleLine = require('../components/titleLine.js');
 
 var loginBox = React.createClass({
   getInitialState: function() {
@@ -43,14 +44,15 @@ var loginBox = React.createClass({
     }
 
     return (
-      <div>
-        <div className="uiPanel center">
+      <div className="center">
+        <TitleLine/>
+        <div className="uiPanel">
           <h1>Login</h1>
           <form method="post" action="index.html">
             <input type="text" name="login" value={this.state.user} onChange={this.handleUsernameChange} placeholder="Username/Email"/>
             <input type="password" name="password" value={this.state.pass} onChange={this.handlePasswordChange} placeholder="Password"/>
             <input type="submit" className="submit majorButton" name="commit" value="Login" onClick={this.submitLogin}/>
-            <input type="submit" className="submit majorButton" name="commitGuest" value="Login As Guest" onClick={this.submitLoginAsGuest}/>
+            <input type="submit" className="submit majorButton" name="commitGuest" value="Enter As Guest" onClick={this.submitLoginAsGuest}/>
           </form>
           {errorText}
           <div className="vPadding small"><Link to="/forgotPassword">Forgot Password?</Link></div>

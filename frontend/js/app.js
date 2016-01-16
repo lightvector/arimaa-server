@@ -9,6 +9,7 @@ var Register = require('./components/register.js');
 var ForgotPassword = require('./components/forgotPassword.js');
 var ResetPassword = require('./components/resetPassword.js');
 var VerifyEmail = require('./components/verifyEmail.js');
+var ResendVerifyEmail = require('./components/resendVerifyEmail.js');
 var Gameroom = require('./components/gameroom.js');
 var Chat = require('./components/chat.js');
 var DebugComp = require('./components/generalDebugComponent.js');
@@ -42,6 +43,7 @@ const routes = {
     { path: 'register', component: Register },
     { path: 'resetPassword/:username/:resetAuth', component: ResetPassword },
     { path: 'verifyEmail/:username/:verifyAuth', component: VerifyEmail },
+    { path: 'resendVerifyEmail', component: ResendVerifyEmail },
     { path: 'forgotPassword', component: ForgotPassword },
     { path: 'gameroom', component: Gameroom },
     { path: 'game/:gameID', component: Game },

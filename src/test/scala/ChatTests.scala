@@ -31,9 +31,12 @@ class ChatServletTests(_system: ActorSystem) extends TestKit(_system) with Scala
   val config = ConfigFactory.load
   val siteName = config.getString("siteName")
   val siteAddress = config.getString("siteAddress")
+  val domainName = config.getString("domainName")
   val smtpHost = ""//config.getString("smtpHost")
-  val smtpPort = ""//config.getString("smtpPort")
+  val smtpPort = 0//config.getInt("smtpPort")
   val smtpAuth = config.getBoolean("smtpAuth")
+  val smtpUser = config.getString("smtpUser")
+  val smtpPass = config.getString("smtpPass")
   val noReplyAddress = config.getString("noReplyAddress")
   val helpAddress = config.getString("helpAddress")
 
@@ -42,10 +45,10 @@ class ChatServletTests(_system: ActorSystem) extends TestKit(_system) with Scala
   val cryptEC: ExecutionContext = mainEC
   val actorEC: ExecutionContext = actorSystem.dispatcher
   val serverInstanceID: Long = System.currentTimeMillis
-  val db = DatabaseConfig.createDB("h2memchat")
+  val db = DatabaseConfig.getDB()
   val scheduler = actorSystem.scheduler
-  val emailer = new Emailer(siteName,siteAddress,smtpHost,smtpPort,smtpAuth,noReplyAddress,helpAddress)(mainEC)
-  val accounts = new Accounts(db,scheduler)(mainEC)
+  val emailer = new Emailer(siteName,siteAddress,smtpHost,smtpPort,smtpAuth,smtpUser,smtpPass,noReplyAddress,helpAddress)(mainEC)
+  val accounts = new Accounts(domainName,db,scheduler)(mainEC)
   val siteLogin = new SiteLogin(accounts,emailer,cryptEC,scheduler)(mainEC)
   val games = new Games(db,siteLogin.logins,scheduler,accounts,serverInstanceID)(mainEC)
   val chat = new ChatSystem(db,siteLogin.logins,actorSystem)(actorEC)

@@ -27,9 +27,17 @@ object SiteLogin {
     val VERIFY_EMAIL_LOOP_PERIOD: Double = 42300 //12 hours
     val DELETE_UNVERIFIED_ACCOUNTS_OLDER_THAN: Double = 86400 * 2 //2 days
 
-    //Allow 10 login attempts in a row, refilling at a rate of 2 per minute
+    //Allow 10 login attempts in a row, refilling at a rate of 1 per minute
     val LOGIN_BUCKET_CAPACITY: Double = 10
-    val LOGIN_BUCKET_FILL_PER_SEC: Double = 2.0/60.0
+    val LOGIN_BUCKET_FILL_PER_SEC: Double = 1.0/60.0
+
+    //Allow 5 forget password sends in a row, refilling at a rate of 1 per minute
+    val FORGOT_PASS_BUCKET_CAPACITY: Double = 5
+    val FORGOT_PASS_BUCKET_FILL_PER_SEC: Double = 1.0/60.0
+
+    //Allow 15 queries that change account stuff in a row, refilling at a rate of 1 per minute
+    val ACCOUNT_STUFF_BUCKET_CAPACITY: Double = 15
+    val ACCOUNT_STUFF_BUCKET_FILL_PER_SEC: Double = 1.0/60.0
 
     val USERNAME_MIN_LENGTH: Int = 3
     val USERNAME_MAX_LENGTH: Int = 24
@@ -79,7 +87,10 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
 
   val logins: LoginTracker = new LoginTracker(None, INACTIVITY_TIMEOUT, updateInfosFromParent = false)
 
-  private val loginBuckets: TimeBuckets[String] = new TimeBuckets(LOGIN_BUCKET_CAPACITY, LOGIN_BUCKET_FILL_PER_SEC) //throttle for login attempts
+  //Throttles for different kinds of queries
+  private val loginBuckets: TimeBuckets[String] = new TimeBuckets(LOGIN_BUCKET_CAPACITY, LOGIN_BUCKET_FILL_PER_SEC)
+  private val forgotPassBuckets: TimeBuckets[String] = new TimeBuckets(FORGOT_PASS_BUCKET_CAPACITY, FORGOT_PASS_BUCKET_FILL_PER_SEC)
+  private val accountStuffBuckets: TimeBuckets[String] = new TimeBuckets(ACCOUNT_STUFF_BUCKET_CAPACITY, ACCOUNT_STUFF_BUCKET_FILL_PER_SEC)
 
   private var passResets: Map[Username,AuthTime] = Map()
   private val passResetLock = new Object()
@@ -245,12 +256,12 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
         val now = Timestamp.get
         val verifyAuth = RandGen.genAuth
         val account = Account(
-          lowercaseName,
-          username,
-          email,
+          lowercaseName = lowercaseName,
+          username = username,
+          email = email,
           emailVerifyNeeded = Some(verifyAuth),
-          passwordHash,
-          isBot,
+          passwordHash = passwordHash,
+          isBot = isBot,
           createdTime = now,
           isGuest = false,
           isAdmin = false,
@@ -270,7 +281,7 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
 
           logger.info(logInfo + " Registered new account for " + username)
           emailer.sendVerifyEmail(email,username,verifyAuth)
-
+          
           doTimeouts(now)
           val siteAuth = logins.login(account.info, now)
           (account.username,siteAuth)
@@ -323,14 +334,16 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
 
   def loginGuest(username: Username, logInfo: LogInfo): Future[(Username,SiteAuth)] = {
     Future.successful(()).flatMap { case () =>
+      if(username == "")
+        throw new Exception("Please choose a username.")
       validateUsername(username)
 
       val lowercaseName = username.toLowerCase
       val now = Timestamp.get
       val rating = Rating.newPlayerPrior
       val account = Account(
-        lowercaseName,
-        username,
+        lowercaseName = lowercaseName,
+        username = username,
         email = "",
         emailVerifyNeeded = None,
         passwordHash = "N/A",
@@ -404,6 +417,11 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
   def forgotPassword(usernameOrEmail: String, logInfo: LogInfo) : Future[Unit] = {
     Future.successful(()).map { case () =>
       validateUsernameOrEmail(usernameOrEmail)
+
+      if(!forgotPassBuckets.takeOne(usernameOrEmail.toLowerCase, Timestamp.get)) {
+        logger.warn(logInfo + " Too many forgot password attempts for " + usernameOrEmail)
+        throw new Exception("Too many forget password attempts for account, please wait a few minutes before the next attempt.")
+      }
 
       //Spawn off a job to find the user's account if it exists and send the email and don't wait for it
       accounts.getByNameOrEmail(usernameOrEmail, excludeGuests=true).onComplete { result =>
@@ -484,6 +502,7 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
     Future.successful(()).flatMap { case () =>
       validateUsername(username)
       validatePassword(newPassword)
+
       requiringLogin(siteAuth) { user =>
         accounts.getByName(username, excludeGuests=true).flatMap { result =>
           result match {
@@ -491,6 +510,11 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
             case Some(account) =>
               if(user.name != account.username)
                 throw new Exception("Username does not match login.")
+
+              if(!accountStuffBuckets.takeOne(username.toLowerCase, Timestamp.get)) {
+                logger.warn(logInfo + " Too many account data changes for " + username)
+                throw new Exception("Too many account data changes for account, please wait a few minutes before the next attempt.")
+              }
 
               checkpw(password, account.passwordHash).flatMap { success =>
                 if(!success)
@@ -547,6 +571,11 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
               if(newEmail == account.email)
                 throw new Exception("New email is the same as the old email.")
 
+              if(!accountStuffBuckets.takeOne(username.toLowerCase, Timestamp.get)) {
+                logger.warn(logInfo + " Too many account data changes for " + username)
+                throw new Exception("Too many account data changes for account, please wait a few minutes before the next attempt.")
+              }
+
               checkpw(password, account.passwordHash).flatMap { success =>
                 if(!success)
                   throw new Exception("Password did not match.")
@@ -575,7 +604,7 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
     }
   }
 
-  def confirmChangeEmail(username: Username, changeAuth: SiteAuth, logInfo: LogInfo) : Future[Unit] = {
+  def confirmChangeEmail(username: Username, changeAuth: Auth, logInfo: LogInfo) : Future[Unit] = {
     Future.successful(()).flatMap { case () =>
       validateUsername(username)
       accounts.getByName(username, excludeGuests=true).flatMap { result =>
@@ -612,4 +641,31 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
     }
   }
 
+  def resendVerifyEmail(username: Username, siteAuth: SiteAuth, logInfo: LogInfo) : Future[Unit] = {
+    Future.successful(()).flatMap { case () =>
+      validateUsername(username)
+      requiringLogin(siteAuth) { user =>
+        accounts.getByName(username, excludeGuests=true).map { result =>
+          result match {
+            case None => throw new IllegalArgumentException("Unknown username/account.")
+            case Some(account) =>
+              if(user.name != account.username)
+                throw new Exception("Username does not match login.")
+
+              if(!accountStuffBuckets.takeOne(username.toLowerCase, Timestamp.get)) {
+                logger.warn(logInfo + " Too many account data changes for " + username)
+                throw new Exception("Too many account data changes for account, please wait a few minutes before the next attempt.")
+              }
+
+              account.emailVerifyNeeded match {
+                case None => throw new Exception("Account email already verified.")
+                case Some(verifyAuth) =>
+                  emailer.sendVerifyEmail(account.email,account.username,verifyAuth)
+                  logger.info(logInfo + " User requested resend verify email: " + account.username)
+              }
+          }
+        }
+      }.get
+    }
+  }
 }
