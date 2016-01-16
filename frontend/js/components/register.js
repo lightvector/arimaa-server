@@ -2,6 +2,7 @@ var React = require('react');
 var SiteActions = require('../actions/SiteActions.js');
 var UserStore = require('../stores/UserStore.js');
 var Link = require('react-router').Link;
+var TitleLine = require('../components/titleLine.js');
 
 var registrationBox = React.createClass({
   getInitialState: function() {
@@ -50,8 +51,9 @@ var registrationBox = React.createClass({
     }
 
     return (
-      <div>
-        <div className="uiPanel center">
+      <div className="center">
+        <TitleLine/>
+        <div className="uiPanel">
           <h1>Register</h1>
           <form method="post" action="index.html">
             <input type="text" name="login" value={this.state.user} onChange={this.handleUsernameChange} placeholder="Username"/>

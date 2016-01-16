@@ -1,6 +1,7 @@
 var React = require('react');
 var SiteActions = require('../actions/SiteActions.js');
 var UserStore = require('../stores/UserStore.js');
+var TitleLine = require('../components/titleLine.js');
 
 var resetPasswordBox = React.createClass({
   getInitialState: function() {
@@ -44,8 +45,9 @@ var resetPasswordBox = React.createClass({
 
     //TODO here and elsewhere, should we be disabling the buttons upon submit so that we don't accidentally get double-sends of requests?
     return (
-      <div>
-        <div className="uiPanel center">
+      <div className="center">
+        <TitleLine/>
+        <div className="uiPanel">
           <h1>Reset Password</h1>
           <form method="post" action="index.html">
             <input type="password" name="password" value={this.state.pass} onChange={this.handlePasswordChange} placeholder="New Password"/>

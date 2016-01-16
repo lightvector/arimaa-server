@@ -2,6 +2,7 @@ var React = require('react');
 var SiteActions = require('../actions/SiteActions.js');
 var UserStore = require('../stores/UserStore.js');
 var Link = require('react-router').Link;
+var TitleLine = require('../components/titleLine.js');
 
 var forgotPasswordBox = React.createClass({
   getInitialState: function() {
@@ -38,8 +39,9 @@ var forgotPasswordBox = React.createClass({
     }
 
     return (
-      <div>
-        <div className="uiPanel center">
+      <div className="center">
+        <TitleLine/>
+        <div className="uiPanel">
           <h1>Request Password Reset</h1>
           <form method="post" action="index.html">
             <input type="text" name="forgotPassword" value={this.state.user} onChange={this.handleUsernameChange} placeholder="Username/Email"/>

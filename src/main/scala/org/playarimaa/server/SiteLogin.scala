@@ -334,6 +334,8 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
 
   def loginGuest(username: Username, logInfo: LogInfo): Future[(Username,SiteAuth)] = {
     Future.successful(()).flatMap { case () =>
+      if(username == "")
+        throw new Exception("Please choose a username.")
       validateUsername(username)
 
       val lowercaseName = username.toLowerCase
