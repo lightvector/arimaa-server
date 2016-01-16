@@ -69,7 +69,7 @@ class ScalatraBootstrap extends LifeCycle {
     //A value that should be unique in practice between each time the server is started
     val serverInstanceID: Long = System.currentTimeMillis
 
-    val db = DatabaseConfig.createDB("h2mem1")
+    val db = DatabaseConfig.getDB()
     val scheduler = actorSystem.scheduler
     val emailer = new Emailer(siteName,siteAddress,smtpHost,smtpPort,smtpAuth,noReplyAddress,helpAddress)(mainEC)
     val accounts = new Accounts(db,scheduler)(mainEC)

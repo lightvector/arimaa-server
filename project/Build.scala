@@ -10,7 +10,6 @@ object ArimaaServerBuild extends Build {
     settings = Seq(
       scalaVersion := "2.11.6",
 
-
       scalacOptions ++= Seq(
           "-deprecation",
           "-feature",
@@ -52,14 +51,37 @@ object ArimaaServerBuild extends Build {
         "org.json4s"    %% "json4s-jackson"    % "3.3.0.RC1",
         "org.mindrot" % "jbcrypt" % "0.3m",
         "org.slf4j" % "slf4j-api" % "1.7.5",
-        "org.slf4j" % "slf4j-simple" % "1.7.5"
+        "org.slf4j" % "slf4j-simple" % "1.7.5",
+        "org.postgresql" % "postgresql" % "9.3-1100-jdbc4",
+        "com.zaxxer" % "HikariCP-java6" % "2.3.3"
       ),
 
       resolvers += "Scalaz Bintray Repo" at "https://dl.bintray.com/scalaz/releases",
 
       //Full backtraces
-      testOptions in Test += Tests.Argument("-oF")
+      testOptions in Test += Tests.Argument("-oF"),
+
+      //Different settings in test
+      fork in Test := true,
+      javaOptions in Test := Seq("-DisProd=false"),
+
+      //New commands in sbt
+      commands ++= Seq(startServerProd, startServerTest)
 
     ) ++ jetty()
   )
+
+  //Start the server in production mode (currently, this affects how we initialize the DB - see DatabaseConfig.scala)
+  def startServerProd = Command.command("startServerProd") { state =>
+    val state2 = Project.extract(state).append(Seq(javaOptions in container += "-DisProd=true"), state)
+    Project.extract(state2).runTask(start in container, state2)
+    state
+  }
+
+  //Start the server in test mode (currently, this affects how we initialize the DB - see DatabaseConfig.scala)
+  def startServerTest = Command.command("startServerTest") { state =>
+    val state2 = Project.extract(state).append(Seq(javaOptions in container += "-DisProd=false"), state)
+    Project.extract(state2).runTask(start in container, state2)
+    state
+  }
 }

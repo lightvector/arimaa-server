@@ -114,7 +114,7 @@ class Accounts(val db: Database, val scheduler: Scheduler)(implicit ec: Executio
   //Add a new account to the table.
   //In the case where there is an existing guest account, replaces the guest account with the new account.
   def add(account: Account): Future[Unit] = {
-    getByName(account.username, excludeGuests=true).flatMap {
+    getByName(account.username, excludeGuests=false).flatMap {
       case Some(acct) =>
         if(acct.isGuest) {
           val lowercaseName = account.username.toLowerCase

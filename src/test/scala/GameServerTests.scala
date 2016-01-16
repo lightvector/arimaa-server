@@ -43,7 +43,7 @@ class GameServletTests(_system: ActorSystem) extends TestKit(_system) with Scala
   val mainEC: ExecutionContext = ExecutionContext.Implicits.global
   val cryptEC: ExecutionContext = mainEC
   val serverInstanceID: Long = System.currentTimeMillis
-  val db = DatabaseConfig.createDB("h2memgame")
+  val db = DatabaseConfig.getDB()
   val scheduler = actorSystem.scheduler
   val emailer = new Emailer(siteName,siteAddress,smtpHost,smtpPort,smtpAuth,noReplyAddress,helpAddress)(mainEC)
   val accounts = new Accounts(db,scheduler)(mainEC)

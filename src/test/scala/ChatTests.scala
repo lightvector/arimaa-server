@@ -42,7 +42,7 @@ class ChatServletTests(_system: ActorSystem) extends TestKit(_system) with Scala
   val cryptEC: ExecutionContext = mainEC
   val actorEC: ExecutionContext = actorSystem.dispatcher
   val serverInstanceID: Long = System.currentTimeMillis
-  val db = DatabaseConfig.createDB("h2memchat")
+  val db = DatabaseConfig.getDB()
   val scheduler = actorSystem.scheduler
   val emailer = new Emailer(siteName,siteAddress,smtpHost,smtpPort,smtpAuth,noReplyAddress,helpAddress)(mainEC)
   val accounts = new Accounts(db,scheduler)(mainEC)
