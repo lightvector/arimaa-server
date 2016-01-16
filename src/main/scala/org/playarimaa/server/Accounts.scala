@@ -69,7 +69,7 @@ case object AccountGameStats {
   }
 }
 
-class Accounts(val db: Database, val scheduler: Scheduler)(implicit ec: ExecutionContext) {
+class Accounts(val domainName: String, val db: Database, val scheduler: Scheduler)(implicit ec: ExecutionContext) {
 
   val logger =  LoggerFactory.getLogger(getClass)
 
@@ -245,7 +245,7 @@ class Accounts(val db: Database, val scheduler: Scheduler)(implicit ec: Executio
       case Some(account) =>
         account.emailVerifyNeeded match {
           case None => List()
-          case Some(_) => List("An email was sent to verify the address you provided. Please follow the link provided in the email to complete your registration.")
+          case Some(_) => List("An email was sent to verify the address you provided. Please follow the link provided in the email to complete your registration. Otherwise, your account may be dropped after a few days. See " + domainName + "/resendVerifyEmail" + " to resend this email.")
         }
     }
   }

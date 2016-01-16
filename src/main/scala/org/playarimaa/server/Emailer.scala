@@ -26,18 +26,22 @@ class Emailer(
 
   def send(to: Email, subject: String, body: String): Future[Unit] = {
     Future {
-      val email: org.apache.commons.mail.HtmlEmail = new org.apache.commons.mail.HtmlEmail()
-      email.setHostName(smtpHost)
-      email.setSmtpPort(smtpPort)
-      email.setAuthenticator(new org.apache.commons.mail.DefaultAuthenticator(smtpUser, smtpPass))
-      email.setSSLOnConnect(smtpAuth)
-      email.setFrom(noReplyAddress)
-      email.setSubject(subject)
-      email.setTextMsg(body)
-      email.setHtmlMsg(body)
-      email.addTo(to)
-      email.send()
-      ()
+      if(smtpHost == "")
+        logger.info("No smtp host provided, not sending email")
+      else {
+        val email: org.apache.commons.mail.HtmlEmail = new org.apache.commons.mail.HtmlEmail()
+        email.setHostName(smtpHost)
+        email.setSmtpPort(smtpPort)
+        email.setAuthenticator(new org.apache.commons.mail.DefaultAuthenticator(smtpUser, smtpPass))
+        email.setSSLOnConnect(smtpAuth)
+        email.setFrom(noReplyAddress)
+        email.setSubject(subject)
+        email.setTextMsg(body)
+        email.setHtmlMsg(body)
+        email.addTo(to)
+        email.send()
+        ()
+      }
     }.recover {
       case exn: Exception =>
         logger.error("Error sending email: " + exn)

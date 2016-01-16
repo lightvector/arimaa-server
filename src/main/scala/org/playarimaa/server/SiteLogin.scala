@@ -575,7 +575,7 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
     }
   }
 
-  def confirmChangeEmail(username: Username, changeAuth: SiteAuth, logInfo: LogInfo) : Future[Unit] = {
+  def confirmChangeEmail(username: Username, changeAuth: Auth, logInfo: LogInfo) : Future[Unit] = {
     Future.successful(()).flatMap { case () =>
       validateUsername(username)
       accounts.getByName(username, excludeGuests=true).flatMap { result =>
@@ -612,4 +612,25 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
     }
   }
 
+  def resendVerifyEmail(username: Username, siteAuth: SiteAuth, logInfo: LogInfo) : Future[Unit] = {
+    Future.successful(()).flatMap { case () =>
+      validateUsername(username)
+      requiringLogin(siteAuth) { user =>
+        accounts.getByName(username, excludeGuests=true).map { result =>
+          result match {
+            case None => throw new IllegalArgumentException("Unknown username/account.")
+            case Some(account) =>
+              if(user.name != account.username)
+                throw new Exception("Username does not match login.")
+              account.emailVerifyNeeded match {
+                case None => throw new Exception("Account email already verified.")
+                case Some(verifyAuth) =>
+                  emailer.sendVerifyEmail(account.email,account.username,verifyAuth)
+                  logger.info(logInfo + " User requested resend verify email: " + account.username)
+              }
+          }
+        }
+      }.get
+    }
+  }
 }

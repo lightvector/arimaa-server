@@ -132,6 +132,22 @@ var SiteActions = {
     });
   },
 
+  resendVerifyEmail: function(username) {
+    APIUtils.resendVerifyEmail(username, SiteActions.resendVerifyEmailSuccess, SiteActions.resendVerifyEmailError);
+  },
+  resendVerifyEmailError: function(data) {
+    ArimaaDispatcher.dispatch({
+      actionType: SiteConstants.ACTIONS.RESEND_VERIFY_EMAIL_FAILED,
+      reason: data.error
+    });
+  },
+  resendVerifyEmailSuccess: function(data) {
+    ArimaaDispatcher.dispatch({
+      actionType: SiteConstants.ACTIONS.RESEND_VERIFY_EMAIL_SUCCESS,
+      reason: data.message
+    });
+  },
+
   goLoginPageIfNotLoggedIn: function() {
     APIUtils.authLoggedIn(SiteActions.goLoginPageIfNotLoggedInSuccess, FUNC_NOP);
   },

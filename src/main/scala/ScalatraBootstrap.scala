@@ -56,6 +56,7 @@ class ScalatraBootstrap extends LifeCycle {
     val mainThreadPoolSizeFactor = config.getDouble("mainThreadPoolSizeFactor")
     val siteName = config.getString("siteName")
     val siteAddress = config.getString("siteAddress")
+    val domainName = config.getString("domainName")
     val smtpHost = config.getString("smtpHost")
     val smtpPort = config.getInt("smtpPort")
     val smtpAuth = config.getBoolean("smtpAuth")
@@ -74,7 +75,7 @@ class ScalatraBootstrap extends LifeCycle {
     val db = DatabaseConfig.getDB()
     val scheduler = actorSystem.scheduler
     val emailer = new Emailer(siteName,siteAddress,smtpHost,smtpPort,smtpAuth,smtpUser,smtpPass,noReplyAddress,helpAddress)(mainEC)
-    val accounts = new Accounts(db,scheduler)(mainEC)
+    val accounts = new Accounts(domainName,db,scheduler)(mainEC)
     val siteLogin = new SiteLogin(accounts,emailer,cryptEC,scheduler)(mainEC)
     val games = new Games(db,siteLogin.logins,scheduler,accounts,serverInstanceID)(mainEC)
     val chat = new ChatSystem(db,siteLogin.logins,actorSystem)(actorEC)

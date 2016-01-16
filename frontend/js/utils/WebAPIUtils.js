@@ -109,6 +109,10 @@ var APIUtils = {
     POST('/api/accounts/verifyEmail', {username:username, verifyAuth:verifyAuth}, success, error);
   },
 
+  resendVerifyEmail: function(username, verifyAuth, success, error) {
+    POST('/api/accounts/resendVerifyEmail', {username:username, siteAuth:UserStore.siteAuthToken()}, success, error);
+  },
+
   //TODO use this
   changePassword: function(username, password, siteAuth, newPassword, success, error) {
     POST('/api/accounts/changePassword', {username:username, password:password, siteAuth:UserStore.siteAuthToken(), newPassword:newPassword}, success, error);

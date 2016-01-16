@@ -3,6 +3,8 @@
 siteName = "SITENAME"
 #Main address of site, such as "http://myarimaa.com/"
 siteAddress = "http://myarimaa.com/"
+#Domain name of site
+domainName = "myarimaa.com"
 
 #Number of threads to have for password hashing for logins and registrations
 cryptThreadPoolSize = 3

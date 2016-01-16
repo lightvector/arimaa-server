@@ -81,6 +81,16 @@ class ArimaaServlet(val siteLogin: SiteLogin)
     new java.io.File( getServletContext().getResource(path).getFile )
   }
 
+  get("/resendVerifyEmail/?") {
+    if(notLoggedIn(request.cookies))
+      redirect("/")
+    else {
+      contentType="text/html"
+      val path = "/board.html"
+      new java.io.File( getServletContext().getResource(path).getFile )
+    }
+  }
+
   get("/game/:gameid/?") {
     contentType="text/html"
     val path = "/board.html"
@@ -88,9 +98,13 @@ class ArimaaServlet(val siteLogin: SiteLogin)
   }
 
   get("/chat/:chatchannel/?") {
-    contentType="text/html"
-    val path = "/board.html"
-    new java.io.File( getServletContext().getResource(path).getFile )
+    if(notLoggedIn(request.cookies))
+      redirect("/")
+    else {
+      contentType="text/html"
+      val path = "/board.html"
+      new java.io.File( getServletContext().getResource(path).getFile )
+    }
   }
 
   get("/debug/?") {
