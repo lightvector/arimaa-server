@@ -25,11 +25,13 @@ object ArimaaServerBuild extends Build {
       ),
 
       libraryDependencies ++= Seq(
+        "ch.qos.logback" % "logback-classic" % "1.1.2",
         "com.typesafe" % "config" % "1.2.1",
         "com.typesafe.akka" %% "akka-actor" % "2.3.4",
         "com.typesafe.akka" %% "akka-testkit" % "2.3.4",
         "com.h2database" % "h2" % "1.3.170",
         "com.typesafe.slick" %% "slick" % "3.0.0",
+        "com.typesafe.scala-logging" %% "scala-logging" % "3.1.0",
         "com.zaxxer" % "HikariCP-java6" % "2.3.3",
         "javax.mail" % "javax.mail-api" % "1.5.4",
         "javax.servlet" %  "javax.servlet-api" % "3.1.0",
@@ -53,7 +55,6 @@ object ArimaaServerBuild extends Build {
         "org.scala-lang" % "scala-library" % "2.11.6",
         "org.scala-lang" % "scala-reflect" % "2.11.6",
         "org.slf4j" % "slf4j-api" % "1.7.5",
-        "org.slf4j" % "slf4j-simple" % "1.7.5",
         "org.postgresql" % "postgresql" % "9.3-1100-jdbc4"
       ),
 
