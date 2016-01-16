@@ -87,10 +87,11 @@ class Accounts(val db: Database, val scheduler: Scheduler)(implicit ec: Executio
   def getByNameOrEmail(usernameOrEmail: String, excludeGuests: Boolean): Future[List[Account]] = {
     val lowercaseName = usernameOrEmail.toLowerCase
     var query = Accounts.table.filter(_.lowercaseName === lowercaseName)
-    query = if(excludeGuests) query.filter(_.isGuest) else query
+    query = if(excludeGuests) query.filter(_.isGuest === false) else query
     db.run(query.result).flatMap { result =>
       result.headOption match {
-        case Some(account) => Future.successful(List(account))
+        case Some(account) =>
+          Future.successful(List(account))
         case None =>
           val query = Accounts.table.filter(_.email === usernameOrEmail)
           db.run(query.result).map(_.toList)
@@ -107,7 +108,7 @@ class Accounts(val db: Database, val scheduler: Scheduler)(implicit ec: Executio
   //Get all accounts, optionally excluding guests
   def getAll(excludeGuests: Boolean): Future[List[Account]] = {
     var query: Query[AccountTable,Account,Seq] = Accounts.table
-    query = if(excludeGuests) query.filter(_.isGuest) else query
+    query = if(excludeGuests) query.filter(_.isGuest === false) else query
     db.run(query.result).map(_.toList)
   }
 

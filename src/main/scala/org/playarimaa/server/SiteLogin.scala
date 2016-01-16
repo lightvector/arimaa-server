@@ -245,12 +245,12 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
         val now = Timestamp.get
         val verifyAuth = RandGen.genAuth
         val account = Account(
-          lowercaseName,
-          username,
-          email,
+          lowercaseName = lowercaseName,
+          username = username,
+          email = email,
           emailVerifyNeeded = Some(verifyAuth),
-          passwordHash,
-          isBot,
+          passwordHash = passwordHash,
+          isBot = isBot,
           createdTime = now,
           isGuest = false,
           isAdmin = false,
@@ -329,8 +329,8 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
       val now = Timestamp.get
       val rating = Rating.newPlayerPrior
       val account = Account(
-        lowercaseName,
-        username,
+        lowercaseName = lowercaseName,
+        username = username,
         email = "",
         emailVerifyNeeded = None,
         passwordHash = "N/A",

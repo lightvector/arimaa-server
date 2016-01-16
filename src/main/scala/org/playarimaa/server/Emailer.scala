@@ -36,7 +36,6 @@ class Emailer(
       email.setTextMsg(body)
       email.setHtmlMsg(body)
       email.addTo(to)
-      logger.info("" + email)
       email.send()
       ()
     }.recover {
