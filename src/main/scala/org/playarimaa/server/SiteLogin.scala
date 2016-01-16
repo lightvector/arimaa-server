@@ -270,7 +270,7 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
 
           logger.info(logInfo + " Registered new account for " + username)
           emailer.sendVerifyEmail(email,username,verifyAuth)
-
+          
           doTimeouts(now)
           val siteAuth = logins.login(account.info, now)
           (account.username,siteAuth)

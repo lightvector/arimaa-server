@@ -32,13 +32,17 @@ postgresDBConfig = {
 #Mail host for sending emails to users
 #Ex:
 #smtpHost = "smtp.gmail.com"
-#smtpPort = "587"
+#smtpPort = 465
 #smtpAuth = true
+#smtpUser = "server@myarimaa.com"
+#smtpPass = "foobar"
 #noReplyAddress = "no-reply@myarimaa.com"
 #helpAddress = "help@myarimaa.com"
 smtpHost = ""
-smtpPort = ""
+smtpPort = 465
 smtpAuth = true
+smtpUser = ""
+smtpPass = ""
 
 #Address for no-reply email sent by the server
 noReplyAddress = ""

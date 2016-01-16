@@ -7,7 +7,17 @@ import org.slf4j.{Logger, LoggerFactory}
 
 import org.playarimaa.server.CommonTypes._
 
-class Emailer(siteName: String, siteAddress: String, smtpHost: String, smtpPort: String, smtpAuth: Boolean, noReplyAddress: String, helpAddress: String)(implicit ec: ExecutionContext) {
+class Emailer(
+  siteName: String,
+  siteAddress: String,
+  smtpHost: String,
+  smtpPort: Int,
+  smtpAuth: Boolean,
+  smtpUser: String,
+  smtpPass: String,
+  noReplyAddress: String,
+  helpAddress: String
+)(implicit ec: ExecutionContext) {
 
   val logger =  LoggerFactory.getLogger(getClass)
 
@@ -16,21 +26,19 @@ class Emailer(siteName: String, siteAddress: String, smtpHost: String, smtpPort:
 
   def send(to: Email, subject: String, body: String): Future[Unit] = {
     Future {
-      val props = new Properties()
-      props.put("mail.smtp.host", smtpHost)
-      props.put("mail.smtp.port", smtpPort)
-      if(smtpAuth) {
-        props.put("mail.smtp.auth", "true")
-        props.put("mail.smtp.starttls.enable", "true")
-      }
-
-      val session = Session.getDefaultInstance(props, null)
-      val message: Message = new MimeMessage(session)
-      message.setFrom(new InternetAddress(noReplyAddress))
-      message.addRecipient(Message.RecipientType.TO, new InternetAddress(to))
-      message.setSubject(subject)
-      message.setText(body)
-      Transport.send(message)
+      val email: org.apache.commons.mail.HtmlEmail = new org.apache.commons.mail.HtmlEmail()
+      email.setHostName(smtpHost)
+      email.setSmtpPort(smtpPort)
+      email.setAuthenticator(new org.apache.commons.mail.DefaultAuthenticator(smtpUser, smtpPass))
+      email.setSSLOnConnect(smtpAuth)
+      email.setFrom(noReplyAddress)
+      email.setSubject(subject)
+      email.setTextMsg(body)
+      email.setHtmlMsg(body)
+      email.addTo(to)
+      logger.info("" + email)
+      email.send()
+      ()
     }.recover {
       case exn: Exception =>
         logger.error("Error sending email: " + exn)
@@ -47,9 +55,10 @@ class Emailer(siteName: String, siteAddress: String, smtpHost: String, smtpPort:
       username,
       "\" at ",
       siteName,
-      ". You may choose a new password for your account at the following link:\n",
+      ".<br/>\n",
+      "You may choose a new password for your account at the following link:<br/>\n",
       resetLink,
-      "\n",
+      "<br/>\n",
       "If you did not make this request or did not intend to request this password reset, please ignore this email."
     ).mkString("")
 
@@ -67,9 +76,10 @@ class Emailer(siteName: String, siteAddress: String, smtpHost: String, smtpPort:
       username,
       "\" at ",
       siteName,
-      ". You may confirm this change by visiting the following link:\n",
+      ".<br/>\n",
+      "You may confirm this change by visiting the following link:<br/>\n",
       resetLink,
-      "\n",
+      "<br/>\n",
       "Otherwise, the old address will be retained. If you did not make this request or did not intend to request this change, please ignore this email."
     ).mkString("")
 
@@ -85,7 +95,8 @@ class Emailer(siteName: String, siteAddress: String, smtpHost: String, smtpPort:
       siteName,
       " was changed from this address to \"",
       newEmail,
-      "\". If you did not make this change, please contact ",
+      "\".<br/>\n",
+      "If you did not make this change, please contact ",
       helpAddress,
       "."
     ).mkString("")
@@ -98,7 +109,7 @@ class Emailer(siteName: String, siteAddress: String, smtpHost: String, smtpPort:
     val body = List(
       "A password reset was requested by you (or someone else) at ",
       siteLink,
-      " for this email address. ",
+      " for this email address.<br/>\n",
       "However, there is no account with this email address, so no password reset has been initiated. ",
       "If you made this request, please try again with the email address associated with your account. Otherwise, please ignore this email."
     ).mkString("")
@@ -114,11 +125,12 @@ class Emailer(siteName: String, siteAddress: String, smtpHost: String, smtpPort:
     val body = List(
       "Welcome to ",
       siteLink,
-      "! To verify your new account \"",
+      "!<br/>\n",
+      "To verify your new account \"",
       username,
-      "\" and complete your registration, please visit the following link:\n",
+      "\" and complete your registration, please visit the following link:<br/>\n",
       verifyLink,
-      "\n",
+      "<br/>\n",
       "Otherwise, your account may deactivated or removed within a few days. ",
       "If you did not create this account, please ignore this email, or contact ",
       helpAddress,
