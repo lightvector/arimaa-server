@@ -45,10 +45,14 @@ class Emailer(
     }
   }
 
+  def makeSubject(desc: String): String = {
+    siteName + " - " + desc
+  }
+
   def sendPasswordResetRequest(to: Email, username: Username, auth: Auth): Future[Unit] = {
     val resetUrl = siteAddress + "resetPassword/" + username + "/" + auth
     val resetLink = "<a href=\"" + resetUrl + "\">" + resetUrl + "</a>"
-    val subject = "Password reset requested"
+    val subject = makeSubject("Password reset requested")
     val body = List(
       "A password reset was requested for your account \"",
       username,
@@ -67,7 +71,7 @@ class Emailer(
   def sendEmailChangeRequest(to: Email, username: Username, auth: Auth, oldEmail: Email): Future[Unit] = {
     val resetUrl = siteAddress + "confirmChangeEmail/" + username + "/" + auth
     val resetLink = "<a href=\"" + resetUrl + "\">" + resetUrl + "</a>"
-    val subject = "Email change requested"
+    val subject = makeSubject("Email change requested")
     val body = List(
       "A email address change to this email address from \"",
       oldEmail,
@@ -86,7 +90,7 @@ class Emailer(
   }
 
   def sendOldEmailChangeNotification(to: Email, username: Username, newEmail: Email): Future[Unit] = {
-    val subject = "Email change requested"
+    val subject = makeSubject("Email change requested")
     val body = List(
       "The email address for your account \"",
       username,
@@ -104,7 +108,7 @@ class Emailer(
   }
 
   def sendPasswordResetNoAccount(to: Email): Future[Unit] = {
-    val subject = "Password reset requested for unknown account"
+    val subject = makeSubject("Password reset requested for unknown account")
     val body = List(
       "A password reset was requested by you (or someone else) at ",
       siteLink,
@@ -120,7 +124,7 @@ class Emailer(
   def sendVerifyEmail(to: Email, username: Username, auth: Auth): Future[Unit] = {
     val verifyUrl = siteAddress + "verifyEmail/" + username + "/" + auth
     val verifyLink = "<a href=\"" + verifyUrl + "\">" + verifyUrl + "</a>"
-    val subject = siteName + " - welcome and please verify your account"
+    val subject = makeSubject("Welcome and please verify your account")
     val body = List(
       "Welcome to ",
       siteLink,
