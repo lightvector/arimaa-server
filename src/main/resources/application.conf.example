@@ -1,0 +1,46 @@
+
+#Name of site, such as "myarimaa.com"
+siteName = "SITENAME"
+#Main address of site, such as "http://myarimaa.com/"
+siteAddress = "http://myarimaa.com/"
+
+#Number of threads to have for password hashing for logins and registrations
+cryptThreadPoolSize = 3
+#Number of threads in main pool = numProcessors * this
+mainThreadPoolSizeFactor = 2.0
+
+#Database configurations------------------------------------------------------
+h2DBConfig = {
+  url = "jdbc:h2:mem:test1"
+  driver = org.h2.Driver
+  connectionPool = disabled
+  keepAliveConnection = true
+}
+postgresDBConfig = {
+  dataSourceClass = "org.postgresql.ds.PGSimpleDataSource"
+  properties = {
+    #Set up a postgres database and fill these in to to have the server use that database in prod mode
+    databaseName = "DATABASE_NAME"
+    user = "DATABASE_USER"
+    password = "DATABASE_PASSWORD"
+  }
+  numThreads = 10
+}
+
+#Email-------------------------------------------------------------------------
+
+#Mail host for sending emails to users
+#Ex:
+#smtpHost = "smtp.gmail.com"
+#smtpPort = "587"
+#smtpAuth = true
+#noReplyAddress = "no-reply@myarimaa.com"
+#helpAddress = "help@myarimaa.com"
+smtpHost = ""
+smtpPort = ""
+smtpAuth = true
+
+#Address for no-reply email sent by the server
+noReplyAddress = ""
+#Address that should be listed as a help/contact address
+helpAddress = ""

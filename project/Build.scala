@@ -84,4 +84,5 @@ object ArimaaServerBuild extends Build {
     Project.extract(state2).runTask(start in container, state2)
     state
   }
+
 }
