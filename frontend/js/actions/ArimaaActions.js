@@ -107,8 +107,8 @@ var ArimaaActions = {
     var history = data.history;
     var n = ArimaaStore.getMoveList().length;
     while(history.length > ArimaaStore.getMoveList().length && n < history.length) {
-        ArimaaActions.addMove(history[n]);
-        n++;
+      ArimaaActions.addMove(history[n]);
+      n++;
     }
     if(data.openGameData) {
       //game is still unstarted

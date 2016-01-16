@@ -14,7 +14,7 @@ var SiteActions = {
     if(!navigator.cookieEnabled) {
       ArimaaDispatcher.dispatch({
         actionType: SiteConstants.ACTIONS.LOGIN_FAILED,
-        reason: "Cookies not enabled - please enable cookies or else the site will not work properly."
+        reason: "Cookies not enabled - please enable or else the site will not work properly (cookies used only for site login state and not for tracking)."
       });
       return false;
     }

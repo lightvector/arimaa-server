@@ -315,6 +315,9 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
       ArimaaStore.emitChange();
       break;
     case ArimaaConstants.ACTIONS.GAME_SEND_SETUP_GOLD:
+      //Do nothing unless we're one of the players AND it's our turn
+      if(_myColor === ArimaaConstants.GAME.NULL_COLOR || _myColor !== _colorToMove || _myColor !== ArimaaConstants.GAME.GOLD)
+        break;
       var moveStr = "";
       for(var i=0;i<2;i++) {
         for(var j=0;j<8;j++) {
@@ -325,6 +328,9 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
       ArimaaStore.sendMoveToServer(action.gameID, _gameAuth, moveStr, 0);
       break;
     case ArimaaConstants.ACTIONS.GAME_SEND_SETUP_SILVER:
+      //Do nothing unless we're one of the players AND it's our turn
+      if(_myColor === ArimaaConstants.GAME.NULL_COLOR || _myColor !== _colorToMove || _myColor !== ArimaaConstants.GAME.SILVER)
+        break;
       var moveStr = "";
       for(var i=0;i<2;i++) {
         for(var j=0;j<8;j++) {
@@ -455,6 +461,9 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
 
 
     case ArimaaConstants.ACTIONS.GAME_UNDO_STEP:
+      //Do nothing unless we're one of the players AND it's our turn
+      if(_myColor === ArimaaConstants.GAME.NULL_COLOR || _myColor !== _colorToMove)
+        break;
       var undo = _arimaa.undo_step();
       if(undo) {
         _setSelectedSquare({squareNum:undo.squareNum,squareName:undo.square});
@@ -462,6 +471,9 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
       }
       break;
     case ArimaaConstants.ACTIONS.GAME_REDO_STEP:
+      //Do nothing unless we're one of the players AND it's our turn
+      if(_myColor === ArimaaConstants.GAME.NULL_COLOR || _myColor !== _colorToMove)
+        break;
       var redo = _arimaa.redo_step();
       if(redo) {
         _setSelectedSquare({squareNum:redo.destSquareNum,squareName:redo.destSquare});
@@ -478,14 +490,21 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
       _selSquareStack = [];
       _setSelectedSquareToNull();
       _arimaa.add_move_string(moveStr);
-      var completed = _arimaa.complete_move();
-      if(!completed.success) {
-        debugMsg = completed.reason;
-        _setSelectedSquareToNull();
-        ArimaaStore.emitChange();
+      
+      //Avoid trying to complete a non-existent move on setup moves
+      if(_arimaa.get_halfmove_number() >= 2) {
+        var completed = _arimaa.complete_move();
+        if(!completed.success) {
+          debugMsg = completed.reason;
+          _setSelectedSquareToNull();
+        }
       }
+      ArimaaStore.emitChange();
       break;
     case ArimaaConstants.ACTIONS.GAME_COMPLETE_MOVE:
+      //Do nothing unless we're one of the players AND it's our turn
+      if(_myColor === ArimaaConstants.GAME.NULL_COLOR || _myColor !== _colorToMove)
+        break;
       var completed = _arimaa.complete_move();
       if(completed.success) {
         //definitely need a better way of doing this...
