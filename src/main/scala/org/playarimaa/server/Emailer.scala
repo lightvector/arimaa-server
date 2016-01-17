@@ -12,9 +12,11 @@ class Emailer(
   siteAddress: String,
   smtpHost: String,
   smtpPort: Int,
-  smtpAuth: Boolean,
+  smtpTLS: Boolean,
+  smtpSSL: Boolean,
   smtpUser: String,
   smtpPass: String,
+  smtpDebug: Boolean,
   noReplyAddress: String,
   helpAddress: String
 )(implicit ec: ExecutionContext) {
@@ -33,12 +35,14 @@ class Emailer(
         email.setHostName(smtpHost)
         email.setSmtpPort(smtpPort)
         email.setAuthenticator(new org.apache.commons.mail.DefaultAuthenticator(smtpUser, smtpPass))
-        email.setSSLOnConnect(smtpAuth)
+        email.setStartTLSEnabled(smtpTLS)
+        email.setSSLOnConnect(smtpSSL)
         email.setFrom(noReplyAddress)
         email.setSubject(subject)
         email.setTextMsg(body)
         email.setHtmlMsg(body)
         email.addTo(to)
+        email.setDebug(smtpDebug)
         email.send()
         ()
       }

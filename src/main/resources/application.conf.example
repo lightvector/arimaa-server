@@ -35,17 +35,24 @@ postgresDBConfig = {
 #Ex:
 #smtpHost = "smtp.gmail.com"
 #smtpPort = 465
-#smtpAuth = true
+#smtpTLS = false
+#smtpSSL = true
 #smtpUser = "server@myarimaa.com"
 #smtpPass = "foobar"
+#smtpDebug = false
 #noReplyAddress = "no-reply@myarimaa.com"
 #helpAddress = "help@myarimaa.com"
+
 smtpHost = ""
 smtpPort = 465
-smtpAuth = true
+#Use TLS (generally with port 587)
+smtpTLS = false
+#Use SSL (generally with port 465)
+smtpSSL = true
 smtpUser = ""
 smtpPass = ""
-
+#Output debug messages when email sending
+smtpDebug=false
 #Address for no-reply email sent by the server
 noReplyAddress = ""
 #Address that should be listed as a help/contact address

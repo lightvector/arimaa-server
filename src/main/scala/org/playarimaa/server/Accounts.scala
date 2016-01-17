@@ -134,6 +134,7 @@ class Accounts(val domainName: String, val db: Database, val scheduler: Schedule
   def removeIfGuest(username: Username): Future[Unit] = {
     val lowercaseName = username.toLowerCase
     val query: DBIO[Int] = Accounts.table.filter(_.lowercaseName === lowercaseName).filter(_.isGuest).delete
+    logger.info("Removing guest account: " + username)
     db.run(DBIO.seq(query))
   }
 
@@ -141,6 +142,7 @@ class Accounts(val domainName: String, val db: Database, val scheduler: Schedule
   def removeIfUnverified(username: Username): Future[Unit] = {
     val lowercaseName = username.toLowerCase
     val query: DBIO[Int] = Accounts.table.filter(_.lowercaseName === lowercaseName).filter(_.emailVerifyNeeded.isDefined).delete
+    logger.info("Removing unverified account: " + username)
     db.run(DBIO.seq(query))
   }
 
