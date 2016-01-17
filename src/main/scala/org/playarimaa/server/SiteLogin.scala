@@ -58,24 +58,78 @@ object SiteLogin {
 
     val NO_LOGIN_MESSAGE: String = "Not logged in, or timed out due to inactivity."
 
-    //TODO mention a help or contact address for this?
     val INTERNAL_ERROR: String = "Internal server error."
     val LOGIN_ERROR: String = "Invalid username/email and password combination."
 
+    //These are also used to filter out some email addresses as a slight speedbump against
+    //some forms of spammy stuff according to AWS email best practices - these include a variety
+    //of "role" accounts.
     val INVALID_USERNAME_ERROR: String = "Invalid username or username already in use."
-    val INVALID_USERNAMES = List(
-      "anyone",
+    val INVALID_USERNAMES: List[String] = List(
+      "abuse",
       "admin",
-      "root",
-      "guest",
-      "user",
-      "test",
       "administrator",
+      "all",
+      "anyone",
+      "billing",
+      "contact",
+      "compliance",
+      "devnull",
+      "dns",
+      "everyone",
+      "feedback",
+      "ftp",
+      "guest",
+      "help",
+      "hostmaster",
+      "info",
+      "inoc",
+      "inquiries",
+      "investorrelations",
+      "ispfeedback",
+      "ispsupport",
+      "jobs",
+      "list",
+      "listrequest",
+      "maildaemon",
+      "marketing",
+      "media",
       "moderator",
+      "news",
+      "nobody",
+      "noc",
       "none",
+      "noreply",
       "null",
-      "undefined"
+      "orders",
+      "phish",
+      "phishing",
+      "postmaster",
+      "press",
+      "privacy",
+      "registrar",
+      "remove",
+      "root",
+      "sales",
+      "security",
+      "service",
+      "spam",
+      "support",
+      "sysadmin",
+      "tech",
+      "test",
+      "trouble",
+      "undefined",
+      "undisclosedrecipients",
+      "unsubscribe",
+      "usenet",
+      "user",
+      "uucp",
+      "webmaster",
+      "www"
     )
+    val INVALID_EMAIL_ERROR: String = "Invalid email address, please try a different one."
+    val INVALID_EMAILS: List[String] = INVALID_USERNAMES
   }
 }
 
@@ -177,6 +231,11 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
       throw new IllegalArgumentException("Email must contain an '@'.")
     if(email.length < EMAIL_MIN_LENGTH || EMAIL_MAX_LENGTH > EMAIL_MAX_LENGTH)
       throw new IllegalArgumentException(EMAIL_LENGTH_ERROR)
+
+    //Filter down to the alphanumeric part of the email address to the left of the @
+    val s = email.slice(0,email.lastIndexOf('@')).filter(_.isLetterOrDigit).toLowerCase
+    if(INVALID_EMAILS.exists(_ == s))
+      throw new IllegalArgumentException(INVALID_EMAIL_ERROR)
   }
 
   def validateUsernameOrEmail(usernameOrEmail: String) : Unit = {
