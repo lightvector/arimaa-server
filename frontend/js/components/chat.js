@@ -204,7 +204,7 @@ var chatBox = React.createClass({
           ),
           React.createElement(
             "form", {key: "chatForm", className: "chatForm", onSubmit: this.submitUserInput},
-            React.createElement("input", {key:"chatInput", type: "text", ref: "text", value: this.state.userInput, onChange: this.handleUserInputChange, disabled: this.state.inputDisabled, placeholder: "Say something..."}),
+            React.createElement("input", {key:"chatInput", className:"chatInput", type: "text", ref: "text", value: this.state.userInput, onChange: this.handleUserInputChange, disabled: this.state.inputDisabled, placeholder: "Say something..."}),
             React.createElement("input", {key:"chatSubmit", type: "submit", className:"submit", disabled: !this.state.chatAuth || this.state.inputDisabled, value: "Post"})
           ),
           React.createElement("div", {key: "chatJoinLeaveDiv", className: "chatJoinLeaveDiv"}, [

@@ -6,6 +6,7 @@ $selection: #8b9ae0 !default;
 
 $body-bg : #dddddd !default;
 $panel-bg : #505050 !default;
+$panel-border-color : #808080 !default;
 $game-bg : #272727 !default;
 
 $font-stack: 'Quattrocento Sans', sans-serif;
@@ -111,6 +112,9 @@ h4 {
   padding: 10px 10px 5px 10px;
   background: $panel-bg;
   border-radius: 5px;
+  border-style: outset;
+  border-width: thin;
+  border-color: $panel-border-color;
   color: white;
   //@include box-shadow(0 0 200px rgba(white, .5), 0 1px 2px rgba(black, .3));
 
@@ -332,11 +336,20 @@ div.bigError {
 
 .chatTable {
   overflow:auto;
-  display:block;
+  display:-webkit-flex;
+  display:flex;
   background:white;
   color:black;
   border-radius:1px;
   margin-bottom:4px;
+  border-style:inset;
+  border-width:thin;
+}
+
+.chatInput {
+  -webkit-flex:auto;
+  -ms-flex:auto;
+  flex:auto;
 }
 
 .unselectable {
