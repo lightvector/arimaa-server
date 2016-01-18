@@ -7,6 +7,7 @@ object CommonTypes {
   type GameAuth = String
   type GameID = String
   type UserID = String
+  type LowercaseName = String
   type Username = String
   type Email = String
 

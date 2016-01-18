@@ -329,6 +329,7 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
         val account = Account(
           lowercaseName = lowercaseName,
           username = username,
+          userID = RandGen.genUserID,
           email = email,
           emailVerifyNeeded = Some(verifyAuth),
           passwordHash = passwordHash,
@@ -418,6 +419,7 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
       val account = Account(
         lowercaseName = lowercaseName,
         username = username,
+        userID = RandGen.genUserID,
         email = "",
         emailVerifyNeeded = None,
         passwordHash = "N/A",

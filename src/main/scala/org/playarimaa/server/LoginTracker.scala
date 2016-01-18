@@ -31,9 +31,9 @@ class LoginTracker(
     var isActive: Boolean = true
   }
 
-  //We use UserID (i.e. lowercaseName) internally for loginData so that we aren't sensitive to the capitalization of a user's name for
+  //We use lowercaseName internally for loginData so that we aren't sensitive to the capitalization of a user's name for
   //methods of LoginTracker.
-  private var loginData: Map[UserID,LoginData] = Map()
+  private var loginData: Map[LowercaseName,LoginData] = Map()
   private var lastActive: Timestamp = Timestamp.get
 
   private var userAndParentAuth: Map[Auth,(Username,Option[Auth])] = Map()
