@@ -1499,7 +1499,7 @@ object GameUtils {
   }
 
   def searchDB(db: Database, searchParams: Games.SearchParams, serverInstanceID: Long)(implicit ec: ExecutionContext): Future[List[GameMetadata]] = {
-    var query = Games.gameTable.filter(_.numPly === 5)
+    var query: Query[GameTable,GameMetadata,Seq] = Games.gameTable
     searchParams.rated.foreach { rated => query = query.filter(_.rated === rated) }
     searchParams.postal.foreach { postal => query = query.filter(_.postal === postal) }
     searchParams.gameType.foreach { gameType => query = query.filter(_.gameType === gameType) }
