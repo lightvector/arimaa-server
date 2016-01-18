@@ -13,11 +13,13 @@ import akka.actor.{Scheduler,Cancellable}
 object SiteLogin {
 
   object Constants {
-    //TODO maybe add an "inactive" mode where timed out users will auto-log-in if they use their auth within a much longer
-    //time frame, so that 2 minutes of lag doesn't require a re-log-in
-    val INACTIVITY_TIMEOUT: Double = 120 //2 minutes (including heartbeats)
+    //How much inactivity until a user is no longer displayed as present in the game room, including heartbeats.
+    val INACTIVITY_TIMEOUT: Double = 120 //2 minutes
+    //How much inactivity until we actually invalidate the user's authentication and require a re-log-in
+    val LOGOUT_TIMEOUT: Double = 172800 //2 days
+    //Timeouts for resetting passwords and email change requests
     val PASSWORD_RESET_TIMEOUT: Double = 1800 //30 minutes
-    val EMAIL_CHANGE_TIMEOUT: Double = 84600 //1 day
+    val EMAIL_CHANGE_TIMEOUT: Double = 86400 //1 day
 
     //Rate of refresh of simple user infos (displayed ratings and such), as well as internal upkeep and cleanup
     val LOOP_PERIOD: Double = 10 //10 seconds
@@ -139,7 +141,7 @@ import SiteLogin.Constants._
 
 class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: ExecutionContext, val scheduler: Scheduler)(implicit ec: ExecutionContext) {
 
-  val logins: LoginTracker = new LoginTracker(None, INACTIVITY_TIMEOUT, updateInfosFromParent = false)
+  val logins: LoginTracker = new LoginTracker(None, INACTIVITY_TIMEOUT, LOGOUT_TIMEOUT, updateInfosFromParent = false)
 
   //Throttles for different kinds of queries
   private val loginBuckets: TimeBuckets[String] = new TimeBuckets(LOGIN_BUCKET_CAPACITY, LOGIN_BUCKET_FILL_PER_SEC)
@@ -248,7 +250,7 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
             throw new Exception("Invalid username or email (" + exn1.getMessage() + ") (" + exn2.getMessage() + ")")
         }
     }
-  }            
+  }
 
   def validatePassword(password: String): Unit = {
     if(password.length < PASSWORD_MIN_LENGTH || PASSWORD_MAX_LENGTH > PASSWORD_MAX_LENGTH)
@@ -256,8 +258,8 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
   }
 
   def doTimeouts(now: Timestamp): Unit = {
-    val usersTimedOut = logins.doTimeouts(now)
-    usersTimedOut.foreach { user =>
+    val usersLoggedOut = logins.doTimeouts(now)
+    usersLoggedOut.foreach { user =>
       accounts.removeIfGuest(user)
     }
   }
@@ -267,7 +269,7 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
     val futures = logins.usersLoggedIn.map { user =>
       accounts.getByName(user.name,excludeGuests=false).map {
         case None => ()
-        case Some(acct) =>logins.updateInfo(acct.info)
+        case Some(acct) => logins.updateInfo(acct.info)
       }
     }
     Future.sequence(futures).map { _ : List[Unit] => () }
@@ -276,7 +278,7 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
   def usersLoggedIn: List[SimpleUserInfo] = {
     val now = Timestamp.get
     doTimeouts(now)
-    logins.usersLoggedIn
+    logins.usersActive
   }
 
   private def hashpw(password: String): Future[String] = {
@@ -295,7 +297,6 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
     }
   }
 
-  //TODO throttle registrations and guest logins by IP address
   def register(username: Username, email: Email, password: String, isBot: Boolean, priorRating:Option[Double], logInfo: LogInfo): Future[(Username,SiteAuth)] = {
     Future.successful(()).flatMap { case () =>
       validateUsername(username)
@@ -331,7 +332,7 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
 
         //Note: not sensitive to capitalization of user's name
         //Slight race condition possible here, but hopefully not a big deal
-        if(logins.isUserLoggedIn(username))
+        if(logins.isUserActive(username))
           throw new Exception(INVALID_USERNAME_ERROR)
 
         accounts.add(account).recover { case _ => throw new Exception(INVALID_USERNAME_ERROR) }.map { case () =>
@@ -340,7 +341,7 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
 
           logger.info(logInfo + " Registered new account for " + username)
           emailer.sendVerifyEmail(email,username,verifyAuth)
-          
+
           doTimeouts(now)
           val siteAuth = logins.login(account.info, now)
           (account.username,siteAuth)
@@ -418,7 +419,7 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
       //Also only allow guest login if nobody is already logged in with that account.
       //Note: not sensitive to capitalization of user's name
       //Slight race condition possible here, but hopefully not a big deal
-      if(logins.isUserLoggedIn(username))
+      if(logins.isUserActive(username))
         throw new Exception(INVALID_USERNAME_ERROR)
 
       accounts.add(account).recover { case _ => throw new Exception(INVALID_USERNAME_ERROR) }.map { case () =>
@@ -577,7 +578,7 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
 
               checkpw(password, account.passwordHash).flatMap { success =>
                 if(!success)
-                  throw new Exception("Old password did not match.")                
+                  throw new Exception("Old password did not match.")
                 hashpw(newPassword).flatMap { passwordHash =>
                   accounts.setPasswordHash(account.username,passwordHash).map { result =>
                     logger.info(logInfo + " Password changed for account: " + account.username)
@@ -692,7 +693,7 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
                   logger.info(logInfo + " Email change confirmed for account: " + account.username + " from " + oldEmail + " to " + newEmail)
                 }
             }
-        }      
+        }
       }.recover { case exn: Exception =>
           logger.info(logInfo + " Confirm change email for account: " + username + " failed with result " + exn)
           throw exn

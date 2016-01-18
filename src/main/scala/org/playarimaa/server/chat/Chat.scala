@@ -99,7 +99,7 @@ class ChatSystem(val db: Database, val parentLogins: LoginTracker, val actorSyst
   implicit val timeout = ChatSystem.AKKA_TIMEOUT
 
   private val gf = ChatSystem.CHAT_GLOBAL_BUCKET_FACTOR
-  private val joinBuckets: TimeBuckets[Username] = new TimeBuckets(ChatSystem.CHAT_JOIN_BUCKET_CAPACITY * gf, ChatSystem.CHAT_JOIN_BUCKET_FILL_PER_SEC * gf) 
+  private val joinBuckets: TimeBuckets[Username] = new TimeBuckets(ChatSystem.CHAT_JOIN_BUCKET_CAPACITY * gf, ChatSystem.CHAT_JOIN_BUCKET_FILL_PER_SEC * gf)
   private val lineBuckets: TimeBuckets[Username] = new TimeBuckets(ChatSystem.CHAT_LINE_BUCKET_CAPACITY * gf, ChatSystem.CHAT_LINE_BUCKET_FILL_PER_SEC * gf)
   private val charBuckets: TimeBuckets[Username] = new TimeBuckets(ChatSystem.CHAT_CHAR_BUCKET_CAPACITY * gf, ChatSystem.CHAT_CHAR_BUCKET_FILL_PER_SEC * gf)
 
@@ -238,14 +238,14 @@ class ChatChannel(
   var messagesNotYetInDB: Queue[ChatLine] = Queue()
 
   //Tracks who is logged in to this chat channel
-  val logins: LoginTracker = new LoginTracker(Some(parentLogins), ChatSystem.INACTIVITY_TIMEOUT, updateInfosFromParent = true)
+  val logins: LoginTracker = new LoginTracker(Some(parentLogins), ChatSystem.INACTIVITY_TIMEOUT, ChatSystem.INACTIVITY_TIMEOUT, updateInfosFromParent = true)
   //Most recent time anything happened in this channel
   var lastActive = Timestamp.get
 
   //Whether or not we started the loop that checks timeouts for the chat
   var timeoutCycleStarted = false
 
-  private val joinBuckets: TimeBuckets[Username] = new TimeBuckets(ChatSystem.CHAT_JOIN_BUCKET_CAPACITY, ChatSystem.CHAT_JOIN_BUCKET_FILL_PER_SEC) 
+  private val joinBuckets: TimeBuckets[Username] = new TimeBuckets(ChatSystem.CHAT_JOIN_BUCKET_CAPACITY, ChatSystem.CHAT_JOIN_BUCKET_FILL_PER_SEC)
   private val lineBuckets: TimeBuckets[Username] = new TimeBuckets(ChatSystem.CHAT_LINE_BUCKET_CAPACITY, ChatSystem.CHAT_LINE_BUCKET_FILL_PER_SEC)
   private val charBuckets: TimeBuckets[Username] = new TimeBuckets(ChatSystem.CHAT_CHAR_BUCKET_CAPACITY, ChatSystem.CHAT_CHAR_BUCKET_FILL_PER_SEC)
 
