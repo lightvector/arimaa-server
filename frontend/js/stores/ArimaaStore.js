@@ -162,7 +162,7 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
     return clock;
   },
 
-  getSeletedSquare: function() {
+  getSelectedSquare: function() {
     return {
       num: _selSquareNum,
       name: _selSquareName
@@ -324,8 +324,12 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
           moveStr += _currentSetup[8*i+j]+ArimaaConstants.GAME.FILES[j]+(2-i).toString()+" ";
         }
       }
-      _arimaa.setup_gold(moveStr); //TODO NO ERROR CHECKING YET
-      ArimaaStore.sendMoveToServer(action.gameID, _gameAuth, moveStr, 0);
+      var completed = _arimaa.setup_gold(moveStr);
+      if(completed.success) {
+        ArimaaStore.sendMoveToServer(action.gameID, _gameAuth, moveStr, 0);
+      } else {
+        debugMsg = completed.reason;
+      }
       break;
     case ArimaaConstants.ACTIONS.GAME_SEND_SETUP_SILVER:
       //Do nothing unless we're one of the players AND it's our turn
@@ -337,8 +341,12 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
           moveStr += _currentSetup[8*i+j]+ArimaaConstants.GAME.FILES[j]+(8-i).toString()+" ";
         }
       }
-      _arimaa.setup_silver(moveStr); //TODO NO ERROR CHECKING YET
-      ArimaaStore.sendMoveToServer(action.gameID, _gameAuth, moveStr, 1);
+      var completed = _arimaa.setup_silver(moveStr);
+      if(completed.success) {
+        ArimaaStore.sendMoveToServer(action.gameID, _gameAuth, moveStr, 1);
+      } else {
+        debugMsg = completed.reason;
+      }
       break;
 
       //debug methods to send setup as text
@@ -489,15 +497,9 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
       _redoSquareStack = [];
       _selSquareStack = [];
       _setSelectedSquareToNull();
-      _arimaa.add_move_string(moveStr);
-      
-      //Avoid trying to complete a non-existent move on setup moves
-      if(_arimaa.get_halfmove_number() >= 2) {
-        var completed = _arimaa.complete_move();
-        if(!completed.success) {
-          debugMsg = completed.reason;
-          _setSelectedSquareToNull();
-        }
+      var completed = _arimaa.add_move_string(moveStr);
+      if(!completed.success) {
+        debugMsg = completed.reason;
       }
       ArimaaStore.emitChange();
       break;
@@ -505,21 +507,21 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
       //Do nothing unless we're one of the players AND it's our turn
       if(_myColor === ArimaaConstants.GAME.NULL_COLOR || _myColor !== _colorToMove)
         break;
-      var completed = _arimaa.complete_move();
+      //Don't actually complete the move, because if the server rejects our move for any reason, we'll enter into an inconsistent state having
+      //played the move locally but not having it accepted by the server.
+      //When the server gamestate comes back to us, we'll blow away our partial step state and update properly via _arimaa.add_move_string above.
+      var completed = _arimaa.can_complete_move();
       if(completed.success) {
-        //definitely need a better way of doing this...
+        //TODO definitely need a better way of doing this...
         //converts list of step strings to single move string
-        var moves = _arimaa.get_move_list();
-        var lastMove = moves[moves.length-1];
-        var lastMoveStr = lastMove.map(function(s) {return s.string;}).join(' ');
+        var ongoingMove = _arimaa.get_ongoing_move();
+        var moveStr = ongoingMove.map(function(s) {return s.string;}).join(' ');
 
-        //send move to server
-        ArimaaStore.sendMoveToServer(action.gameID, _gameAuth, lastMoveStr, _arimaa.get_halfmove_number()+1);
+        //Send move to server
+        ArimaaStore.sendMoveToServer(action.gameID, _gameAuth, moveStr, _arimaa.get_halfmove_number());
         _redoSquareStack = [];
         _selSquareStack = [];
       } else {
-        //alert "can't complete move because..."
-        //undo step?
         debugMsg = completed.reason;
       }
       ArimaaStore.emitChange();

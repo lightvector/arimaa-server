@@ -8,7 +8,7 @@ var ArimaaConstants = require('../constants/ArimaaConstants.js');
 function getGameState() {
   var boardState = {
     fen: ArimaaStore.getArimaa().get_fen(),
-    stepFrom: ArimaaStore.getSeletedSquare().name, //TODO need to change this name
+    stepFrom: ArimaaStore.getSelectedSquare().name,
     steps: ArimaaStore.getValidSteps(),
     viewSide: ArimaaStore.getViewSide(),
     setupColor: ArimaaStore.getSetupColor(),
@@ -120,7 +120,7 @@ var Board = React.createClass({
       </div>
     );
   }
-  
+
 });
 
 module.exports = Board;
