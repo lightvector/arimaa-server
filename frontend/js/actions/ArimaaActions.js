@@ -62,24 +62,48 @@ var ArimaaActions = {
     });
   },
 
+  rejoinIfNotActive: function(gameID) {
+    var username = UserStore.getUsername();
+    var game = ArimaaStore.getGameState();
+    if(game !== null &&
+       game.meta.activeGameData !== undefined &&
+       (game.meta.gUser.name == username && !game.meta.activeGameData.gPresent) ||
+       (game.meta.sUser.name == username && !game.meta.activeGameData.sPresent)) {
+      ArimaaActions.joinAndStartHeartbeatLoop(gameID);
+    }
+  },
+
   //Initiates a loop heartbeating this game so long as this game is active and we're joined with it
   startHeartbeatLoop: function(gameID, gameAuth) {
     var username = UserStore.getUsername();
     var game = ArimaaStore.getGameState();
 
     //If the game is not active, terminate
-    if(game.meta.activeGameData === undefined)
+    if(game === null || game.meta.activeGameData === undefined)
       return;
 
-    //If we're not joined to this game, terminate.
+    //If we're not part of this game, terminate
+    if(!(game.meta.gUser !== undefined && game.meta.gUser.name == username) &&
+       !(game.meta.sUser !== undefined && game.meta.sUser.name == username))
+      return;
+
+    //If we're not joined to this game, try joining it again
     if((game.meta.gUser.name == username && !game.meta.activeGameData.gPresent) ||
-       (game.meta.sUser.name == username && !game.meta.activeGameData.sPresent))
-      return;
+       (game.meta.sUser.name == username && !game.meta.activeGameData.sPresent)) {
+      //But wait a bit to see if we actually do get a game state indicating we're joined
+      setTimeout(function () {
+        ArimaaActions.rejoinIfNotActive(gameID);
+      }, SiteConstants.VALUES.REJOIN_GAME_DELAY * 1000);
+    }
 
-    APIUtils.gameHeartbeat(gameID, gameAuth, FUNC_NOP, function (data) {ArimaaActions.onHeartbeatError(gameID,data);});
-     setTimeout(function () {
-       ArimaaActions.startHeartbeatLoop(gameID, gameAuth);
-     }, SiteConstants.VALUES.GAME_HEARTBEAT_PERIOD * 1000);
+    APIUtils.gameHeartbeat(gameID, gameAuth,
+                           function (data) {ArimaaActions.onHeartbeatSuccess(gameID,gameAuth,data);},
+                           function (data) {ArimaaActions.onHeartbeatError(gameID,data);});
+  },
+  onHeartbeatSuccess: function(gameID,gameAuth,data) {
+    setTimeout(function () {
+      ArimaaActions.startHeartbeatLoop(gameID, gameAuth);
+    }, SiteConstants.VALUES.GAME_HEARTBEAT_PERIOD * 1000);
   },
   onHeartbeatError: function(gameID,data) {
     ArimaaDispatcher.dispatch({
@@ -93,7 +117,7 @@ var ArimaaActions = {
   startGameStateLoop: function() {
     var game = ArimaaStore.getGameState();
     //If the game is not open or active, terminate
-    if(game.meta.openGameData === undefined && game.meta.activeGameData === undefined)
+    if(game === null || game.meta.openGameData === undefined && game.meta.activeGameData === undefined)
       return;
     APIUtils.gameState(game.meta.gameID, game.meta.sequence+1, ArimaaActions.gameStateSuccess, ArimaaActions.gameStateError);
   },

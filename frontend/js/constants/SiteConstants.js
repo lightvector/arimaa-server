@@ -31,7 +31,7 @@ var ACTIONS = keyMirror({
 const VALUES = {
   //TODO if we could get atmosphere working, replacing all these loops with a simple event stream
   //would be really nice
-  
+
   //Seconds between queries for refreshing open or active games lists in the gameroom
   GAME_LIST_LOOP_DELAY: 10.0,
   GAME_LIST_LOOP_DELAY_ON_ERROR: 30.0,
@@ -43,6 +43,8 @@ const VALUES = {
   //Seconds to wait before another polling query for a game state for a game we're playing
   GAME_STATE_LOOP_DELAY: 0.2,
   GAME_STATE_LOOP_DELAY_ON_ERROR: 5.0,
+  //Seconds to wait to try to rejoin a game that is active that we're part of but not joined in
+  REJOIN_GAME_DELAY: 2.0,
 
   //Check if we need to go to login page if not logged in this often
   //This also serves as a heartbeat for the site so it won't log us out
