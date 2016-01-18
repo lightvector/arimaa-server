@@ -238,7 +238,7 @@ class ChatChannel(
   var messagesNotYetInDB: Queue[ChatLine] = Queue()
 
   //Tracks who is logged in to this chat channel
-  val logins: LoginTracker = new LoginTracker(Some(parentLogins), ChatSystem.INACTIVITY_TIMEOUT, ChatSystem.INACTIVITY_TIMEOUT, updateInfosFromParent = true)
+  val logins: LoginTracker = new LoginTracker(Some(parentLogins), ChatSystem.INACTIVITY_TIMEOUT, ChatSystem.INACTIVITY_TIMEOUT, ChatSystem.INACTIVITY_TIMEOUT, updateInfosFromParent = true)
   //Most recent time anything happened in this channel
   var lastActive = Timestamp.get
 

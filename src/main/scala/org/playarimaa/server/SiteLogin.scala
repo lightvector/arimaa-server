@@ -17,6 +17,9 @@ object SiteLogin {
     val INACTIVITY_TIMEOUT: Double = 120 //2 minutes
     //How much inactivity until we actually invalidate the user's authentication and require a re-log-in
     val LOGOUT_TIMEOUT: Double = 172800 //2 days
+    //How long a user can be logged in total until they get logged out the moment they're inactive, including heartbeats.
+    val SOFT_LOGIN_TIME_LIMIT: Double = 172800 //2 days
+
     //Timeouts for resetting passwords and email change requests
     val PASSWORD_RESET_TIMEOUT: Double = 1800 //30 minutes
     val EMAIL_CHANGE_TIMEOUT: Double = 86400 //1 day
@@ -141,7 +144,7 @@ import SiteLogin.Constants._
 
 class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: ExecutionContext, val scheduler: Scheduler)(implicit ec: ExecutionContext) {
 
-  val logins: LoginTracker = new LoginTracker(None, INACTIVITY_TIMEOUT, LOGOUT_TIMEOUT, updateInfosFromParent = false)
+  val logins: LoginTracker = new LoginTracker(None, INACTIVITY_TIMEOUT, LOGOUT_TIMEOUT, SOFT_LOGIN_TIME_LIMIT, updateInfosFromParent = false)
 
   //Throttles for different kinds of queries
   private val loginBuckets: TimeBuckets[String] = new TimeBuckets(LOGIN_BUCKET_CAPACITY, LOGIN_BUCKET_FILL_PER_SEC)

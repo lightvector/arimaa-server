@@ -10,14 +10,23 @@ import org.playarimaa.server.Timestamp.Timestamp
  *
  * @param inactiveAfter how old to require a login is to declare it inactive when [doTimeouts] is called.
  * @param logoutAfter how old to require a login is to time it out when [doTimeouts] is called.
+ * @param softLoginTimeLimit once a login hits this age, log it out as soon as not active
  * @param updateInfosFromParent if true, also update SimpleUserInfos if they change in the parent.
  */
-class LoginTracker(val parent: Option[LoginTracker], val inactiveAfter: Double, val logoutAfter: Double, val updateInfosFromParent: Boolean) {
+class LoginTracker(
+  val parent: Option[LoginTracker],
+  val inactiveAfter: Double,
+  val logoutAfter: Double,
+  val softLoginTimeLimit: Double,
+  val updateInfosFromParent: Boolean
+) {
   class LoginData(var info: SimpleUserInfo) {
     //All auth keys this user has, along with the time they were most recently used
     var auths: Map[Auth,Timestamp] = Map()
+    //Start time of this login
+    val startTime: Timestamp = Timestamp.get
     //Most recent time anything happened for this user
-    var lastActive: Timestamp = Timestamp.get
+    var lastActive: Timestamp = startTime
     //Whether this user is considered active right now or not
     var isActive: Boolean = true
   }
@@ -172,14 +181,17 @@ class LoginTracker(val parent: Option[LoginTracker], val inactiveAfter: Double, 
     loginData = loginData.filter { case (_,ld) =>
       var atLeastOneActive = false
       ld.auths = ld.auths.filter { case (auth,time) =>
-        //Update inactivity
-        if(!atLeastOneActive && now < time + inactiveAfter)
-          atLeastOneActive = true
-
+        //Has this auth been accessed particularly recently?
+        val isAuthActive = now < time + inactiveAfter
         //Should we keep this auth of this user logged in?
         val shouldKeep =
-          //Only if it's within the inactivity timeout and the parent is still there
+          //Must be within the logout timeout
           now < time + logoutAfter &&
+          //Must be active if a guest account
+          (!ld.info.isGuest || isAuthActive)
+          //Must be active if past the soft limit
+          (now < ld.startTime + softLoginTimeLimit || isAuthActive)
+          //Parent must still be logged in with the parent auth
           userAndParentAuth(auth)._2.forall { parentAuth =>
             parent.get.userOfAuth(parentAuth) match {
               case None =>
@@ -194,6 +206,8 @@ class LoginTracker(val parent: Option[LoginTracker], val inactiveAfter: Double, 
             }
           }
 
+        if(isAuthActive)
+          atLeastOneActive = true
         if(!shouldKeep)
           userAndParentAuth = userAndParentAuth - auth
         shouldKeep
