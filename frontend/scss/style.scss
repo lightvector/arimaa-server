@@ -240,6 +240,15 @@ div.bigError {
   color:red;
 }
 
+.navItem {
+  margin-left:10px;
+  margin-right:10px;
+}
+
+.navItemRight {
+  float:right;
+}
+
 .gameroom {
   display:-webkit-flex;
   display:flex;
@@ -356,6 +365,11 @@ div.bigError {
   margin-bottom:4px;
   border-style:inset;
   border-width:thin;
+}
+
+.chatForm {
+  display:-webkit-flex;
+  display:flex;
 }
 
 .chatInput {

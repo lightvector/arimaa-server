@@ -2,6 +2,7 @@ var React = require('react');
 var ReactDOM = require('react-dom');
 var Modal = require('react-modal');
 var Linkify = require('react-linkify');
+var Link = require('react-router').Link;
 var ClassNames = require('classnames');
 var SiteActions = require('../actions/SiteActions.js');
 var UserStore = require('../stores/UserStore.js');
@@ -55,6 +56,11 @@ var component = React.createClass({
       popupMessage:message,
       popupMessageOpen:true
     });
+  },
+
+  onMenuLogout: function() {
+    SiteActions.logout();
+    return false;
   },
 
   handleJoinedPlayerSelection: function(gameID, evt) {
@@ -277,6 +283,19 @@ var component = React.createClass({
     ));
   },
 
+  renderMenu: function() {
+    return (
+      <nav className="uiPanel">
+        <span className="navItem">
+          <Link to="/gameroom">Gameroom</Link>
+        </span>
+        <span className="navItem navItemRight">
+          <a href="#" onClick={this.onMenuLogout}>Logout</a>
+        </span>
+      </nav>
+    );
+  },
+
   render: function() {
     var that = this;
     var username = UserStore.getUsername();
@@ -359,9 +378,12 @@ var component = React.createClass({
           React.createElement("ul", {key: "notificationsList"}, notificationsList));
     }
 
+    var menu = this.renderMenu();
+
     var contents = [
       createModal,
       popupModal,
+      menu,
       notificationsDiv,
       React.createElement("div", {key:"gameroomPanels", className: "gameroomPanels"}, [
         React.createElement("div", {key:"gamesDiv", className:"games"}, [
