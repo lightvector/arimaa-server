@@ -231,18 +231,18 @@ class AccountServlet(val accounts: Accounts, val siteLogin: SiteLogin, val ec: E
         }
       case Some(ChangeEmail) =>
         val query = Json.read[ChangeEmail.Query](request.body)
-        siteLogin.changeEmail(query.username, query.password, query.siteAuth, query.newEmail, logInfo).map { case () =>
-          Json.write(ChangeEmail.Reply("Email sent to new address, please confirm from there to complete this change."))
+        siteLogin.changeEmail(query.username, query.password, query.siteAuth, query.newEmail, logInfo).map { case email =>
+          Json.write(ChangeEmail.Reply("Email sent to " + email + ", please confirm from there to complete this change."))
         }
       case Some(ConfirmChangeEmail) =>
         val query = Json.read[ConfirmChangeEmail.Query](request.body)
-        siteLogin.confirmChangeEmail(query.username, query.changeAuth, logInfo).map { case () =>
-          Json.write(ConfirmChangeEmail.Reply("New email set."))
+        siteLogin.confirmChangeEmail(query.username, query.changeAuth, logInfo).map { case email =>
+          Json.write(ConfirmChangeEmail.Reply("New email " + email + " set."))
         }
       case Some(ResendVerifyEmail) =>
         val query = Json.read[ResendVerifyEmail.Query](request.body)
-        siteLogin.resendVerifyEmail(query.username, query.siteAuth, logInfo).map { case () =>
-          Json.write(ResendVerifyEmail.Reply("Ok."))
+        siteLogin.resendVerifyEmail(query.username, query.siteAuth, logInfo).map { case email =>
+          Json.write(ResendVerifyEmail.Reply("Verification resent to " + email + "."))
         }
       case Some(VerifyEmail) =>
         val query = Json.read[VerifyEmail.Query](request.body)

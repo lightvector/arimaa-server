@@ -635,7 +635,7 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
     }
   }
 
-  def changeEmail(username: Username, password: String, siteAuth: SiteAuth, newEmail: Email, logInfo: LogInfo) : Future[Unit] = {
+  def changeEmail(username: Username, password: String, siteAuth: SiteAuth, newEmail: Email, logInfo: LogInfo) : Future[Email] = {
     Future.successful(()).flatMap { case () =>
       validateUsername(username)
       validateEmail(newEmail)
@@ -671,6 +671,7 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
                 //Send email to user advising about change
                 emailer.sendEmailChangeRequest(newEmail,account.username,auth,account.email).map { case () =>
                   logger.info(logInfo + " Email change initated for account: " + account.username + " from " + account.email + " to " + newEmail)
+                  newEmail
                 }
               }
           }
@@ -682,7 +683,7 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
     }
   }
 
-  def confirmChangeEmail(username: Username, changeAuth: Auth, logInfo: LogInfo) : Future[Unit] = {
+  def confirmChangeEmail(username: Username, changeAuth: Auth, logInfo: LogInfo) : Future[Email] = {
     Future.successful(()).flatMap { case () =>
       validateUsername(username)
       accounts.getByName(username, excludeGuests=true).flatMap { result =>
@@ -709,6 +710,7 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
                   //Don't wait for old email to go out
                   emailer.sendOldEmailChangeNotification(oldEmail,account.username,newEmail)
                   logger.info(logInfo + " Email change confirmed for account: " + account.username + " from " + oldEmail + " to " + newEmail)
+                  newEmail
                 }
             }
         }
@@ -719,7 +721,7 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
     }
   }
 
-  def resendVerifyEmail(username: Username, siteAuth: SiteAuth, logInfo: LogInfo) : Future[Unit] = {
+  def resendVerifyEmail(username: Username, siteAuth: SiteAuth, logInfo: LogInfo) : Future[Email] = {
     Future.successful(()).flatMap { case () =>
       validateUsername(username)
       requiringLogin(siteAuth) { user =>
@@ -740,6 +742,7 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
                 case Some(verifyAuth) =>
                   emailer.sendVerifyEmail(account.email,account.username,verifyAuth)
                   logger.info(logInfo + " User requested resend verify email: " + account.username)
+                  account.email
               }
           }
         }

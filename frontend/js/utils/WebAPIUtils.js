@@ -117,7 +117,7 @@ var APIUtils = {
     POST('/api/accounts/verifyEmail', {username:username, verifyAuth:verifyAuth}, success, error);
   },
 
-  resendVerifyEmail: function(username, verifyAuth, success, error) {
+  resendVerifyEmail: function(username, success, error) {
     POST('/api/accounts/resendVerifyEmail', {username:username, siteAuth:UserStore.siteAuthToken()}, success, error);
   },
 
