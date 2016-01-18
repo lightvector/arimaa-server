@@ -80,7 +80,7 @@ var APIUtils = {
   loginGuest: function(username, success, error) {
     var siteAuth = UserStore.siteAuthToken();
     if(siteAuth)
-      POST('/api/accounts/loginGuest', {username:username, siteAuth:siteAuth}, success, error);
+      POST('/api/accounts/loginGuest', {username:username, oldSiteAuth:siteAuth}, success, error);
     else
       POST('/api/accounts/loginGuest', {username:username}, success, error);
   },
@@ -88,7 +88,7 @@ var APIUtils = {
   register: function(username, email, password, priorRating, success, error) {
     var siteAuth = UserStore.siteAuthToken();
     if(siteAuth)
-      POST('/api/accounts/register', {username:username, email:email, password:password, isBot:false, priorRating:priorRating, siteAuth:siteAuth}, success, error);
+      POST('/api/accounts/register', {username:username, email:email, password:password, isBot:false, priorRating:priorRating, oldSiteAuth:siteAuth}, success, error);
     else
       POST('/api/accounts/register', {username:username, email:email, password:password, isBot:false, priorRating:priorRating}, success, error);
   },
