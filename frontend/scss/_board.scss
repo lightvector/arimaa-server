@@ -10,13 +10,35 @@ $step-to-img : "../images/green-circle.png" !default;
 
 //Css file for the game client
 
+.arimaaGame {
+  display:-webkit-flex;
+  display:flex;
+  flex-flow: column;
+  min-height:0;
+}
+
+.arimaaGameDisplay {
+  display:-webkit-flex;
+  display:flex;
+  min-height:0;
+}
+
+.arimaaBoardDisplay {
+}
+
+.arimaaGame .chat {
+  width: 40%;
+}
+
 .boardPane {
+  display:-webkit-flex;
   display: flex;
   flex-flow: column;
   float: left;
 }
 
 .sidePane {
+  display:-webkit-flex;
   display: flex;
   flex-flow: column;
   height: $board-size;
@@ -27,11 +49,15 @@ $step-to-img : "../images/green-circle.png" !default;
 }
 
 .topPlayerInfo {
+  -webkit-flex:initial;
+  -ms-flex:initial;
   flex: initial;
   margin-bottom:10px;
 }
 
 .bottomPlayerInfo {
+  -webkit-flex:initial;
+  -ms-flex:initial;
   flex: initial;
   margin-top:10px;
 }
@@ -127,6 +153,8 @@ $step-to-img : "../images/green-circle.png" !default;
 table.moveList {
   border-width: 2px;
   border-color: $panel-bg;
+  -webkit-flex:auto;
+  -ms-flex:auto;
   flex: auto;
   width: 270px;
   display: block;

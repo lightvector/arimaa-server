@@ -340,7 +340,7 @@ var component = React.createClass({
 
       ownGamesList.unshift(React.createElement("button", {key: "createGameButton", className:"bMargin", onClick: this.createButtonClicked}, "Create New Game"));
       ownGamesList.unshift(React.createElement("h3", {key: "myCurrentGamesLabel"}, "My Current Games"));
-      ownGamesDiv = React.createElement("div", {key: "ownDiv", className:"uiPanel bMargin"}, ownGamesList);
+      ownGamesDiv = React.createElement("div", {key: "ownDiv", className:"uiPanel bMargin gamesList"}, ownGamesList);
     }
 
     var joinableOpenGamesDiv = "";
@@ -350,7 +350,7 @@ var component = React.createClass({
       });
 
       joinableOpenGamesList.unshift(React.createElement("h3", {key: "openGamesLabel"}, "Open Games"));
-      joinableOpenGamesDiv = React.createElement("div", {key: "joinableOpenDiv", className:"uiPanel bMargin" }, joinableOpenGamesList);
+      joinableOpenGamesDiv = React.createElement("div", {key: "joinableOpenDiv", className:"uiPanel bMargin gamesList" }, joinableOpenGamesList);
     }
 
 
@@ -361,7 +361,7 @@ var component = React.createClass({
       });
 
       watchableGamesList.unshift(React.createElement("h3", {key: "activeGamesLabel"}, "Active Games"));
-      watchableGamesDiv = React.createElement("div", {key: "watchableDiv", className:"uiPanel bMargin"}, watchableGamesList);
+      watchableGamesDiv = React.createElement("div", {key: "watchableDiv", className:"uiPanel bMargin gamesList"}, watchableGamesList);
     }
 
     var chat = (

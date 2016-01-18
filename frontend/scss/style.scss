@@ -51,6 +51,7 @@ body {
   -webkit-flex:auto;
   -ms-flex:auto;
   flex:auto;
+  min-height:0;
 }
 
 .app {
@@ -60,6 +61,7 @@ body {
   -webkit-flex:auto;
   -ms-flex:auto;
   flex:auto;
+  min-height:0;
 }
 
 footer {
@@ -260,6 +262,7 @@ div.bigError {
   -webkit-flex:auto;
   -ms-flex:auto;
   flex:auto;
+  min-height:0;
 }
 
 .gameroomPanels {
@@ -268,6 +271,7 @@ div.bigError {
   -webkit-flex:auto;
   -ms-flex:auto;
   flex:auto;
+  min-height:0;
 }
 
 .games {
@@ -275,6 +279,7 @@ div.bigError {
   display:-webkit-flex;
   display:flex;
   flex-flow:column;
+  min-height:0;
 }
 
 .gamesContents {
@@ -284,6 +289,7 @@ div.bigError {
   display:-webkit-flex;
   display:flex;
   height: 70%;
+  min-height:0;
 }
 
 .gamesLists {
@@ -293,6 +299,11 @@ div.bigError {
   display:-webkit-flex;
   display:flex;
   flex-flow:column;
+  min-height:0;
+}
+
+.gamesList {
+  min-height:50px;
 }
 
 .gameroomGameElt.quickHighlightOrange {
@@ -320,6 +331,7 @@ div.bigError {
   -ms-flex:0.15 1 auto;
   flex: 0.15 1 auto;
   margin-left: 8px;
+  min-height:100px;
 }
 
 .chat {
@@ -328,6 +340,7 @@ div.bigError {
   display:flex;
   flex-flow:column;
   margin-left: 10px;
+  min-height:0;
 }
 
 .chatContents {
@@ -337,6 +350,7 @@ div.bigError {
   display:-webkit-flex;
   display:flex;
   height: 70%;
+  min-height:0;
 }
 
 .chatUsersDiv {
@@ -348,6 +362,7 @@ div.bigError {
   -ms-flex:0.15 1 auto;
   flex: 0.15 1 auto;
   margin-left: 8px;
+  min-height:100px;
 }
 
 .chatUI {
@@ -357,6 +372,7 @@ div.bigError {
   display:-webkit-flex;
   display:flex;
   flex-flow:column;
+  min-height:200px;
 }
 
 .chatTable {
@@ -370,6 +386,7 @@ div.bigError {
   border-style:inset;
   border-width:thin;
   font-size:90%;
+  min-height:150px;
 }
 
 .chatForm {
