@@ -194,8 +194,14 @@ var chatBox = React.createClass({
       this.props.params.chatChannel == "main" ?
       React.createElement("h1", {key: "chatLabel"}, "Chat") : null;
 
+    var errorDiv = "";
+    if(this.state.error != "") {
+      errorDiv = React.createElement("div", {key: "chatError", className:"bigError bMargin"}, this.state.error);
+    }
+
     var contents = [
       chatLabel,
+      errorDiv,
       React.createElement("div", {key: "chatContents", className:"chatContents"}, [
         React.createElement("div", {key: "chatUI", className:"chatUI uiPanel"}, [
           React.createElement(
@@ -215,10 +221,6 @@ var chatBox = React.createClass({
         usersDiv
       ]),
     ];
-
-    if(this.state.error != "") {
-      contents.push(React.createElement("div", {key: "chatError", className:"error"}, this.state.error));
-    }
 
     return React.createElement("div", {key: "chat", className: "chat"}, contents);
   }
