@@ -18,7 +18,7 @@ import org.playarimaa.server.Timestamp.Timestamp
 
 object ChatSystem {
   //Leave chat if it's been this many seconds with no activity (including heartbeats)
-  val INACTIVITY_TIMEOUT: Double = 240.0
+  val INACTIVITY_TIMEOUT: Double = 120.0
   //Max lines at a time to return in a single query
   val READ_MAX_LINES: Int = 5000
   //Timeout for a single get query for chat messages
@@ -26,7 +26,7 @@ object ChatSystem {
   //Timeout for akka ask queries
   val AKKA_TIMEOUT: Timeout = new Timeout(20 seconds)
   //Period for checking timeouts in a chat even if nothing happens
-  val CHAT_CHECK_TIMEOUT_PERIOD: Double = 120.0
+  val CHAT_CHECK_TIMEOUT_PERIOD: Double = 60.0
   //Max length of text in characters
   val MAX_TEXT_LENGTH: Int = 4000
   val MAX_TEXT_LENGTH_MESSAGE: String = "Chat text too long (max " + MAX_TEXT_LENGTH + " chars)"
