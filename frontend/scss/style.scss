@@ -38,23 +38,33 @@ body {
   font-family: $font-stack;
   background : $body-bg;
   margin: 0px;
-  padding: 8px 8px 30px 8px;
+  padding: 8px 8px 15px 8px;
+  display:-webkit-flex;
+  display:flex;
+  flex-flow:column;
 }
 
 #app_container {
-  height: 100%;
+  display:-webkit-flex;
+  display:flex;
+  flex-flow:column;
+  -webkit-flex:auto;
+  -ms-flex:auto;
+  flex:auto;
 }
 
 .app {
-  height: 100%;
+  display:-webkit-flex;
+  display:flex;
+  flex-flow:column;
+  -webkit-flex:auto;
+  -ms-flex:auto;
+  flex:auto;
 }
 
 footer {
   text-align: center;
-  position: absolute;
-  left: 50%;
-  transform: translate(-50%,-50%);
-  bottom: 0px;
+  margin: 8px;
   z-index: -1;
 }
 
@@ -231,16 +241,20 @@ div.bigError {
 }
 
 .gameroom {
-  height:100%;
   display:-webkit-flex;
   display:flex;
   flex-flow:column;
+  -webkit-flex:auto;
+  -ms-flex:auto;
+  flex:auto;
 }
 
 .gameroomPanels {
-  height:100%;
   display:-webkit-flex;
   display:flex;
+  -webkit-flex:auto;
+  -ms-flex:auto;
+  flex:auto;
 }
 
 .games {
@@ -248,7 +262,6 @@ div.bigError {
   display:-webkit-flex;
   display:flex;
   flex-flow:column;
-  height:100%;
 }
 
 .gamesContents {
@@ -301,7 +314,6 @@ div.bigError {
   display:-webkit-flex;
   display:flex;
   flex-flow:column;
-  height:100%;
   margin-left: 10px;
 }
 
