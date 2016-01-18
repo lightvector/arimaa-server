@@ -82,13 +82,13 @@ class GameServletTests(_system: ActorSystem) extends TestKit(_system) with Scala
 
   "GameServer" should "allow users to create games" in {
 
-    post("/accounts/register", Json.write(AccountServlet.Register.Query("Bob","bob@domainname.com","password",false,""))) {
+    post("/accounts/register", Json.write(AccountServlet.Register.Query("Bob","bob@domainname.com","password",false,"",None))) {
       status should equal (200)
       val reply = readJson[AccountServlet.Register.Reply](body)
       bobSiteAuth = reply.siteAuth
       (bobSiteAuth.length > 10) should be (true)
     }
-    post("/accounts/register", Json.write(AccountServlet.Register.Query("Alice","alice@domainname.com","password",false,"2000"))) {
+    post("/accounts/register", Json.write(AccountServlet.Register.Query("Alice","alice@domainname.com","password",false,"2000",None))) {
       status should equal (200)
       val reply = readJson[AccountServlet.Register.Reply](body)
       aliceSiteAuth = reply.siteAuth

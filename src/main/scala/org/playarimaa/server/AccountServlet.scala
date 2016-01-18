@@ -70,7 +70,7 @@ object AccountServlet {
 
   case object Register extends Action {
     val name = "register"
-    case class Query(username: String, email: String, password: String, isBot: Boolean, priorRating: String)
+    case class Query(username: String, email: String, password: String, isBot: Boolean, priorRating: String, oldSiteAuth: Option[String])
     case class Reply(username: String, siteAuth: String)
   }
   case object Login extends Action {
@@ -80,7 +80,7 @@ object AccountServlet {
   }
   case object LoginGuest extends Action {
     val name = "loginGuest"
-    case class Query(username: String)
+    case class Query(username: String, oldSiteAuth: Option[String])
     case class Reply(username: String, siteAuth: String)
   }
   case object Logout extends Action {
@@ -184,7 +184,7 @@ class AccountServlet(val accounts: Accounts, val siteLogin: SiteLogin, val ec: E
           case "" => None
           case s => Some(s.toFiniteDouble)
         }
-        siteLogin.register(query.username, query.email, query.password, query.isBot, priorRating, logInfo).map { case (username,siteAuth) =>
+        siteLogin.register(query.username, query.email, query.password, query.isBot, priorRating, query.oldSiteAuth, logInfo).map { case (username,siteAuth) =>
           Json.write(Register.Reply(username, siteAuth))
         }
       case Some(Login) =>
@@ -199,7 +199,7 @@ class AccountServlet(val accounts: Accounts, val siteLogin: SiteLogin, val ec: E
           throw new Exception(GUEST_LIMIT_MESSAGE)
         }
         val query = Json.read[LoginGuest.Query](request.body)
-        siteLogin.loginGuest(query.username, logInfo).map { case (username,siteAuth) =>
+        siteLogin.loginGuest(query.username, query.oldSiteAuth, logInfo).map { case (username,siteAuth) =>
           Json.write(LoginGuest.Reply(username, siteAuth))
         }
       case Some(Logout) =>

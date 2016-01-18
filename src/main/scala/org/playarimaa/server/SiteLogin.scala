@@ -300,7 +300,15 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
     }
   }
 
-  def register(username: Username, email: Email, password: String, isBot: Boolean, priorRating:Option[Double], logInfo: LogInfo): Future[(Username,SiteAuth)] = {
+  def register(
+    username: Username,
+    email: Email,
+    password: String,
+    isBot: Boolean,
+    priorRating: Option[Double],
+    oldSiteAuth: Option[SiteAuth],
+    logInfo: LogInfo
+  ): Future[(Username,SiteAuth)] = {
     Future.successful(()).flatMap { case () =>
       validateUsername(username)
       validateEmail(email)
@@ -333,9 +341,12 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
           priorRating = rating
         )
 
+        //You can't register a new account if someone (i.e. a guest) is logged in with that account,
+        //UNLESS you were the one logged in with that account (with the siteAuth to prove it).
         //Note: not sensitive to capitalization of user's name
         //Slight race condition possible here, but hopefully not a big deal
-        if(logins.isUserActive(username))
+        if(logins.isUserActive(username) &&
+          !oldSiteAuth.exists { oldSiteAuth => logins.isLoggedIn(username,oldSiteAuth) })
           throw new Exception(INVALID_USERNAME_ERROR)
 
         accounts.add(account).recover { case _ => throw new Exception(INVALID_USERNAME_ERROR) }.map { case () =>
@@ -395,7 +406,7 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
     }
   }
 
-  def loginGuest(username: Username, logInfo: LogInfo): Future[(Username,SiteAuth)] = {
+  def loginGuest(username: Username, oldSiteAuth: Option[SiteAuth], logInfo: LogInfo): Future[(Username,SiteAuth)] = {
     Future.successful(()).flatMap { case () =>
       if(username == "")
         throw new Exception("Please choose a username.")
@@ -420,9 +431,11 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
       )
 
       //Also only allow guest login if nobody is already logged in with that account.
+      //UNLESS you were the one logged in with that account (with the siteAuth to prove it).
       //Note: not sensitive to capitalization of user's name
       //Slight race condition possible here, but hopefully not a big deal
-      if(logins.isUserActive(username))
+      if(logins.isUserActive(username) &&
+        !oldSiteAuth.exists { oldSiteAuth => logins.isLoggedIn(username,oldSiteAuth) })
         throw new Exception(INVALID_USERNAME_ERROR)
 
       accounts.add(account).recover { case _ => throw new Exception(INVALID_USERNAME_ERROR) }.map { case () =>

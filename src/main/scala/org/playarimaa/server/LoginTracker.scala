@@ -106,6 +106,10 @@ class LoginTracker(
     }
   }
 
+  def userOfLogin(username: Username, auth: Auth): Option[SimpleUserInfo] = synchronized {
+    getLoginData(username,auth).map(_.info)
+  }
+
   /* Returns the last time that any activity occurred */
   def lastActiveTime: Timestamp = synchronized {
     lastActive
@@ -144,12 +148,24 @@ class LoginTracker(
     }
   }
 
+  private def clearAllAuths(ld: LoginData): Unit = {
+    ld.auths.foreach { case (auth,_) =>
+      userAndParentAuth = userAndParentAuth - auth
+    }
+  }
+
   /* Log a single auth of a user out */
   def logout(username: Username, auth: Auth, now: Timestamp): Unit = synchronized {
     lastActive = now
     getLoginData(username,auth).foreach { ld =>
       ld.auths = ld.auths - auth
+      val numLeft = ld.auths.size
+      if(numLeft <= 0) {
+        val lowercaseName = username.toLowerCase
+        loginData = loginData - lowercaseName
+      }
     }
+    userAndParentAuth = userAndParentAuth - auth
   }
   /* Log a single auth of a user out */
   def logoutAuth(auth: Auth, now: Timestamp): Unit = synchronized {
@@ -162,14 +178,17 @@ class LoginTracker(
   def logoutUser(username: Username, now: Timestamp): Unit = synchronized {
     lastActive = now
     val lowercaseName = username.toLowerCase
+    loginData.get(lowercaseName).foreach(clearAllAuths(_))
     loginData = loginData - lowercaseName
   }
 
   /* Log out all users except the list specified */
   def logoutAllExcept(users: List[Username]): Unit = synchronized {
     val lowercaseNames = users.map(_.toLowerCase)
-    loginData = loginData.filter { case (lowercaseName,_) =>
+    loginData = loginData.filter { case (lowercaseName,ld) =>
       val shouldKeep = lowercaseNames.contains(lowercaseName)
+      if(!shouldKeep)
+        clearAllAuths(ld)
       shouldKeep
     }
   }
@@ -188,9 +207,9 @@ class LoginTracker(
           //Must be within the logout timeout
           now < time + logoutAfter &&
           //Must be active if a guest account
-          (!ld.info.isGuest || isAuthActive)
+          (!ld.info.isGuest || isAuthActive) &&
           //Must be active if past the soft limit
-          (now < ld.startTime + softLoginTimeLimit || isAuthActive)
+          (now < ld.startTime + softLoginTimeLimit || isAuthActive) &&
           //Parent must still be logged in with the parent auth
           userAndParentAuth(auth)._2.forall { parentAuth =>
             parent.get.userOfAuth(parentAuth) match {

@@ -63,7 +63,7 @@ class ChatServletTests(_system: ActorSystem) extends TestKit(_system) with Scala
 
   "ChatServer" should "allow users to join and post messages" in {
 
-    post("/accounts/register", Json.write(AccountServlet.Register.Query("Bob","bob@domainname.com","password",false,""))) {
+    post("/accounts/register", Json.write(AccountServlet.Register.Query("Bob","bob@domainname.com","password",false,"",None))) {
       status should equal (200)
       val reply = readJson[AccountServlet.Register.Reply](body)
       bobSiteAuth = reply.siteAuth
