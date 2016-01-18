@@ -38,6 +38,7 @@ var GameClock = React.createClass({
   },
 
   render: function() {
+    //TODO take into account maxMoveTime!!
     var clock = this.state.clock;
     var clockFormatted = "-:--";
     if(clock !== null)

@@ -37,15 +37,22 @@ case class TimeControl(
       throw new Exception("Invalid time control: too fast")
   }
 
-  /* Compute the amount of time left on player clock after a player's turn */
-  def clockAfterTurn(clockBeforeTurn: Double, timeSpent: Double, turn: Int): Double = {
+  private def adjIncrementDelay(plyNum: Int): (Double,Double) = {
+    val turnNum : Int = plyNum / 2
     val overtimeFactor =
-      if(overtimeAfter.exists(turn >= _))
-        math.pow(TimeControl.OVERTIME_FACTOR_PER_TURN, turn - overtimeAfter.get + 1.0)
+      if(overtimeAfter.exists(turnNum >= _))
+        math.pow(TimeControl.OVERTIME_FACTOR_PER_TURN, (turnNum - overtimeAfter.get).toDouble)
       else
         1.0
     val adjIncrement = increment * overtimeFactor
     val adjDelay = delay * overtimeFactor
+    (adjIncrement,adjDelay)
+  }
+
+  /* Compute the amount of time left on player clock after a player's turn.
+   * @param plyNum the (0-indexed) index of the relevant (half-)turn of the player */
+  def clockAfterTurn(clockBeforeTurn: Double, timeSpent: Double, plyNum: Int): Double = {
+    val (adjIncrement,adjDelay) = adjIncrementDelay(plyNum)
     var clock = clockBeforeTurn + adjIncrement - math.max(timeSpent - adjDelay, 0.0)
     maxReserve.foreach { maxReserve => clock = math.min(clock, maxReserve) }
     clock
@@ -55,15 +62,16 @@ case class TimeControl(
    * of time usage on all the moves of the game. */
   def clockFromHistory(timeUsageHistory: Seq[Double]): Double = {
     var clock: Double = initialTime
-    timeUsageHistory.zipWithIndex.foreach { case (timeSpent,turn) =>
-      clock = clockAfterTurn(clock,timeSpent,turn)
+    timeUsageHistory.zipWithIndex.foreach { case (timeSpent,plyNum) =>
+      clock = clockAfterTurn(clock,timeSpent,plyNum*2)
     }
     clock
   }
 
   /* Compute the remaining amount of time a player can use this turn before losing due to time */
-  def timeLeftUntilLoss(clockBeforeTurn: Double, timeSpent: Double, turn: Int): Double = {
-    var clock = clockAfterTurn(clockBeforeTurn, timeSpent, turn)
+  def timeLeftUntilLoss(clockBeforeTurn: Double, timeSpent: Double, plyNum: Int): Double = {
+    val (adjIncrement,adjDelay) = adjIncrementDelay(plyNum)
+    var clock = clockBeforeTurn + adjIncrement + adjDelay - timeSpent
     maxMoveTime match {
       case None => clock
       case Some(maxMoveTime) => math.min(clock, maxMoveTime - timeSpent)
