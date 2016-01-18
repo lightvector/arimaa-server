@@ -249,6 +249,10 @@ div.bigError {
   float:right;
 }
 
+.notificationsList {
+  margin-top:0.5em;
+  margin-bottom:0.5em;
+}
 .gameroom {
   display:-webkit-flex;
   display:flex;
@@ -365,6 +369,7 @@ div.bigError {
   margin-bottom:4px;
   border-style:inset;
   border-width:thin;
+  font-size:90%;
 }
 
 .chatForm {

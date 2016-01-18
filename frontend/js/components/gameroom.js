@@ -285,7 +285,7 @@ var component = React.createClass({
 
   renderMenu: function() {
     return (
-      <nav className="uiPanel">
+      <nav className="uiPanel bMargin">
         <span className="navItem">
           <Link to="/gameroom">Gameroom</Link>
         </span>
@@ -375,7 +375,7 @@ var component = React.createClass({
       });
       notificationsDiv =
         React.createElement("div", {key: "notificationsDiv", className:"uiPanel bMargin"},
-          React.createElement("ul", {key: "notificationsList"}, notificationsList));
+          React.createElement("ul", {key: "notificationsList", className:"notificationsList"}, notificationsList));
     }
 
     var menu = this.renderMenu();
