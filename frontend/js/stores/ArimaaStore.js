@@ -55,6 +55,10 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
     return _setupColor;
   },
 
+  getColorToMove: function() {
+    return _colorToMove;
+  },
+
   getSetup: function() {
     return _currentSetup;
   },

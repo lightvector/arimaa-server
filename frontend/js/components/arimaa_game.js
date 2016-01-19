@@ -72,13 +72,13 @@ var Game = React.createClass({
           <div className="arimaaGameDisplay">
             <div className="arimaaBoardDisplay">
               <div className="boardPane">
+                <PlayerInfo pos={"top"}/>
                 <Board gameID={this.props.params.gameID}/>
+                <PlayerInfo pos={"bottom"}/>
                 <BoardButtons gameID={this.props.params.gameID}/>
               </div>
               <div className="sidePane">
-                <PlayerInfo pos={"top"}/>
                 <Movelist gameID={this.props.params.gameID}/>
-                <PlayerInfo pos={"bottom"}/>
               </div>
             </div>
             <Chat params={{chatChannel:"game/"+this.props.params.gameID}}/>

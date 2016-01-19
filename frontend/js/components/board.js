@@ -115,8 +115,11 @@ var Board = React.createClass({
     var squares = position.map(this.renderSquare, this);
 
     return (
-      <div className="board unselectable" onMouseLeave={this.hoverAway}>
-        {squares}
+      <div className="boardSquare unselectable" >
+        <div className="boardSquareBuffer"></div>
+        <div className="board unselectable" onMouseLeave={this.hoverAway}>
+          {squares}
+        </div>
       </div>
     );
   }

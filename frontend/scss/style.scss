@@ -1,5 +1,9 @@
 $silver : #A9D5E4 !default;
+$silver-border : #aaaaff !default;
+$silver-shadow : #5588ff !default;
 $gold : #E4D5A6 !default;
+$gold-border : #ffaa77 !default;
+$gold-shadow : #ff8811 !default;
 
 $highlight: #8b9ae0 !default;
 $selection: #8b9ae0 !default;
@@ -52,6 +56,7 @@ body {
   -ms-flex:auto;
   flex:auto;
   min-height:0;
+  overflow:auto;
 }
 
 .app {

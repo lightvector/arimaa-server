@@ -12,6 +12,7 @@ var GameClock = React.createClass({
       clock: ArimaaStore.getClockRemaining(this.props.pos, false),
       playerInfo: ArimaaStore.getUserInfo(this.props.pos),
       player: ArimaaStore.getPlayerOfPos(this.props.pos),
+      playerToMove: ArimaaStore.getColorToMove(),
       tc: ArimaaStore.getTCOfPos(this.props.pos),
       gameState: ArimaaStore.getGameState()
     };
@@ -22,6 +23,7 @@ var GameClock = React.createClass({
       clock: ArimaaStore.getClockRemaining(this.props.pos, false),
       playerInfo: ArimaaStore.getUserInfo(this.props.pos),
       player: ArimaaStore.getPlayerOfPos(this.props.pos),
+      playerToMove: ArimaaStore.getColorToMove(),
       tc: ArimaaStore.getTCOfPos(this.props.pos),
       gameState: ArimaaStore.getGameState()
     });
@@ -74,17 +76,24 @@ var GameClock = React.createClass({
       }
     }
 
+    var toMove = "";
+    if(this.state.gameState &&
+       this.state.gameState.meta.activeGameData &&
+       this.state.playerToMove !== ArimaaConstants.GAME.NULL_COLOR &&
+       this.state.playerToMove == this.state.player)
+      toMove = " toMove";
+
     if(this.props.pos === "top") {
       return (
-        <div className={"topPlayerInfo " + panelColor}>
-          <span className={clockClass}> {clockFormatted} </span> <span className={tcClass}> {tcFormatted} </span>
-          <br/>
+        <div className={"topPlayerInfo " + panelColor + toMove}>
           <span className="playerName"> {userInfoString} </span>
+          <br/>
+          <span className={clockClass}> {clockFormatted} </span> <span className={tcClass}> {tcFormatted} </span>
         </div>
       );
     } else {
       return (
-        <div className={"bottomPlayerInfo " + panelColor}>
+        <div className={"bottomPlayerInfo " + panelColor + toMove}>
           <span className="playerName"> {userInfoString} </span>
           <br/>
           <span className={clockClass}> {clockFormatted} </span> <span className={tcClass}> {tcFormatted} </span>
