@@ -243,7 +243,7 @@ const ArimaaStore = Object.assign({}, EventEmitter.prototype, {
       ArimaaStore.emitChange();
       break;
     case ArimaaConstants.ACTIONS.SENT_MOVE_TO_SERVER_FAILED:
-      debugMsg = "Failed to send move, try refreshing page: " + action.data.error;
+      debugMsg = "Failed to send move: " + action.data.error;
       ArimaaStore.emitChange();
       break;
     case ArimaaConstants.ACTIONS.GAME_STATE_FAILED:
