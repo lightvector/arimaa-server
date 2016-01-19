@@ -129,10 +129,24 @@ var Arimaa = function(options) {
       destSquareNum : fromSqNumber + DIRECTIONS[direction],
       destSquare : square_name(fromSqNumber + DIRECTIONS[direction]),
       direction : direction,
-      special : specialOptions, //do something else later...
+      special : specialOptions, //do something else later... //TODO unused??
       string : PIECES.charAt(piece)+square_name(fromSqNumber)+direction
     };
   };
+
+  function get_prev_step_no_caps() {
+    var prevStep = null;
+    if(ongoingMove.length > 0) {
+      prevStep = ongoingMove[ongoingMove.length-1];
+
+      if(prevStep.direction === 'x') {
+        prevStep = null;
+        if(ongoingMove.length > 1)
+          prevStep = ongoingMove[ongoingMove.length-2];
+      }
+    }
+    return prevStep;
+  }
 
   //need to undo 2 steps if one is a capture
   function undo_step() {
@@ -194,8 +208,13 @@ var Arimaa = function(options) {
     if(ongoingMove.length === 0) return {success: false, reason: "No steps taken"};
 
     if(boardHistory.length) {
-      if(currentFen === boardHistory[boardHistory.length-1]) return {success: false, reason: "Position hasn't changed"}; //no change
+      if(currentFen === boardHistory[boardHistory.length-1])
+        return {success: false, reason: "Position hasn't changed"};
     }
+
+    if(has_uncompleted_push())
+      return {success: false, reason: "Incomplete push"};
+
     var count = 0;
     for(var i=0;i<boardHistory.length;i++) {
       if(currentFen == boardHistory[i]) count += 1;
@@ -351,7 +370,8 @@ var Arimaa = function(options) {
     if(piece === EMPTY) return false;
     if(((piece & COLOR)>>3) == colorToMove) return false;
     if(ongoingMove.length == 0) return false;
-    var prevStep = ongoingMove[ongoingMove.length-1];
+
+    var prevStep = get_prev_step_no_caps();
 
     if(prevStep['completedPush']) return false; //a piece that just pushed can't also pull
 
@@ -401,6 +421,16 @@ var Arimaa = function(options) {
     return steps;
   }
 
+  function has_uncompleted_push() {
+    if(ongoingMove.length) {
+      var prevStep = get_prev_step_no_caps();
+      if(prevStep['push']) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   //eventually, since we will need to call generate_moves at the beginning
   //of every move, we can skip some of the checking and just add steps if its
   //in the list of possible moves after splitting the string to a step obj
@@ -432,7 +462,7 @@ var Arimaa = function(options) {
     if(piece === SRABBIT && direction === 'n') return {success:false, stepsLeft: stepsLeft};
 
     if(ongoingMove.length) {
-      var prevStep = ongoingMove[ongoingMove.length-1];
+      var prevStep = get_prev_step_no_caps();
       if(prevStep['push']) {
         if(prevStep['squareNum'] == squareNum+DIRECTIONS[direction] &&
           ((piece & COLOR) >> 3) == colorToMove &&
@@ -457,7 +487,7 @@ var Arimaa = function(options) {
     if(p !== piece) return {success:false, stepsLeft: stepsLeft};
 
     if(direction === 'x') {
-      //CHECK IF WE ACTUALLY SHOULD REMOVE THIS PIECE LATER
+      //TODO CHECK IF WE ACTUALLY SHOULD REMOVE THIS PIECE LATER
       remove_piece_from_square(squareNum);
       return {success:true, stepsLeft: stepsLeft, step: stepObj};
     }
@@ -501,15 +531,7 @@ var Arimaa = function(options) {
       return steps;
     }
 
-    var prevStep = null;
-    if(ongoingMove.length > 0) {
-      prevStep = ongoingMove[ongoingMove.length-1];
-      //ignore captures
-      if(prevStep.direction === 'x') {
-        prevStep = ongoingMove[ongoingMove.length-2];
-      }
-
-    }
+    var prevStep = get_prev_step_no_caps();
 
     var pieceName = PIECES.charAt(piece);
     var location = square_name(squareNum);
@@ -861,6 +883,10 @@ var Arimaa = function(options) {
 
     can_complete_move: function() {
       return can_complete_move();
+    },
+
+    has_uncompleted_push() {
+      return has_uncompleted_push();
     },
 
     //note: currently, you can add more steps after victory,
