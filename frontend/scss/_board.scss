@@ -43,7 +43,7 @@ $step-to-img : "../images/green-circle.png" !default;
   -webkit-flex:auto;
   -ms-flex:auto;
   flex: auto;
-  max-width: 520px;
+  max-width: 480px;
 }
 
 .sidePane {
@@ -51,7 +51,7 @@ $step-to-img : "../images/green-circle.png" !default;
   display: flex;
   flex-flow: column;
   min-height: 40px;
-  max-height: 540px;
+  max-height: 500px;
   margin-left:10px;
   margin-bottom:10px;
   margin-right:10px;
@@ -89,7 +89,7 @@ $step-to-img : "../images/green-circle.png" !default;
   border-style:solid;
 }
 
-.goldPlayerPanel .toMove {
+.goldToMove {
   box-shadow: 0px 0px 6px $gold-shadow;
 }
 
@@ -102,7 +102,7 @@ $step-to-img : "../images/green-circle.png" !default;
   border-style:solid;
 }
 
-.silverPlayerPanel .toMove {
+.silverToMove {
   box-shadow: 0px 0px 6px $silver-shadow;
 }
 

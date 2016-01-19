@@ -54,7 +54,7 @@ var GameClock = React.createClass({
         userInfoString += " (disconnected)";
     }
 
-    var panelColor = (this.state.player == ArimaaConstants.GAME.GOLD ? "goldPlayerPanel" : "silverPlayerPanel");
+    var panelColor = (this.state.player == ArimaaConstants.GAME.GOLD ? " goldPlayerPanel" : " silverPlayerPanel");
 
     var clockClass = "clockSpan";
     if(clock < 10)
@@ -81,11 +81,11 @@ var GameClock = React.createClass({
        this.state.gameState.meta.activeGameData &&
        this.state.playerToMove !== ArimaaConstants.GAME.NULL_COLOR &&
        this.state.playerToMove == this.state.player)
-      toMove = " toMove";
+      toMove = (this.state.player == ArimaaConstants.GAME.GOLD ? " goldToMove" : " silverToMove");
 
     if(this.props.pos === "top") {
       return (
-        <div className={"topPlayerInfo " + panelColor + toMove}>
+        <div className={"topPlayerInfo" + panelColor + toMove}>
           <span className="playerName"> {userInfoString} </span>
           <br/>
           <span className={clockClass}> {clockFormatted} </span> <span className={tcClass}> {tcFormatted} </span>
@@ -93,7 +93,7 @@ var GameClock = React.createClass({
       );
     } else {
       return (
-        <div className={"bottomPlayerInfo " + panelColor + toMove}>
+        <div className={"bottomPlayerInfo" + panelColor + toMove}>
           <span className="playerName"> {userInfoString} </span>
           <br/>
           <span className={clockClass}> {clockFormatted} </span> <span className={tcClass}> {tcFormatted} </span>
