@@ -20,7 +20,7 @@ var SiteActions = {
     }
     return true;
   },
-  
+
   login: function(username, password) {
     if(!SiteActions.checkCookiesEnabled())
       return;
@@ -39,7 +39,7 @@ var SiteActions = {
   },
   loginSuccess: function(data) {
     SiteActions.doLogin(data);
-  },  
+  },
 
   register: function(username, email, password, priorRating) {
     if(!SiteActions.checkCookiesEnabled())
@@ -68,7 +68,7 @@ var SiteActions = {
     });
     window.location.pathname = "/gameroom"; //TODO we should track where the user was before and then redirect there instead
   },
-  
+
   logout: function() {
     APIUtils.logout(SiteActions.logoutSuccess, SiteActions.logoutError);
   },
@@ -172,7 +172,7 @@ var SiteActions = {
   },
   createGameSuccess: function(data) {
     ArimaaDispatcher.dispatch({
-      actionType: SiteConstants.ACTIONS.GAME_JOINED,
+      actionType: SiteConstants.ACTIONS.GAMEROOM_GAME_JOINED,
       gameID: data.gameID,
       gameAuth: data.gameAuth
     });
@@ -192,7 +192,7 @@ var SiteActions = {
   },
   joinGameSuccess: function(gameID, data) {
     ArimaaDispatcher.dispatch({
-      actionType: SiteConstants.ACTIONS.GAME_JOINED,
+      actionType: SiteConstants.ACTIONS.GAMEROOM_GAME_JOINED,
       gameID: gameID,
       gameAuth: data.gameAuth
     });
@@ -238,14 +238,14 @@ var SiteActions = {
     });
     console.log(data);
   },
-  
+
   //Initiates a loop querying for the list of users logged in every few seconds, continuing forever.
   beginLoginCheckLoopCalled: false,
   beginLoginCheckLoop: function() {
     if(SiteActions.beginLoginCheckLoopCalled)
       return;
     SiteActions.beginLoginCheckLoopCalled = true;
-      
+
     SiteActions.goLoginPageIfNotLoggedIn();
     setTimeout(SiteActions.continueLoginCheckLoop, SiteConstants.VALUES.LOGIN_CHECK_LOOP_DELAY * 1000);
   },
@@ -254,7 +254,7 @@ var SiteActions = {
     SiteActions.goLoginPageIfNotLoggedIn();
     setTimeout(SiteActions.continueLoginCheckLoop, SiteConstants.VALUES.LOGIN_CHECK_LOOP_DELAY * 1000);
   },
-  
+
   updateErrorMessage :
   "Error getting gameroom updates, possible network or other connection issues, consider refreshing the page.",
 
@@ -316,13 +316,13 @@ var SiteActions = {
       APIUtils.getNotifications(username, SiteActions.notificationsLoopSuccess, SiteActions.notificationsLoopError);
     }, SiteConstants.VALUES.NOTIFICATIONS_LOOP_DELAY * 1000);
   },
-  
+
   //Initiates a loop querying for the list of open games every few seconds, continuing forever.
   beginOpenGamesLoopCalled: false,
   beginOpenGamesLoop: function() {
     if(SiteActions.beginOpenGamesLoopCalled)
       return;
-    SiteActions.beginOpenGamesLoopCalled = true;    
+    SiteActions.beginOpenGamesLoopCalled = true;
     APIUtils.getOpenGames(SiteActions.openGamesLoopSuccess, SiteActions.openGamesLoopError);
     UserStore.addNewOpenJoinedGameListener(SiteActions.newOpenJoinedGame);
   },
@@ -475,7 +475,7 @@ var SiteActions = {
   },
   onHeartbeatError: function(gameID,data) {
     ArimaaDispatcher.dispatch({
-      actionType: SiteConstants.ACTIONS.HEARTBEAT_FAILED,
+      actionType: SiteConstants.ACTIONS.GAMEROOM_HEARTBEAT_FAILED,
       gameID: gameID
     });
   }

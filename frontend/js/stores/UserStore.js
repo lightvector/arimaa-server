@@ -167,7 +167,7 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
     }, SiteConstants.VALUES.HIGHLIGHT_FLASH_TIMEOUT * 1000);
   },
 
-  
+
   addGame: function(metadata) {
     var username = UserStore.getUsername();
     var gameID = metadata.gameID;
@@ -243,7 +243,7 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
     if(prevGameIfOpen !== null && metadata.activeGameData !== undefined && Utils.isUserJoined(metadata,username)) {
       Utils.flashWindowIfNotFocused("Game Begun");
       UserStore.flashPlayingGame(gameID);
-      
+
       //TODO this doesn't quite work, it gets blocked a lot, maybe we just let the user click on the button...?
       var newWindow = window.open("/game/" + gameID);
       if(newWindow)
@@ -354,11 +354,11 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
       UserStore.removeGame(gameID);
       UserStore.emitChange();
       break;
-    case SiteConstants.ACTIONS.GAME_JOINED:
+    case SiteConstants.ACTIONS.GAMEROOM_GAME_JOINED:
       joinedGameAuths[action.gameID] = action.gameAuth;
       UserStore.emitChange();
       break;
-    case SiteConstants.ACTIONS.HEARTBEAT_FAILED:
+    case SiteConstants.ACTIONS.GAMEROOM_HEARTBEAT_FAILED:
       delete joinedGameAuths[action.gameID];
       UserStore.emitChange();
       break;

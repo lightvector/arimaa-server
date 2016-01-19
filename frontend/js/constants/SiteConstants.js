@@ -1,5 +1,6 @@
 var keyMirror = require('keymirror');
 
+//TODO these can overlap with arimaaconstants - this is wonky. given this, merge them
 var ACTIONS = keyMirror({
   LOGIN_FAILED: null,
   LOGIN_SUCCESS: null,
@@ -22,8 +23,8 @@ var ACTIONS = keyMirror({
   GAME_METADATA_UPDATE: null,
   GAME_REMOVED: null,
   CREATE_GAME_FAILED: null,
-  GAME_JOINED: null,
-  HEARTBEAT_FAILED: null,
+  GAMEROOM_GAME_JOINED: null,
+  GAMEROOM_HEARTBEAT_FAILED: null,
   LEAVING_GAME: null,
   LEAVE_GAME_SUCCESS: null
 });
