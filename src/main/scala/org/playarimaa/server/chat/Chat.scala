@@ -448,7 +448,7 @@ class ChatChannel(
 class ChatTable(tag: Tag) extends Table[ChatLine](tag, "chatTable") {
   def id : Rep[Long] = column[Long]("id")
   def channel : Rep[String] = column[String]("channel")
-  def user : Rep[Username] = column[Username]("user")
+  def username : Rep[Username] = column[Username]("username")
   def rating : Rep[Double] = column[Double]("rating")
   def ratingStdev : Rep[Double] = column[Double]("ratingStdev")
   def isBot : Rep[Boolean] = column[Boolean]("isBot")
@@ -467,7 +467,7 @@ class ChatTable(tag: Tag) extends Table[ChatLine](tag, "chatTable") {
   //The * projection (e.g. select * ...) auto-transforms the tuple to the case class
   def * : ProvenShape[ChatLine] = (
     id, channel,
-    (user,rating,ratingStdev,isBot,isGuest,userID),
+    (username,rating,ratingStdev,isBot,isGuest,userID),
     timestamp, event, label, text
   ).shaped <> (
     //Database shape -> Scala object
