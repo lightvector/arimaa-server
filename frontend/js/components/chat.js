@@ -48,7 +48,8 @@ var chatBox = React.createClass({
   //Manually reach into the dom and make the chat scroll to the bottom on update if it's at that point just prior to the update
   componentWillUpdate: function() {
     var chatTable = ReactDOM.findDOMNode(this.refs.chatTable);
-    chatTable.shouldScrollBottom = chatTable.scrollTop + chatTable.offsetHeight === chatTable.scrollHeight;
+    //Subtract 10 pixels for some tolerance
+    chatTable.shouldScrollBottom = chatTable.scrollTop + chatTable.clientHeight >= chatTable.scrollHeight - 10;
   },
   componentDidUpdate: function() {
     var chatTable = ReactDOM.findDOMNode(this.refs.chatTable);
