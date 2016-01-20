@@ -18,7 +18,7 @@ import org.playarimaa.server.Timestamp.Timestamp
 
 object ChatSystem {
   //Leave chat if it's been this many seconds with no activity (including heartbeats)
-  val INACTIVITY_TIMEOUT: Double = 240.0
+  val INACTIVITY_TIMEOUT: Double = 120.0
   //Max lines at a time to return in a single query
   val READ_MAX_LINES: Int = 5000
   //Timeout for a single get query for chat messages
@@ -26,7 +26,7 @@ object ChatSystem {
   //Timeout for akka ask queries
   val AKKA_TIMEOUT: Timeout = new Timeout(20 seconds)
   //Period for checking timeouts in a chat even if nothing happens
-  val CHAT_CHECK_TIMEOUT_PERIOD: Double = 120.0
+  val CHAT_CHECK_TIMEOUT_PERIOD: Double = 60.0
   //Max length of text in characters
   val MAX_TEXT_LENGTH: Int = 4000
   val MAX_TEXT_LENGTH_MESSAGE: String = "Chat text too long (max " + MAX_TEXT_LENGTH + " chars)"
@@ -99,7 +99,7 @@ class ChatSystem(val db: Database, val parentLogins: LoginTracker, val actorSyst
   implicit val timeout = ChatSystem.AKKA_TIMEOUT
 
   private val gf = ChatSystem.CHAT_GLOBAL_BUCKET_FACTOR
-  private val joinBuckets: TimeBuckets[Username] = new TimeBuckets(ChatSystem.CHAT_JOIN_BUCKET_CAPACITY * gf, ChatSystem.CHAT_JOIN_BUCKET_FILL_PER_SEC * gf) 
+  private val joinBuckets: TimeBuckets[Username] = new TimeBuckets(ChatSystem.CHAT_JOIN_BUCKET_CAPACITY * gf, ChatSystem.CHAT_JOIN_BUCKET_FILL_PER_SEC * gf)
   private val lineBuckets: TimeBuckets[Username] = new TimeBuckets(ChatSystem.CHAT_LINE_BUCKET_CAPACITY * gf, ChatSystem.CHAT_LINE_BUCKET_FILL_PER_SEC * gf)
   private val charBuckets: TimeBuckets[Username] = new TimeBuckets(ChatSystem.CHAT_CHAR_BUCKET_CAPACITY * gf, ChatSystem.CHAT_CHAR_BUCKET_FILL_PER_SEC * gf)
 
@@ -238,14 +238,14 @@ class ChatChannel(
   var messagesNotYetInDB: Queue[ChatLine] = Queue()
 
   //Tracks who is logged in to this chat channel
-  val logins: LoginTracker = new LoginTracker(Some(parentLogins), ChatSystem.INACTIVITY_TIMEOUT, updateInfosFromParent = true)
+  val logins: LoginTracker = new LoginTracker(Some(parentLogins), ChatSystem.INACTIVITY_TIMEOUT, ChatSystem.INACTIVITY_TIMEOUT, ChatSystem.INACTIVITY_TIMEOUT, updateInfosFromParent = true)
   //Most recent time anything happened in this channel
   var lastActive = Timestamp.get
 
   //Whether or not we started the loop that checks timeouts for the chat
   var timeoutCycleStarted = false
 
-  private val joinBuckets: TimeBuckets[Username] = new TimeBuckets(ChatSystem.CHAT_JOIN_BUCKET_CAPACITY, ChatSystem.CHAT_JOIN_BUCKET_FILL_PER_SEC) 
+  private val joinBuckets: TimeBuckets[Username] = new TimeBuckets(ChatSystem.CHAT_JOIN_BUCKET_CAPACITY, ChatSystem.CHAT_JOIN_BUCKET_FILL_PER_SEC)
   private val lineBuckets: TimeBuckets[Username] = new TimeBuckets(ChatSystem.CHAT_LINE_BUCKET_CAPACITY, ChatSystem.CHAT_LINE_BUCKET_FILL_PER_SEC)
   private val charBuckets: TimeBuckets[Username] = new TimeBuckets(ChatSystem.CHAT_CHAR_BUCKET_CAPACITY, ChatSystem.CHAT_CHAR_BUCKET_FILL_PER_SEC)
 
@@ -448,11 +448,12 @@ class ChatChannel(
 class ChatTable(tag: Tag) extends Table[ChatLine](tag, "chatTable") {
   def id : Rep[Long] = column[Long]("id")
   def channel : Rep[String] = column[String]("channel")
-  def user : Rep[Username] = column[Username]("user")
+  def username : Rep[Username] = column[Username]("username")
   def rating : Rep[Double] = column[Double]("rating")
   def ratingStdev : Rep[Double] = column[Double]("ratingStdev")
   def isBot : Rep[Boolean] = column[Boolean]("isBot")
   def isGuest : Rep[Boolean] = column[Boolean]("isGuest")
+  def userID : Rep[String] = column[String]("userID")
   def timestamp : Rep[Double] = column[Double]("time")
   def event : Rep[ChatEvent] = column[ChatEvent]("event")
   def label : Rep[Option[String]] = column[Option[String]]("label")
@@ -466,7 +467,7 @@ class ChatTable(tag: Tag) extends Table[ChatLine](tag, "chatTable") {
   //The * projection (e.g. select * ...) auto-transforms the tuple to the case class
   def * : ProvenShape[ChatLine] = (
     id, channel,
-    (user,rating,ratingStdev,isBot,isGuest),
+    (username,rating,ratingStdev,isBot,isGuest,userID),
     timestamp, event, label, text
   ).shaped <> (
     //Database shape -> Scala object

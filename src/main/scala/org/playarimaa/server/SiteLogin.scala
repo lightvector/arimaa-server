@@ -13,11 +13,16 @@ import akka.actor.{Scheduler,Cancellable}
 object SiteLogin {
 
   object Constants {
-    //TODO maybe add an "inactive" mode where timed out users will auto-log-in if they use their auth within a much longer
-    //time frame, so that 2 minutes of lag doesn't require a re-log-in
-    val INACTIVITY_TIMEOUT: Double = 120 //2 minutes (including heartbeats)
+    //How much inactivity until a user is no longer displayed as present in the game room, including heartbeats.
+    val INACTIVITY_TIMEOUT: Double = 120 //2 minutes
+    //How much inactivity until we actually invalidate the user's authentication and require a re-log-in
+    val LOGOUT_TIMEOUT: Double = 172800 //2 days
+    //How long a user can be logged in total until they get logged out the moment they're inactive, including heartbeats.
+    val SOFT_LOGIN_TIME_LIMIT: Double = 172800 //2 days
+
+    //Timeouts for resetting passwords and email change requests
     val PASSWORD_RESET_TIMEOUT: Double = 1800 //30 minutes
-    val EMAIL_CHANGE_TIMEOUT: Double = 84600 //1 day
+    val EMAIL_CHANGE_TIMEOUT: Double = 86400 //1 day
 
     //Rate of refresh of simple user infos (displayed ratings and such), as well as internal upkeep and cleanup
     val LOOP_PERIOD: Double = 10 //10 seconds
@@ -58,24 +63,78 @@ object SiteLogin {
 
     val NO_LOGIN_MESSAGE: String = "Not logged in, or timed out due to inactivity."
 
-    //TODO mention a help or contact address for this?
     val INTERNAL_ERROR: String = "Internal server error."
     val LOGIN_ERROR: String = "Invalid username/email and password combination."
 
+    //These are also used to filter out some email addresses as a slight speedbump against
+    //some forms of spammy stuff according to AWS email best practices - these include a variety
+    //of "role" accounts.
     val INVALID_USERNAME_ERROR: String = "Invalid username or username already in use."
-    val INVALID_USERNAMES = List(
-      "anyone",
+    val INVALID_USERNAMES: List[String] = List(
+      "abuse",
       "admin",
-      "root",
-      "guest",
-      "user",
-      "test",
       "administrator",
+      "all",
+      "anyone",
+      "billing",
+      "contact",
+      "compliance",
+      "devnull",
+      "dns",
+      "everyone",
+      "feedback",
+      "ftp",
+      "guest",
+      "help",
+      "hostmaster",
+      "info",
+      "inoc",
+      "inquiries",
+      "investorrelations",
+      "ispfeedback",
+      "ispsupport",
+      "jobs",
+      "list",
+      "listrequest",
+      "maildaemon",
+      "marketing",
+      "media",
       "moderator",
+      "news",
+      "nobody",
+      "noc",
       "none",
+      "noreply",
       "null",
-      "undefined"
+      "orders",
+      "phish",
+      "phishing",
+      "postmaster",
+      "press",
+      "privacy",
+      "registrar",
+      "remove",
+      "root",
+      "sales",
+      "security",
+      "service",
+      "spam",
+      "support",
+      "sysadmin",
+      "tech",
+      "test",
+      "trouble",
+      "undefined",
+      "undisclosedrecipients",
+      "unsubscribe",
+      "usenet",
+      "user",
+      "uucp",
+      "webmaster",
+      "www"
     )
+    val INVALID_EMAIL_ERROR: String = "Invalid email address, please try a different one."
+    val INVALID_EMAILS: List[String] = INVALID_USERNAMES
   }
 }
 
@@ -85,7 +144,7 @@ import SiteLogin.Constants._
 
 class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: ExecutionContext, val scheduler: Scheduler)(implicit ec: ExecutionContext) {
 
-  val logins: LoginTracker = new LoginTracker(None, INACTIVITY_TIMEOUT, updateInfosFromParent = false)
+  val logins: LoginTracker = new LoginTracker(None, INACTIVITY_TIMEOUT, LOGOUT_TIMEOUT, SOFT_LOGIN_TIME_LIMIT, updateInfosFromParent = false)
 
   //Throttles for different kinds of queries
   private val loginBuckets: TimeBuckets[String] = new TimeBuckets(LOGIN_BUCKET_CAPACITY, LOGIN_BUCKET_FILL_PER_SEC)
@@ -177,6 +236,11 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
       throw new IllegalArgumentException("Email must contain an '@'.")
     if(email.length < EMAIL_MIN_LENGTH || EMAIL_MAX_LENGTH > EMAIL_MAX_LENGTH)
       throw new IllegalArgumentException(EMAIL_LENGTH_ERROR)
+
+    //Filter down to the alphanumeric part of the email address to the left of the @
+    val s = email.slice(0,email.lastIndexOf('@')).filter(_.isLetterOrDigit).toLowerCase
+    if(INVALID_EMAILS.exists(_ == s))
+      throw new IllegalArgumentException(INVALID_EMAIL_ERROR)
   }
 
   def validateUsernameOrEmail(usernameOrEmail: String) : Unit = {
@@ -189,7 +253,7 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
             throw new Exception("Invalid username or email (" + exn1.getMessage() + ") (" + exn2.getMessage() + ")")
         }
     }
-  }            
+  }
 
   def validatePassword(password: String): Unit = {
     if(password.length < PASSWORD_MIN_LENGTH || PASSWORD_MAX_LENGTH > PASSWORD_MAX_LENGTH)
@@ -197,8 +261,8 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
   }
 
   def doTimeouts(now: Timestamp): Unit = {
-    val usersTimedOut = logins.doTimeouts(now)
-    usersTimedOut.foreach { user =>
+    val usersLoggedOut = logins.doTimeouts(now)
+    usersLoggedOut.foreach { user =>
       accounts.removeIfGuest(user)
     }
   }
@@ -208,7 +272,7 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
     val futures = logins.usersLoggedIn.map { user =>
       accounts.getByName(user.name,excludeGuests=false).map {
         case None => ()
-        case Some(acct) =>logins.updateInfo(acct.info)
+        case Some(acct) => logins.updateInfo(acct.info)
       }
     }
     Future.sequence(futures).map { _ : List[Unit] => () }
@@ -217,7 +281,7 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
   def usersLoggedIn: List[SimpleUserInfo] = {
     val now = Timestamp.get
     doTimeouts(now)
-    logins.usersLoggedIn
+    logins.usersActive
   }
 
   private def hashpw(password: String): Future[String] = {
@@ -236,8 +300,15 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
     }
   }
 
-  //TODO throttle registrations and guest logins by IP address
-  def register(username: Username, email: Email, password: String, isBot: Boolean, priorRating:Option[Double], logInfo: LogInfo): Future[(Username,SiteAuth)] = {
+  def register(
+    username: Username,
+    email: Email,
+    password: String,
+    isBot: Boolean,
+    priorRating: Option[Double],
+    oldSiteAuth: Option[SiteAuth],
+    logInfo: LogInfo
+  ): Future[(Username,SiteAuth)] = {
     Future.successful(()).flatMap { case () =>
       validateUsername(username)
       validateEmail(email)
@@ -258,6 +329,7 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
         val account = Account(
           lowercaseName = lowercaseName,
           username = username,
+          userID = RandGen.genUserID,
           email = email,
           emailVerifyNeeded = Some(verifyAuth),
           passwordHash = passwordHash,
@@ -270,9 +342,12 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
           priorRating = rating
         )
 
+        //You can't register a new account if someone (i.e. a guest) is logged in with that account,
+        //UNLESS you were the one logged in with that account (with the siteAuth to prove it).
         //Note: not sensitive to capitalization of user's name
         //Slight race condition possible here, but hopefully not a big deal
-        if(logins.isUserLoggedIn(username))
+        if(logins.isUserActive(username) &&
+          !oldSiteAuth.exists { oldSiteAuth => logins.isLoggedIn(username,oldSiteAuth) })
           throw new Exception(INVALID_USERNAME_ERROR)
 
         accounts.add(account).recover { case _ => throw new Exception(INVALID_USERNAME_ERROR) }.map { case () =>
@@ -281,7 +356,7 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
 
           logger.info(logInfo + " Registered new account for " + username)
           emailer.sendVerifyEmail(email,username,verifyAuth)
-          
+
           doTimeouts(now)
           val siteAuth = logins.login(account.info, now)
           (account.username,siteAuth)
@@ -332,7 +407,7 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
     }
   }
 
-  def loginGuest(username: Username, logInfo: LogInfo): Future[(Username,SiteAuth)] = {
+  def loginGuest(username: Username, oldSiteAuth: Option[SiteAuth], logInfo: LogInfo): Future[(Username,SiteAuth)] = {
     Future.successful(()).flatMap { case () =>
       if(username == "")
         throw new Exception("Please choose a username.")
@@ -344,6 +419,7 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
       val account = Account(
         lowercaseName = lowercaseName,
         username = username,
+        userID = RandGen.genUserID,
         email = "",
         emailVerifyNeeded = None,
         passwordHash = "N/A",
@@ -357,9 +433,11 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
       )
 
       //Also only allow guest login if nobody is already logged in with that account.
+      //UNLESS you were the one logged in with that account (with the siteAuth to prove it).
       //Note: not sensitive to capitalization of user's name
       //Slight race condition possible here, but hopefully not a big deal
-      if(logins.isUserLoggedIn(username))
+      if(logins.isUserActive(username) &&
+        !oldSiteAuth.exists { oldSiteAuth => logins.isLoggedIn(username,oldSiteAuth) })
         throw new Exception(INVALID_USERNAME_ERROR)
 
       accounts.add(account).recover { case _ => throw new Exception(INVALID_USERNAME_ERROR) }.map { case () =>
@@ -518,7 +596,7 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
 
               checkpw(password, account.passwordHash).flatMap { success =>
                 if(!success)
-                  throw new Exception("Old password did not match.")                
+                  throw new Exception("Old password did not match.")
                 hashpw(newPassword).flatMap { passwordHash =>
                   accounts.setPasswordHash(account.username,passwordHash).map { result =>
                     logger.info(logInfo + " Password changed for account: " + account.username)
@@ -557,7 +635,7 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
     }
   }
 
-  def changeEmail(username: Username, password: String, siteAuth: SiteAuth, newEmail: Email, logInfo: LogInfo) : Future[Unit] = {
+  def changeEmail(username: Username, password: String, siteAuth: SiteAuth, newEmail: Email, logInfo: LogInfo) : Future[Email] = {
     Future.successful(()).flatMap { case () =>
       validateUsername(username)
       validateEmail(newEmail)
@@ -593,6 +671,7 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
                 //Send email to user advising about change
                 emailer.sendEmailChangeRequest(newEmail,account.username,auth,account.email).map { case () =>
                   logger.info(logInfo + " Email change initated for account: " + account.username + " from " + account.email + " to " + newEmail)
+                  newEmail
                 }
               }
           }
@@ -604,7 +683,7 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
     }
   }
 
-  def confirmChangeEmail(username: Username, changeAuth: Auth, logInfo: LogInfo) : Future[Unit] = {
+  def confirmChangeEmail(username: Username, changeAuth: Auth, logInfo: LogInfo) : Future[Email] = {
     Future.successful(()).flatMap { case () =>
       validateUsername(username)
       accounts.getByName(username, excludeGuests=true).flatMap { result =>
@@ -631,9 +710,10 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
                   //Don't wait for old email to go out
                   emailer.sendOldEmailChangeNotification(oldEmail,account.username,newEmail)
                   logger.info(logInfo + " Email change confirmed for account: " + account.username + " from " + oldEmail + " to " + newEmail)
+                  newEmail
                 }
             }
-        }      
+        }
       }.recover { case exn: Exception =>
           logger.info(logInfo + " Confirm change email for account: " + username + " failed with result " + exn)
           throw exn
@@ -641,7 +721,7 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
     }
   }
 
-  def resendVerifyEmail(username: Username, siteAuth: SiteAuth, logInfo: LogInfo) : Future[Unit] = {
+  def resendVerifyEmail(username: Username, siteAuth: SiteAuth, logInfo: LogInfo) : Future[Email] = {
     Future.successful(()).flatMap { case () =>
       validateUsername(username)
       requiringLogin(siteAuth) { user =>
@@ -662,6 +742,7 @@ class SiteLogin(val accounts: Accounts, val emailer: Emailer, val cryptEC: Execu
                 case Some(verifyAuth) =>
                   emailer.sendVerifyEmail(account.email,account.username,verifyAuth)
                   logger.info(logInfo + " User requested resend verify email: " + account.username)
+                  account.email
               }
           }
         }

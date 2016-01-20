@@ -64,23 +64,25 @@ var Game = React.createClass({
     }
 
     return (
-        <div>
+        <div className="arimaaGame">
           <div className="boardTitle">
             <h3> {titleString} </h3>
           </div>
           {errorDiv}
-          <div>
-            <div className="boardPane">
-              <Board gameID={this.props.params.gameID}/>
-              <BoardButtons gameID={this.props.params.gameID}/>
+          <div className="arimaaGameDisplay">
+            <div className="arimaaBoardDisplay">
+              <div className="boardPane">
+                <PlayerInfo pos={"top"}/>
+                <Board gameID={this.props.params.gameID}/>
+                <PlayerInfo pos={"bottom"}/>
+                <BoardButtons gameID={this.props.params.gameID}/>
+              </div>
+              <div className="sidePane">
+                <Movelist gameID={this.props.params.gameID}/>
+              </div>
             </div>
-            <div className="sidePane">
-              <PlayerInfo pos={"top"}/>
-              <Movelist gameID={this.props.params.gameID}/>
-              <PlayerInfo pos={"bottom"}/>
-            </div>
+            <Chat params={{chatChannel:"game/"+this.props.params.gameID}}/>
           </div>
-          <Chat params={{chatChannel:"game/"+this.props.params.gameID}}/>
         </div>
     );
   }

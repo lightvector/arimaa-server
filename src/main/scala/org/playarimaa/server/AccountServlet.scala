@@ -22,6 +22,11 @@ object AccountServlet {
     val REGISTER_BUCKET_FILL_PER_SEC: Double = 1.0 / 60.0 / 5.0
     val REGISTER_LIMIT_MESSAGE: String = "Too many registrations from this IP in a short time period, wait a few minutes before trying again."
 
+    //20 guest logins from an IP address, refilling at a rate of 1 per 3 minutes
+    val GUEST_BUCKET_CAPACITY: Double = 20.0
+    val GUEST_BUCKET_FILL_PER_SEC: Double = 1.0 / 60.0 / 3.0
+    val GUEST_LIMIT_MESSAGE: String = "Too many guest logins from this IP in a short time period, wait a few minutes before trying again."
+
     //Per-IP throttle on all actions together in this servlet: 40 initial, refilling at a rate of 2 per second
     val REQUEST_BUCKET_CAPACITY: Double = 40.0
     val REQUEST_BUCKET_FILL_PER_SEC: Double = 2.0
@@ -65,7 +70,7 @@ object AccountServlet {
 
   case object Register extends Action {
     val name = "register"
-    case class Query(username: String, email: String, password: String, isBot: Boolean, priorRating: String)
+    case class Query(username: String, email: String, password: String, isBot: Boolean, priorRating: String, oldSiteAuth: Option[String])
     case class Reply(username: String, siteAuth: String)
   }
   case object Login extends Action {
@@ -75,7 +80,7 @@ object AccountServlet {
   }
   case object LoginGuest extends Action {
     val name = "loginGuest"
-    case class Query(username: String)
+    case class Query(username: String, oldSiteAuth: Option[String])
     case class Reply(username: String, siteAuth: String)
   }
   case object Logout extends Action {
@@ -149,6 +154,7 @@ class AccountServlet(val accounts: Accounts, val siteLogin: SiteLogin, val ec: E
   //Buckets throttling by remote host/ip address
   val requestBuckets: TimeBuckets[String] = new TimeBuckets(REQUEST_BUCKET_CAPACITY, REQUEST_BUCKET_FILL_PER_SEC)
   val registerBuckets: TimeBuckets[String] = new TimeBuckets(REGISTER_BUCKET_CAPACITY, REGISTER_BUCKET_FILL_PER_SEC)
+  val guestBuckets: TimeBuckets[String] = new TimeBuckets(GUEST_BUCKET_CAPACITY, GUEST_BUCKET_FILL_PER_SEC)
 
   //Before every action runs, set the content type to be in JSON format.
   before() {
@@ -178,7 +184,7 @@ class AccountServlet(val accounts: Accounts, val siteLogin: SiteLogin, val ec: E
           case "" => None
           case s => Some(s.toFiniteDouble)
         }
-        siteLogin.register(query.username, query.email, query.password, query.isBot, priorRating, logInfo).map { case (username,siteAuth) =>
+        siteLogin.register(query.username, query.email, query.password, query.isBot, priorRating, query.oldSiteAuth, logInfo).map { case (username,siteAuth) =>
           Json.write(Register.Reply(username, siteAuth))
         }
       case Some(Login) =>
@@ -187,8 +193,13 @@ class AccountServlet(val accounts: Accounts, val siteLogin: SiteLogin, val ec: E
           Json.write(Login.Reply(username, siteAuth))
         }
       case Some(LoginGuest) =>
+        val now = Timestamp.get
+        if(!guestBuckets.takeOne(remoteHost,now)) {
+          logger.warn(logInfo + " " + GUEST_LIMIT_MESSAGE)
+          throw new Exception(GUEST_LIMIT_MESSAGE)
+        }
         val query = Json.read[LoginGuest.Query](request.body)
-        siteLogin.loginGuest(query.username, logInfo).map { case (username,siteAuth) =>
+        siteLogin.loginGuest(query.username, query.oldSiteAuth, logInfo).map { case (username,siteAuth) =>
           Json.write(LoginGuest.Reply(username, siteAuth))
         }
       case Some(Logout) =>
@@ -220,18 +231,18 @@ class AccountServlet(val accounts: Accounts, val siteLogin: SiteLogin, val ec: E
         }
       case Some(ChangeEmail) =>
         val query = Json.read[ChangeEmail.Query](request.body)
-        siteLogin.changeEmail(query.username, query.password, query.siteAuth, query.newEmail, logInfo).map { case () =>
-          Json.write(ChangeEmail.Reply("Email sent to new address, please confirm from there to complete this change."))
+        siteLogin.changeEmail(query.username, query.password, query.siteAuth, query.newEmail, logInfo).map { case email =>
+          Json.write(ChangeEmail.Reply("Email sent to " + email + ", please confirm from there to complete this change."))
         }
       case Some(ConfirmChangeEmail) =>
         val query = Json.read[ConfirmChangeEmail.Query](request.body)
-        siteLogin.confirmChangeEmail(query.username, query.changeAuth, logInfo).map { case () =>
-          Json.write(ConfirmChangeEmail.Reply("New email set."))
+        siteLogin.confirmChangeEmail(query.username, query.changeAuth, logInfo).map { case email =>
+          Json.write(ConfirmChangeEmail.Reply("New email " + email + " set."))
         }
       case Some(ResendVerifyEmail) =>
         val query = Json.read[ResendVerifyEmail.Query](request.body)
-        siteLogin.resendVerifyEmail(query.username, query.siteAuth, logInfo).map { case () =>
-          Json.write(ResendVerifyEmail.Reply("Ok."))
+        siteLogin.resendVerifyEmail(query.username, query.siteAuth, logInfo).map { case email =>
+          Json.write(ResendVerifyEmail.Reply("Verification resent to " + email + "."))
         }
       case Some(VerifyEmail) =>
         val query = Json.read[VerifyEmail.Query](request.body)

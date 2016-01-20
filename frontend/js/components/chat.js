@@ -10,10 +10,35 @@ const FUNC_NOP = function(){};
 
 var chatBox = React.createClass({
   getInitialState: function() {
-    return {lines:[], nextMinId:-1, chatAuth:null, userInput:"", usersLoggedIn:[], inputDisabled:false, error:""};
+    return {
+      lines:[],
+      isLoggedIn: UserStore.siteAuthToken() !== null,
+      nextMinId:-1,
+      chatAuth:null,
+      userInput:"", usersLoggedIn:[],
+      inputDisabled:false,
+      error:"",
+      isMainChat: this.props.params.chatChannel === "main"
+    };
   },
   componentDidMount: function() {
-    this.doJoin();
+    if(UserStore.siteAuthToken() !== null)
+      APIUtils.authLoggedIn(this.onAuthLoggedInSuccess, this.onAuthLoggedInError);
+    else
+      //TODO rather than doing this, have external users "log in" as an anonymous guest so we can count/display stats on viewership?
+      this.startPollLoop(null);
+  },
+
+  onAuthLoggedInSuccess: function(data) {
+    this.setState({isLoggedIn: data.value});
+    if(data.value)
+      this.doJoin();
+    else
+      //TODO rather than doing this, have external users "log in" as an anonymous guest so we can count/display stats on viewership?
+      this.startPollLoop(null);
+  },
+  onAuthLoggedInError: function(data) {
+    this.setState({error:data.error});
   },
 
   clearError: function() {
@@ -119,7 +144,9 @@ var chatBox = React.createClass({
 
 
   startPollLoop: function(chatAuth) {
-    if(this.state.chatAuth !== null && this.state.chatAuth == chatAuth) {
+    //TODO think about a better mechanism?
+    //(!this.state.isLoggedIn && !this.state.isMainChat) - specifically allow external viewers
+    if((!this.state.isLoggedIn && !this.state.isMainChat) || (this.state.chatAuth !== null && this.state.chatAuth == chatAuth)) {
       var that = this;
       if(this.state.nextMinId < 0)
         APIUtils.chatGet(this.props.params.chatChannel,
@@ -130,7 +157,7 @@ var chatBox = React.createClass({
     }
   },
   onLinesSuccess: function(data, chatAuth) {
-    if(this.state.chatAuth !== null && this.state.chatAuth == chatAuth) {
+    if((!this.state.isLoggedIn && !this.state.isMainChat) || (this.state.chatAuth !== null && this.state.chatAuth == chatAuth)) {
       var nextMinId = this.state.nextMinId;
       for(var i = 0; i<data.lines.length; i++) {
         if(data.lines[i].id >= nextMinId)
@@ -190,12 +217,16 @@ var chatBox = React.createClass({
       ]);
     }
 
-    var chatLabel =
-      this.props.params.chatChannel == "main" ?
-      React.createElement("h1", {key: "chatLabel"}, "Chat") : null;
+    var chatLabel = this.state.isMainChat ? React.createElement("h1", {key: "chatLabel"}, "Chat") : null;
+
+    var errorDiv = "";
+    if(this.state.error != "") {
+      errorDiv = React.createElement("div", {key: "chatError", className:"bigError bMargin"}, this.state.error);
+    }
 
     var contents = [
       chatLabel,
+      errorDiv,
       React.createElement("div", {key: "chatContents", className:"chatContents"}, [
         React.createElement("div", {key: "chatUI", className:"chatUI uiPanel"}, [
           React.createElement(
@@ -204,21 +235,17 @@ var chatBox = React.createClass({
           ),
           React.createElement(
             "form", {key: "chatForm", className: "chatForm", onSubmit: this.submitUserInput},
-            React.createElement("input", {key:"chatInput", type: "text", ref: "text", value: this.state.userInput, onChange: this.handleUserInputChange, disabled: this.state.inputDisabled, placeholder: "Say something..."}),
-            React.createElement("input", {key:"chatSubmit", type: "submit", className:"submit", disabled: !this.state.chatAuth || this.state.inputDisabled, value: "Post"})
+            React.createElement("input", {key:"chatInput", className:"chatInput", type: "text", ref: "text", value: this.state.userInput, onChange: this.handleUserInputChange, disabled: this.state.inputDisabled || !this.state.isLoggedIn, placeholder: (this.state.isLoggedIn ? "Say something..." : "Log in to comment")}),
+            React.createElement("input", {key:"chatSubmit", type: "submit", className:"submit", disabled: !this.state.chatAuth || this.state.inputDisabled || !this.state.isLoggedIn, value: "Post"})
           ),
           React.createElement("div", {key: "chatJoinLeaveDiv", className: "chatJoinLeaveDiv"}, [
-            React.createElement("button", {key:"chatJoin", onClick: this.submitJoin, disabled: !(!this.state.chatAuth)}, "Join"),
-            React.createElement("button", {key:"chatLeave", onClick: this.submitLeave, disabled: !this.state.chatAuth}, "Leave")
+            React.createElement("button", {key:"chatJoin", onClick: this.submitJoin, disabled: !(!this.state.chatAuth) || !this.state.isLoggedIn}, "Join"),
+            React.createElement("button", {key:"chatLeave", onClick: this.submitLeave, disabled: !this.state.chatAuth || !this.state.isLoggedIn}, "Leave")
           ])
         ]),
         usersDiv
       ]),
     ];
-
-    if(this.state.error != "") {
-      contents.push(React.createElement("div", {key: "chatError", className:"error"}, this.state.error));
-    }
 
     return React.createElement("div", {key: "chat", className: "chat"}, contents);
   }

@@ -8,21 +8,32 @@ import org.playarimaa.server.Timestamp.Timestamp
  * login, heartbeats will heartbeat the parent login as well, and doTimeouts will
  * check if the parent is logged in or not.
  *
- * @param inactivityTimeout how old to require a login is to time it out when [doTimeouts] is called.
- *
+ * @param inactiveAfter how old to require a login is to declare it inactive when [doTimeouts] is called.
+ * @param logoutAfter how old to require a login is to time it out when [doTimeouts] is called.
+ * @param softLoginTimeLimit once a login hits this age, log it out as soon as not active
  * @param updateInfosFromParent if true, also update SimpleUserInfos if they change in the parent.
  */
-class LoginTracker(val parent: Option[LoginTracker], val inactivityTimeout: Double, val updateInfosFromParent: Boolean) {
+class LoginTracker(
+  val parent: Option[LoginTracker],
+  val inactiveAfter: Double,
+  val logoutAfter: Double,
+  val softLoginTimeLimit: Double,
+  val updateInfosFromParent: Boolean
+) {
   class LoginData(var info: SimpleUserInfo) {
     //All auth keys this user has, along with the time they were most recently used
     var auths: Map[Auth,Timestamp] = Map()
+    //Start time of this login
+    val startTime: Timestamp = Timestamp.get
     //Most recent time anything happened for this user
-    var lastActive: Timestamp = Timestamp.get
+    var lastActive: Timestamp = startTime
+    //Whether this user is considered active right now or not
+    var isActive: Boolean = true
   }
 
-  //We use UserID (i.e. lowercaseName) internally for loginData so that we aren't sensitive to the capitalization of a user's name for
+  //We use lowercaseName internally for loginData so that we aren't sensitive to the capitalization of a user's name for
   //methods of LoginTracker.
-  private var loginData: Map[UserID,LoginData] = Map()
+  private var loginData: Map[LowercaseName,LoginData] = Map()
   private var lastActive: Timestamp = Timestamp.get
 
   private var userAndParentAuth: Map[Auth,(Username,Option[Auth])] = Map()
@@ -62,6 +73,7 @@ class LoginTracker(val parent: Option[LoginTracker], val inactivityTimeout: Doub
       ld.auths = ld.auths + (auth -> now)
       userAndParentAuth = userAndParentAuth + (auth -> ((user.name,parentAuth)))
       ld.lastActive = now
+      ld.isActive = true
       lastActive = now
       auth
     }
@@ -82,11 +94,20 @@ class LoginTracker(val parent: Option[LoginTracker], val inactivityTimeout: Doub
     loginData.nonEmpty
   }
 
+  def isUserActive(username: Username): Boolean = synchronized {
+    val lowercaseName = username.toLowerCase
+    loginData.get(lowercaseName).exists(_.isActive)
+  }
+
   def userOfAuth(auth: Auth): Option[SimpleUserInfo] = synchronized {
     userAndParentAuth.get(auth).flatMap { case (username,_) =>
       val lowercaseName = username.toLowerCase
       loginData.get(lowercaseName).map(_.info)
     }
+  }
+
+  def userOfLogin(username: Username, auth: Auth): Option[SimpleUserInfo] = synchronized {
+    getLoginData(username,auth).map(_.info)
   }
 
   /* Returns the last time that any activity occurred */
@@ -98,6 +119,13 @@ class LoginTracker(val parent: Option[LoginTracker], val inactivityTimeout: Doub
     loginData.values.map(_.info).toList
   }
 
+  /* Returns all users active */
+  def usersActive: List[SimpleUserInfo] = synchronized {
+    loginData.values.flatMap { loginData =>
+      if(loginData.isActive) Some(loginData.info) else None
+    }.toList
+  }
+
   /* Updates a user's last active time for timeout-checking purposes.
    * Returns None if the user was not logged in, and Some if the user was. */
   def heartbeat(username: Username, auth: Auth, now: Timestamp): Option[SimpleUserInfo] = synchronized {
@@ -105,6 +133,7 @@ class LoginTracker(val parent: Option[LoginTracker], val inactivityTimeout: Doub
     getLoginData(username,auth).map { ld =>
       ld.auths = ld.auths + (auth -> now)
       ld.lastActive = now
+      ld.isActive = true
       val (_,parentAuth) = userAndParentAuth(auth)
       parentAuth.foreach { parentAuth => parent.get.heartbeat(username, parentAuth, now) }
       ld.info
@@ -119,12 +148,24 @@ class LoginTracker(val parent: Option[LoginTracker], val inactivityTimeout: Doub
     }
   }
 
+  private def clearAllAuths(ld: LoginData): Unit = {
+    ld.auths.foreach { case (auth,_) =>
+      userAndParentAuth = userAndParentAuth - auth
+    }
+  }
+
   /* Log a single auth of a user out */
   def logout(username: Username, auth: Auth, now: Timestamp): Unit = synchronized {
     lastActive = now
     getLoginData(username,auth).foreach { ld =>
       ld.auths = ld.auths - auth
+      val numLeft = ld.auths.size
+      if(numLeft <= 0) {
+        val lowercaseName = username.toLowerCase
+        loginData = loginData - lowercaseName
+      }
     }
+    userAndParentAuth = userAndParentAuth - auth
   }
   /* Log a single auth of a user out */
   def logoutAuth(auth: Auth, now: Timestamp): Unit = synchronized {
@@ -137,28 +178,39 @@ class LoginTracker(val parent: Option[LoginTracker], val inactivityTimeout: Doub
   def logoutUser(username: Username, now: Timestamp): Unit = synchronized {
     lastActive = now
     val lowercaseName = username.toLowerCase
+    loginData.get(lowercaseName).foreach(clearAllAuths(_))
     loginData = loginData - lowercaseName
   }
 
   /* Log out all users except the list specified */
   def logoutAllExcept(users: List[Username]): Unit = synchronized {
     val lowercaseNames = users.map(_.toLowerCase)
-    loginData = loginData.filter { case (lowercaseName,_) =>
+    loginData = loginData.filter { case (lowercaseName,ld) =>
       val shouldKeep = lowercaseNames.contains(lowercaseName)
+      if(!shouldKeep)
+        clearAllAuths(ld)
       shouldKeep
     }
   }
 
-  /* Log out all auths that have not been active recently enough or whose parents were logged out.
+  /* Log out all auths that have not been active recently enough or whose parents were logged out,
    * Returns all users all of whose auths were logged out. */
   def doTimeouts(now: Timestamp): List[Username] = synchronized {
-    var usersTimedOut: List[Username] = List()
+    var usersLoggedOut: List[Username] = List()
     loginData = loginData.filter { case (_,ld) =>
+      var atLeastOneActive = false
       ld.auths = ld.auths.filter { case (auth,time) =>
+        //Has this auth been accessed particularly recently?
+        val isAuthActive = now < time + inactiveAfter
         //Should we keep this auth of this user logged in?
         val shouldKeep =
-          //Only if it's within the inactivity timeout and...
-          now < time + inactivityTimeout &&
+          //Must be within the logout timeout
+          now < time + logoutAfter &&
+          //Must be active if a guest account
+          (!ld.info.isGuest || isAuthActive) &&
+          //Must be active if past the soft limit
+          (now < ld.startTime + softLoginTimeLimit || isAuthActive) &&
+          //Parent must still be logged in with the parent auth
           userAndParentAuth(auth)._2.forall { parentAuth =>
             parent.get.userOfAuth(parentAuth) match {
               case None =>
@@ -173,16 +225,20 @@ class LoginTracker(val parent: Option[LoginTracker], val inactivityTimeout: Doub
             }
           }
 
+        if(isAuthActive)
+          atLeastOneActive = true
         if(!shouldKeep)
           userAndParentAuth = userAndParentAuth - auth
         shouldKeep
       }
+      ld.isActive = atLeastOneActive
+
       val shouldKeep = ld.auths.nonEmpty
       if(!shouldKeep)
-        usersTimedOut = ld.info.name :: usersTimedOut
+        usersLoggedOut = ld.info.name :: usersLoggedOut
       shouldKeep
     }
-    usersTimedOut
+    usersLoggedOut
   }
 
 

@@ -5,33 +5,68 @@ $selection: #8b9ae0 !default;
 //$board-bg : "../images/boards/BoardStoneBig.jpg" !default;
 $board-bg : "../images/boards/boardmarbletiled.png" !default;
 
-$board-size : 480px !default;
 $step-to-img : "../images/green-circle.png" !default;
 
 //Css file for the game client
 
+.arimaaGame {
+  display:-webkit-flex;
+  display:flex;
+  flex-flow: column;
+  min-height:0;
+}
+
+.arimaaGameDisplay {
+  display:-webkit-flex;
+  display:flex;
+  min-height:0;
+}
+
+.arimaaBoardDisplay {
+  width: 60%;
+  display:-webkit-flex;
+  display: flex;
+  -webkit-flex-wrap: wrap;
+  flex-wrap: wrap;
+  max-width: max-content;
+}
+
+.arimaaGame .chat {
+  width: 40%;
+}
+
 .boardPane {
+  display:-webkit-flex;
   display: flex;
   flex-flow: column;
   float: left;
+  -webkit-flex:auto;
+  -ms-flex:auto;
+  flex: auto;
+  max-width: 480px;
 }
 
 .sidePane {
+  display:-webkit-flex;
   display: flex;
   flex-flow: column;
-  height: $board-size;
-  float: left;
+  min-height: 40px;
+  max-height: 500px;
   margin-left:10px;
   margin-bottom:10px;
   margin-right:10px;
 }
 
 .topPlayerInfo {
+  -webkit-flex:initial;
+  -ms-flex:initial;
   flex: initial;
   margin-bottom:10px;
 }
 
 .bottomPlayerInfo {
+  -webkit-flex:initial;
+  -ms-flex:initial;
   flex: initial;
   margin-top:10px;
 }
@@ -49,12 +84,26 @@ $step-to-img : "../images/green-circle.png" !default;
   padding: 10px 10px 5px 10px;
   background: $gold;
   border-radius: 5px;
+  border-color: $gold-border;
+  border-width:1px;
+  border-style:solid;
+}
+
+.goldToMove {
+  box-shadow: 0px 0px 6px $gold-shadow;
 }
 
 .silverPlayerPanel {
   padding: 10px 10px 5px 10px;
   background: $silver;
   border-radius: 5px;
+  border-color: $silver-border;
+  border-width:1px;
+  border-style:solid;
+}
+
+.silverToMove {
+  box-shadow: 0px 0px 6px $silver-shadow;
 }
 
 .playerName {
@@ -81,14 +130,28 @@ $step-to-img : "../images/green-circle.png" !default;
 
 //Board display----------------------------------------------------------------------
 
+//trick to get height = width
+.boardSquare {
+  position:relative;
+  min-width:300px;
+}
+
+//100% actually means 100% of the parent WIDTH!
+.boardSquareBuffer {
+  margin-top:100%;
+}
+
 .board {
-  width:$board-size;
-  height:$board-size;
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  right: 0;
   background: no-repeat center url($board-bg);
   background-size: 100%;
   display: flex;
+  -webkit-flex-wrap: wrap;
   flex-wrap: wrap;
-  float: left;
 }
 
 .square {
@@ -127,6 +190,8 @@ $step-to-img : "../images/green-circle.png" !default;
 table.moveList {
   border-width: 2px;
   border-color: $panel-bg;
+  -webkit-flex:auto;
+  -ms-flex:auto;
   flex: auto;
   width: 270px;
   display: block;
@@ -144,6 +209,9 @@ table.moveList tr.g {
   display: table;
   text-align: left;
   background-color: $gold;
+  border-color: $gold-border;
+  border-width:1px;
+  border-style:solid;
 }
 
 table.moveList tr.s {
@@ -151,6 +219,9 @@ table.moveList tr.s {
   display: table;
   text-align: left;
   background-color: $silver;
+  border-color: $silver-border;
+  border-width:1px;
+  border-style:solid;
 }
 
 

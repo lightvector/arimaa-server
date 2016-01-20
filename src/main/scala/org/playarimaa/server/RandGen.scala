@@ -12,6 +12,7 @@ object RandGen {
   val NUM_SEED_BYTES = 32
   val NUM_AUTH_INTS = 3
   val NUM_GAME_ID_INTS = 2
+  val NUM_USER_ID_INTS = 2
 
   private val secureRand: SecureRandom = new SecureRandom()
   private var initialized = false
@@ -60,10 +61,23 @@ object RandGen {
     genToken(NUM_AUTH_INTS)
   def genGameID: GameID =
     genToken(NUM_GAME_ID_INTS)
+  def genUserID: UserID =
+    genToken(NUM_USER_ID_INTS)
 
   def genBoolean: Boolean = this.synchronized {
     if(!initialized)
       throw new IllegalStateException("RandGen.initialize not called")
     secureRand.nextBoolean
+  }
+
+
+  def main(args: Array[String]): Unit = {
+    if(args.length != 2)
+      throw new Exception("Args: numInts quantity")
+    initialize()
+    val numInts = args(0).toInt
+    val qty = args(1).toInt
+    for(i <- 1 to qty)
+      println(genToken(numInts))
   }
 }

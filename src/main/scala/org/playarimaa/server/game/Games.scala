@@ -536,7 +536,7 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker,
       users = users,
       creator = Some(creator),
       creationTime = now,
-      logins = new LoginTracker(Some(parentLogins),Games.INACTIVITY_TIMEOUT,updateInfosFromParent = false),
+      logins = new LoginTracker(Some(parentLogins),Games.INACTIVITY_TIMEOUT,Games.INACTIVITY_TIMEOUT,Games.INACTIVITY_TIMEOUT,updateInfosFromParent = false),
       accepted = Map(),
       starting = false,
       sequencePromise = Promise(),
@@ -601,7 +601,7 @@ class OpenGames(val db: Database, val parentLogins: LoginTracker,
               users = meta.users.map(Some(_)),
               creator = None,
               creationTime = now,
-              logins = new LoginTracker(Some(parentLogins),Games.INACTIVITY_TIMEOUT,updateInfosFromParent = false),
+              logins = new LoginTracker(Some(parentLogins),Games.INACTIVITY_TIMEOUT,Games.INACTIVITY_TIMEOUT,Games.INACTIVITY_TIMEOUT,updateInfosFromParent = false),
               accepted = Map(),
               starting = false,
               sequencePromise = Promise(),
@@ -1499,7 +1499,7 @@ object GameUtils {
   }
 
   def searchDB(db: Database, searchParams: Games.SearchParams, serverInstanceID: Long)(implicit ec: ExecutionContext): Future[List[GameMetadata]] = {
-    var query = Games.gameTable.filter(_.numPly === 5)
+    var query: Query[GameTable,GameMetadata,Seq] = Games.gameTable
     searchParams.rated.foreach { rated => query = query.filter(_.rated === rated) }
     searchParams.postal.foreach { postal => query = query.filter(_.postal === postal) }
     searchParams.gameType.foreach { gameType => query = query.filter(_.gameType === gameType) }
@@ -1589,11 +1589,13 @@ class GameTable(tag: Tag) extends Table[GameMetadata](tag, "gameTable") {
   def gRatingStdev : Rep[Double] = column[Double]("gRatingStdev")
   def gIsBot : Rep[Boolean] = column[Boolean]("gIsBot")
   def gIsGuest : Rep[Boolean] = column[Boolean]("gIsGuest")
+  def gUserID : Rep[String] = column[String]("gUserID")
   def sUser : Rep[Username] = column[Username]("sUser")
   def sRating : Rep[Double] = column[Double]("sRating")
   def sRatingStdev : Rep[Double] = column[Double]("sRatingStdev")
   def sIsBot : Rep[Boolean] = column[Boolean]("sIsBot")
   def sIsGuest : Rep[Boolean] = column[Boolean]("sIsGuest")
+  def sUserID : Rep[String] = column[String]("sUserID")
 
   def gInitialTime : Rep[Double] = column[Double]("gInitialTime")
   def gIncrement : Rep[Double] = column[Double]("gIncrement")
@@ -1643,8 +1645,8 @@ class GameTable(tag: Tag) extends Table[GameMetadata](tag, "gameTable") {
   def * : ProvenShape[GameMetadata] = (
     //Define database projection shape
     id,numPly,startTime,
-    (gUser,gRating,gRatingStdev,gIsBot,gIsGuest),
-    (sUser,sRating,sRatingStdev,sIsBot,sIsGuest),
+    (gUser,gRating,gRatingStdev,gIsBot,gIsGuest,gUserID),
+    (sUser,sRating,sRatingStdev,sIsBot,sIsGuest,sUserID),
     (gInitialTime,gIncrement,gDelay,gMaxReserve,gMaxMoveTime,gOvertimeAfter),
     (sInitialTime,sIncrement,sDelay,sMaxReserve,sMaxMoveTime,sOvertimeAfter),
     rated,postal,gameType,tags,

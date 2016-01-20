@@ -1,11 +1,16 @@
 $silver : #A9D5E4 !default;
+$silver-border : #aaaaff !default;
+$silver-shadow : #5588ff !default;
 $gold : #E4D5A6 !default;
+$gold-border : #ffaa77 !default;
+$gold-shadow : #ff8811 !default;
 
 $highlight: #8b9ae0 !default;
 $selection: #8b9ae0 !default;
 
 $body-bg : #dddddd !default;
 $panel-bg : #505050 !default;
+$panel-border-color : #808080 !default;
 $game-bg : #272727 !default;
 
 $font-stack: 'Quattrocento Sans', sans-serif;
@@ -37,23 +42,36 @@ body {
   font-family: $font-stack;
   background : $body-bg;
   margin: 0px;
-  padding: 8px 8px 30px 8px;
+  padding: 8px 8px 15px 8px;
+  display:-webkit-flex;
+  display:flex;
+  flex-flow:column;
 }
 
 #app_container {
-  height: 100%;
+  display:-webkit-flex;
+  display:flex;
+  flex-flow:column;
+  -webkit-flex:auto;
+  -ms-flex:auto;
+  flex:auto;
+  min-height:0;
+  overflow:auto;
 }
 
 .app {
-  height: 100%;
+  display:-webkit-flex;
+  display:flex;
+  flex-flow:column;
+  -webkit-flex:auto;
+  -ms-flex:auto;
+  flex:auto;
+  min-height:0;
 }
 
 footer {
   text-align: center;
-  position: absolute;
-  left: 50%;
-  transform: translate(-50%,-50%);
-  bottom: 0px;
+  margin: 8px;
   z-index: -1;
 }
 
@@ -111,6 +129,9 @@ h4 {
   padding: 10px 10px 5px 10px;
   background: $panel-bg;
   border-radius: 5px;
+  border-style: outset;
+  border-width: thin;
+  border-color: $panel-border-color;
   color: white;
   //@include box-shadow(0 0 200px rgba(white, .5), 0 1px 2px rgba(black, .3));
 
@@ -140,6 +161,9 @@ h4 {
   input.submit:active, button:active {
     background: #28624E;
   }
+  input.submit:disabled, button:disabled {
+    background: #CECECE;
+  }
 
   input.submit.yes, button.yes {
     margin: 2px 4px 2px 4px;
@@ -148,6 +172,9 @@ h4 {
   }
   input.submit.yes:active, button.yes:active {
     background: #286A38;
+  }
+  input.submit.yes:disabled, button.yes:disabled {
+    background: #CECECE;
   }
 
   input.submit.no, button.no {
@@ -158,12 +185,18 @@ h4 {
   input.submit.no:active, button.no:active {
     background: #6A2838;
   }
+  input.submit.no:disabled, button.no:disabled {
+    background: #CECECE;
+  }
 
   input.submit.gameButton, button.gameButton {
     margin: 2px 4px 2px 4px;
     height: 24px;
   }
   input.submit.gameButton:active, button.gameButton:active {
+  }
+  input.submit.gameButton:disabled, button.gameButton:disabled {
+    background: #CECECE;
   }
 
   input.submit.goToOurGame, button.goToOurGame {
@@ -173,6 +206,9 @@ h4 {
   }
   input.submit.goToOurGame:active, button.goToOurGame:active {
     background: #28386A;
+  }
+  input.submit.goToOurGame:disabled, button.goToOurGame:disabled {
+    background: #CECECE;
   }
 
   input[type=text], input[type=password] {
@@ -226,17 +262,36 @@ div.bigError {
   color:red;
 }
 
+.navItem {
+  margin-left:10px;
+  margin-right:10px;
+}
+
+.navItemRight {
+  float:right;
+}
+
+.notificationsList {
+  margin-top:0.5em;
+  margin-bottom:0.5em;
+}
 .gameroom {
-  height:100%;
   display:-webkit-flex;
   display:flex;
   flex-flow:column;
+  -webkit-flex:auto;
+  -ms-flex:auto;
+  flex:auto;
+  min-height:0;
 }
 
 .gameroomPanels {
-  height:100%;
   display:-webkit-flex;
   display:flex;
+  -webkit-flex:auto;
+  -ms-flex:auto;
+  flex:auto;
+  min-height:0;
 }
 
 .games {
@@ -244,7 +299,7 @@ div.bigError {
   display:-webkit-flex;
   display:flex;
   flex-flow:column;
-  height:100%;
+  min-height:0;
 }
 
 .gamesContents {
@@ -254,6 +309,7 @@ div.bigError {
   display:-webkit-flex;
   display:flex;
   height: 70%;
+  min-height:0;
 }
 
 .gamesLists {
@@ -263,6 +319,11 @@ div.bigError {
   display:-webkit-flex;
   display:flex;
   flex-flow:column;
+  min-height:0;
+}
+
+.gamesList {
+  min-height:50px;
 }
 
 .gameroomGameElt.quickHighlightOrange {
@@ -290,6 +351,7 @@ div.bigError {
   -ms-flex:0.15 1 auto;
   flex: 0.15 1 auto;
   margin-left: 8px;
+  min-height:100px;
 }
 
 .chat {
@@ -297,8 +359,8 @@ div.bigError {
   display:-webkit-flex;
   display:flex;
   flex-flow:column;
-  height:100%;
   margin-left: 10px;
+  min-height:0;
 }
 
 .chatContents {
@@ -308,6 +370,7 @@ div.bigError {
   display:-webkit-flex;
   display:flex;
   height: 70%;
+  min-height:0;
 }
 
 .chatUsersDiv {
@@ -319,6 +382,7 @@ div.bigError {
   -ms-flex:0.15 1 auto;
   flex: 0.15 1 auto;
   margin-left: 8px;
+  min-height:100px;
 }
 
 .chatUI {
@@ -328,15 +392,33 @@ div.bigError {
   display:-webkit-flex;
   display:flex;
   flex-flow:column;
+  min-height:200px;
 }
 
 .chatTable {
   overflow:auto;
-  display:block;
+  display:-webkit-flex;
+  display:flex;
   background:white;
   color:black;
   border-radius:1px;
   margin-bottom:4px;
+  border-style:inset;
+  border-width:thin;
+  font-size:90%;
+  min-height:150px;
+}
+
+.chatForm {
+  display:-webkit-flex;
+  display:flex;
+}
+
+.chatInput {
+  -webkit-flex:auto;
+  -ms-flex:auto;
+  flex:auto;
+  width:100px;
 }
 
 .unselectable {

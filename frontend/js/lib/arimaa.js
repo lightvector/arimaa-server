@@ -5,16 +5,16 @@ var Arimaa = function(options) {
   const GOLD = 0;
   const SILVER = 1;
 
-   const SQUARES = {
-      a8:   0, b8:   1, c8:   2, d8:   3, e8:   4, f8:   5, g8:   6, h8:   7, //0x00 0x07
-      a7:  16, b7:  17, c7:  18, d7:  19, e7:  20, f7:  21, g7:  22, h7:  23, //0x10 0x17
-      a6:  32, b6:  33, c6:  34, d6:  35, e6:  36, f6:  37, g6:  38, h6:  39, //0x20 0x27
-      a5:  48, b5:  49, c5:  50, d5:  51, e5:  52, f5:  53, g5:  54, h5:  55, //0x30
-      a4:  64, b4:  65, c4:  66, d4:  67, e4:  68, f4:  69, g4:  70, h4:  71, //0x40
-      a3:  80, b3:  81, c3:  82, d3:  83, e3:  84, f3:  85, g3:  86, h3:  87, //0x50
-      a2:  96, b2:  97, c2:  98, d2:  99, e2: 100, f2: 101, g2: 102, h2: 103, //0x60
-      a1: 112, b1: 113, c1: 114, d1: 115, e1: 116, f1: 117, g1: 118, h1: 119  //0x70
-   };
+  const SQUARES = {
+    a8:   0, b8:   1, c8:   2, d8:   3, e8:   4, f8:   5, g8:   6, h8:   7, //0x00 0x07
+    a7:  16, b7:  17, c7:  18, d7:  19, e7:  20, f7:  21, g7:  22, h7:  23, //0x10 0x17
+    a6:  32, b6:  33, c6:  34, d6:  35, e6:  36, f6:  37, g6:  38, h6:  39, //0x20 0x27
+    a5:  48, b5:  49, c5:  50, d5:  51, e5:  52, f5:  53, g5:  54, h5:  55, //0x30
+    a4:  64, b4:  65, c4:  66, d4:  67, e4:  68, f4:  69, g4:  70, h4:  71, //0x40
+    a3:  80, b3:  81, c3:  82, d3:  83, e3:  84, f3:  85, g3:  86, h3:  87, //0x50
+    a2:  96, b2:  97, c2:  98, d2:  99, e2: 100, f2: 101, g2: 102, h2: 103, //0x60
+    a1: 112, b1: 113, c1: 114, d1: 115, e1: 116, f1: 117, g1: 118, h1: 119  //0x70
+  };
 
   const TRAPS = {
     c3: 82,
@@ -32,7 +32,7 @@ var Arimaa = function(options) {
   const GELEPHANT = 6;
   const COLOR = 8;
   const SRABBIT = 9;
-   const SCAT = 10;
+  const SCAT = 10;
   const SDOG = 11;
   const SHORSE = 12;
   const SCAMEL = 13;
@@ -122,16 +122,39 @@ var Arimaa = function(options) {
   //more information than you ever will want
   //make this more object oriented-y later and add better special options support
   var ArimaaStep = function(piece, fromSqNumber, direction, specialOptions) {
-    return {piece : piece,
-        squareNum : fromSqNumber,
-        square : square_name(fromSqNumber),
-        destSquareNum : fromSqNumber + DIRECTIONS[direction],
-        destSquare : square_name(fromSqNumber + DIRECTIONS[direction]),
-        direction : direction,
-        special : specialOptions, //do something else later...
-        string : PIECES.charAt(piece)+square_name(fromSqNumber)+direction
+    return {
+      piece : piece,
+      squareNum : fromSqNumber,
+      square : square_name(fromSqNumber),
+      destSquareNum : fromSqNumber + DIRECTIONS[direction],
+      destSquare : square_name(fromSqNumber + DIRECTIONS[direction]),
+      direction : direction,
+      special : specialOptions, //do something else later... //TODO unused??
+      string : PIECES.charAt(piece)+square_name(fromSqNumber)+direction
     };
   };
+
+  function get_prev_step_no_caps() {
+    var prevStep = null;
+    if(ongoingMove.length > 0) {
+      prevStep = ongoingMove[ongoingMove.length-1];
+
+      if(prevStep.direction === 'x') {
+        prevStep = null;
+        if(ongoingMove.length > 1)
+          prevStep = ongoingMove[ongoingMove.length-2];
+      }
+    }
+    return prevStep;
+  }
+
+  function can_undo_step() {
+    return ongoingMove.length > 0;
+  }
+
+  function can_redo_step() {
+    return stepStack.length > 0;
+  }
 
   //need to undo 2 steps if one is a capture
   function undo_step() {
@@ -182,9 +205,7 @@ var Arimaa = function(options) {
     ongoingMove = [];
     halfmoveNumber += 1;
 
-    //check victory conds???
-    var victory = check_victory(); //???????????
-    return {success: true, victory: victory};
+    return {success: true};
   }
 
   function can_complete_move() {
@@ -192,16 +213,54 @@ var Arimaa = function(options) {
 
     //no move //we should add the starting position to move history and remove this check later
     //ive added the starting position, remove the following line later and TEST
-    if(ongoingMove.length === 0) return {sucess: false, reason: "No steps taken"};
+    if(ongoingMove.length === 0) return {success: false, reason: "No steps taken"};
 
     if(boardHistory.length) {
-      if(currentFen === boardHistory[boardHistory.length-1]) return {success: false, reason: "Position hasn't changed"}; //no change
+      if(currentFen === boardHistory[boardHistory.length-1])
+        return {success: false, reason: "Position hasn't changed"};
     }
+
+    if(has_uncompleted_push())
+      return {success: false, reason: "Incomplete push"};
+
     var count = 0;
     for(var i=0;i<boardHistory.length;i++) {
       if(currentFen == boardHistory[i]) count += 1;
       if(count == 2) return {success: false, reason: "Three times repetition"};
     }
+    return {success:true};
+  }
+
+  function can_setup() {
+    if(halfmoveNumber >= 2)
+      return {success: false, reason: "Setup not possible after the first move"};
+    return {success:true};
+  }
+
+  //NO ERROR CHECKING!!!
+  function setup(setupString) {
+    var canComplete = can_setup();
+    if(!canComplete.success) return canComplete;
+
+    var stepStrsList = setupString.split(' ');
+
+    var stepList = [];
+    stepStrsList.forEach(function(stepString) {
+      var piece = PIECES.indexOf(stepString.charAt(0));
+      var location = stepString.substring(1,3);
+
+      stepList.push({string:stepString}); //need to make adding pieces correspond to the step object
+
+      board[SQUARES[location]] = piece;
+    });
+
+    var currentFen = generate_fen();
+    boardHistory.push(currentFen);
+    colorToMove = (colorToMove === GOLD) ? SILVER : GOLD;
+    stepsLeft = 4;
+    moveHistory.push(stepList);
+    ongoingMove = [];
+    halfmoveNumber += 1;
     return {success:true};
   }
 
@@ -235,19 +294,23 @@ var Arimaa = function(options) {
   //need to call complete move afterwards
   function add_move(move) {
     var isValid = true;
+    var badStep = "";
 
     for(var i=0;i<move.length;i++) {
-      step = move[i];
-      if(!add_step(step).success) isValid = false;
+      var step = move[i];
+      if(!add_step(step).success) {
+        badStep = step;
+        isValid = false;
+      }
     }
 
     if(!isValid) {
       for(var i=0;i<move.length;i++) {
         undo_step(); //undoing more steps than added is safe
       }
-      return false;
+      return {success: false, reason: "bad step" + badStep};
     }
-    return true;
+    return {success: true};
   }
 
   //assumes valid square_num
@@ -321,7 +384,8 @@ var Arimaa = function(options) {
     if(piece === EMPTY) return false;
     if(((piece & COLOR)>>3) == colorToMove) return false;
     if(ongoingMove.length == 0) return false;
-    var prevStep = ongoingMove[ongoingMove.length-1];
+
+    var prevStep = get_prev_step_no_caps();
 
     if(prevStep['completedPush']) return false; //a piece that just pushed can't also pull
 
@@ -343,13 +407,13 @@ var Arimaa = function(options) {
       for(var i=0;i<stack.length;i++) {
         var s = stack[i]['string'];
         var a = add_step(s);
-        if(!a) {  //We should remove this later since this should never happen
+        if(!a) {  //TODO We should remove this later since this should never happen
           console.log("/???");
           console.log(ascii());
           console.log(s);
           console.log('=========');
         }
-        if(can_complete_move()) {
+        if(can_complete_move().success) {
           moves.push(ongoingMove.slice());
         }
         dls(depth-1);
@@ -371,20 +435,14 @@ var Arimaa = function(options) {
     return steps;
   }
 
-  //NO ERROR CHECKING!!!
-  function setup(setupString) {
-    var stepStrsList = setupString.split(' ');
-
-    var stepList = [];
-    stepStrsList.forEach(function(stepString) {
-      var piece = PIECES.indexOf(stepString.charAt(0));
-      var location = stepString.substring(1,3);
-
-      stepList.push({string:stepString}); //need to make adding pieces correspond to the step object
-
-      board[SQUARES[location]] = piece;
-    });
-    moveHistory.push(stepList);
+  function has_uncompleted_push() {
+    if(ongoingMove.length) {
+      var prevStep = get_prev_step_no_caps();
+      if(prevStep['push']) {
+        return true;
+      }
+    }
+    return false;
   }
 
   //eventually, since we will need to call generate_moves at the beginning
@@ -412,13 +470,13 @@ var Arimaa = function(options) {
 
     var squareNum = SQUARES[location];
     //var stepObj = {piece:piece,squareNum:squareNum,direction:direction,string:stepString};
-    stepObj = ArimaaStep(piece, squareNum, direction);
+    var stepObj = ArimaaStep(piece, squareNum, direction);
 
     if(piece === GRABBIT && direction === 's') return {success:false, stepsLeft: stepsLeft};
     if(piece === SRABBIT && direction === 'n') return {success:false, stepsLeft: stepsLeft};
 
     if(ongoingMove.length) {
-      var prevStep = ongoingMove[ongoingMove.length-1];
+      var prevStep = get_prev_step_no_caps();
       if(prevStep['push']) {
         if(prevStep['squareNum'] == squareNum+DIRECTIONS[direction] &&
           ((piece & COLOR) >> 3) == colorToMove &&
@@ -443,7 +501,7 @@ var Arimaa = function(options) {
     if(p !== piece) return {success:false, stepsLeft: stepsLeft};
 
     if(direction === 'x') {
-      //CHECK IF WE ACTUALLY SHOULD REMOVE THIS PIECE LATER
+      //TODO CHECK IF WE ACTUALLY SHOULD REMOVE THIS PIECE LATER
       remove_piece_from_square(squareNum);
       return {success:true, stepsLeft: stepsLeft, step: stepObj};
     }
@@ -487,15 +545,7 @@ var Arimaa = function(options) {
       return steps;
     }
 
-    var prevStep = null;
-    if(ongoingMove.length > 0) {
-      prevStep = ongoingMove[ongoingMove.length-1];
-      //ignore captures
-      if(prevStep.direction === 'x') {
-        prevStep = ongoingMove[ongoingMove.length-2];
-      }
-
-    }
+    var prevStep = get_prev_step_no_caps();
 
     var pieceName = PIECES.charAt(piece);
     var location = square_name(squareNum);
@@ -688,7 +738,7 @@ var Arimaa = function(options) {
   }
 
   //IMPLEMENT THIS AT SOME POINT!!!!!!!
-  function is_repetiton() {
+  function is_repetition() {
 
   }
 
@@ -705,7 +755,7 @@ var Arimaa = function(options) {
 
 
   //0 is no victory, 1 is victory, -1 is loss
-  //TODO: Implement no moves available b/c 3-fold repetiton check
+  //TODO: Implement no moves available b/c 3-fold repetition check
   //Maybe change result to color????
   function check_victory() {
     var goal = is_goal();
@@ -792,21 +842,27 @@ var Arimaa = function(options) {
     },
 
     //Ra1 Rb1 ...
-    setup_gold: function(setupString) {
-      setup(setupString);
+    setup: function(setupString) {
+      return setup(setupString);
     },
-
-    setup_silver: function(setupString) {
-      setup(setupString);
+    can_setup: function() {
+      return can_setup();
     },
 
     //TODO this is ugly!!
     add_move_string: function(moveString) {
+      undo_ongoing_move();
+
       var stepsList = moveString.split(' ');
 
       if(moveHistory.length === 0) return setup(moveString);
       else if(moveHistory.length === 1) return setup(moveString);
-      else return add_move(stepsList);
+      else {
+        var result = add_move(stepsList);
+        if(!result.success)
+          return result;
+        return complete_move();
+      }
     },
 
     //move is a list of step strings
@@ -816,6 +872,14 @@ var Arimaa = function(options) {
 
     add_step: function(stepString) {
       return add_step(stepString);
+    },
+
+    can_undo_step: function() {
+      return can_undo_step();
+    },
+
+    can_redo_step: function() {
+      return can_redo_step();
     },
 
     undo_step: function() {
@@ -838,10 +902,18 @@ var Arimaa = function(options) {
       return complete_move();
     },
 
+    can_complete_move: function() {
+      return can_complete_move();
+    },
+
+    has_uncompleted_push() {
+      return has_uncompleted_push();
+    },
+
     //note: currently, you can add more steps after victory,
     //which allows you to un-win
-    get_victory: function() {
-      return get_victory();
+    check_victory: function() {
+      return check_victory();
     },
 
     //probably should rename one of these functions
@@ -871,12 +943,12 @@ var Arimaa = function(options) {
     },
 
     get_ongoing_move: function() {
-			return ongoingMove;
-		},
+      return ongoingMove;
+    },
 
-		get_ongoing_move_string: function() {
-			return ongoingMove.map(function(m) {return m.string;}).join(' ');
-		},
+    get_ongoing_move_string: function() {
+      return ongoingMove.map(function(m) {return m.string;}).join(' ');
+    },
 
     //TODO TEST THIS!!!!
     get_turn_name: function() {

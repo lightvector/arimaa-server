@@ -29,27 +29,29 @@ var Utils = {
 
   //If not overtime, returns null
   //If overtime, adjusts the TC to reflect the overtime factor
-  overtimeTC: function(tc, turn) {
+  overtimeTC: function(tc, plyNum) {
     var overtimeFactor = 1.0;
     var overtimeFactorPerTurn = 1.0 - 1.0 / 30.0;
-    if(tc.overtimeAfter !== undefined && turn >= tc.overtimeAfter)
-      overtimeFactor = Math.pow(overtimeFactorPerTurn, turn - tc.overtimeAfter + 1);
+    var turnNum = Math.floor(plyNum / 2);
+    if(tc.overtimeAfter !== undefined && turnNum >= tc.overtimeAfter)
+      overtimeFactor = Math.pow(overtimeFactorPerTurn, turnNum - tc.overtimeAfter);
     else
       return null;
-    
-    var newTC = $.extend(true, {}, tc);    
-    if(newTC.increment !== undefined) 
+
+    var newTC = $.extend(true, {}, tc);
+    if(newTC.increment !== undefined)
       newTC.increment *= overtimeFactor;
-    if(newTC.delay !== undefined) 
+    if(newTC.delay !== undefined)
       newTC.delay *= overtimeFactor;
     return newTC;
   },
-  
-  clockAfterTurn: function(clockBeforeTurn, timeSpent, turn, tc){
+
+  clockAfterTurn: function(clockBeforeTurn, timeSpent, plyNum, tc){
     var overtimeFactor = 1.0;
     var overtimeFactorPerTurn = 1.0 - 1.0 / 30.0;
-    if(tc.overtimeAfter !== undefined && turn >= tc.overtimeAfter)
-      overtimeFactor = Math.pow(overtimeFactorPerTurn, turn - tc.overtimeAfter + 1);
+    var turnNum = Math.floor(plyNum / 2);
+    if(tc.overtimeAfter !== undefined && turnNum >= tc.overtimeAfter)
+      overtimeFactor = Math.pow(overtimeFactorPerTurn, turnNum - tc.overtimeAfter);
     var adjIncrement = (tc.increment === undefined ? 0 : tc.increment) * overtimeFactor;
     var adjDelay = (tc.increment === undefined ? 0 : tc.delay) * overtimeFactor;
     var clock = clockBeforeTurn + adjIncrement - Math.max(timeSpent - adjDelay, 0.0);
@@ -66,7 +68,7 @@ var Utils = {
     var i = (player == "g" ? 0 : 1);
     for(; i < gameState.moveTimes.length; i += 2) {
       var timeSpent = gameState.moveTimes[i].time - gameState.moveTimes[i].start;
-      clock = Utils.clockAfterTurn(clock,timeSpent,i/2,tc);
+      clock = Utils.clockAfterTurn(clock,timeSpent,i,tc);
     }
     if(gameState.toMove == player) {
       var timeSpent = 0;
@@ -74,17 +76,7 @@ var Utils = {
         timeSpent = gameState.meta.activeGameData.timeSpent;
       else if(gameState.meta.result !== undefined)
         timeSpent = gameState.meta.result.endTime - gameState.meta.result.lastMoveStartTime;
-      clock = Utils.clockAfterTurn(clock,timeSpent,i/2,tc);
-    }
-    return clock;
-  },
-
-  sClockForEndedGame: function(gameState) {
-    var tc = gameState.meta.sTC;
-    var clock = tc.initialTime;
-    for(var i = 1; i < gameState.moveTimes.length; i += 2) {
-      var timeSpent = gameState.moveTimes[i].time - gameState.moveTimes[i].start;
-      clock = Utils.clockAfterTurn(clock,timeSpent,(i-1)/2,tc);
+      clock = Utils.clockAfterTurn(clock,timeSpent,i,tc);
     }
     return clock;
   },
@@ -142,15 +134,15 @@ var Utils = {
   isUserJoined: function(metadata, username) {
     if(metadata.openGameData !== undefined) {
       for(var j = 0; j<metadata.openGameData.joined.length; j++) {
-        if(metadata.openGameData.joined[j].name == username) {
+        if(metadata.openGameData.joined[j].name === username) {
           return true;
         }
       }
     }
     if(metadata.activeGameData !== undefined) {
-      if(metadata.gUser.name == username && metadata.activeGameData.gPresent)
+      if(metadata.gUser.name === username && metadata.activeGameData.gPresent)
         return true;
-      if(metadata.sUser.name == username && metadata.activeGameData.sPresent)
+      if(metadata.sUser.name === username && metadata.activeGameData.sPresent)
         return true;
     }
     return false;
@@ -180,7 +172,7 @@ var Utils = {
     return title;
   },
 
-  
+
   userDisplayStr: function(userInfo) {
     if(userInfo === null) return "";
 
@@ -207,7 +199,7 @@ var Utils = {
     var color = (plyNum%2===0) ? "g" : "s";
     return turn + color;
   },
-  
+
   flashWindowIfNotFocused: function(reasonTitle) {
     var title = document.title;
     if(!document.hasFocus() && !inMiddleOfFlash) {

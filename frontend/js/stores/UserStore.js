@@ -67,11 +67,17 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
   },
 
   getUsername: function() {
-    return cookie.load('username');
+    var username = cookie.load('username');
+    if(!username)
+      return null;
+    return username;
   },
 
   siteAuthToken: function() {
-    return cookie.load('siteAuth');
+    var siteAuth = cookie.load('siteAuth');
+    if(!siteAuth)
+      return null;
+    return siteAuth;
   },
 
   getUsersLoggedIn: function() {
@@ -167,7 +173,7 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
     }, SiteConstants.VALUES.HIGHLIGHT_FLASH_TIMEOUT * 1000);
   },
 
-  
+
   addGame: function(metadata) {
     var username = UserStore.getUsername();
     var gameID = metadata.gameID;
@@ -185,8 +191,8 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
 
       openGames[gameID] = metadata;
       if(metadata.openGameData.creator.name === username ||
-         (metadata.gUser !== undefined && metadata.gUser.name == username) ||
-         (metadata.sUser !== undefined && metadata.sUser.name == username)) {
+         (metadata.gUser !== undefined && metadata.gUser.name === username) ||
+         (metadata.sUser !== undefined && metadata.sUser.name === username)) {
         ownOpenGames[gameID] = metadata;
       }
       else if(metadata.gUser === undefined || metadata.sUser === undefined) {
@@ -198,8 +204,8 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
     }
     else if(metadata.activeGameData !== undefined) {
       activeGames[gameID] = metadata;
-      if(metadata.gUser.name == username ||
-         metadata.sUser.name == username) {
+      if(metadata.gUser.name === username ||
+         metadata.sUser.name === username) {
         ownActiveGames[gameID] = metadata;
       }
       else {
@@ -217,7 +223,7 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
       }
 
       //If we created this game and someone new joined, alert
-      if(metadata.openGameData.creator.name == username) {
+      if(metadata.openGameData.creator.name === username) {
         for(var i = 0; i<newJoined.length; i++) {
           if(newJoined[i] !== username && (prevGameIfOpen === null || !Utils.isUserJoined(prevGameIfOpen,newJoined[i]))) {
             Utils.flashWindowIfNotFocused("User Joined Game");
@@ -243,7 +249,7 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
     if(prevGameIfOpen !== null && metadata.activeGameData !== undefined && Utils.isUserJoined(metadata,username)) {
       Utils.flashWindowIfNotFocused("Game Begun");
       UserStore.flashPlayingGame(gameID);
-      
+
       //TODO this doesn't quite work, it gets blocked a lot, maybe we just let the user click on the button...?
       var newWindow = window.open("/game/" + gameID);
       if(newWindow)
@@ -354,11 +360,11 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
       UserStore.removeGame(gameID);
       UserStore.emitChange();
       break;
-    case SiteConstants.ACTIONS.GAME_JOINED:
+    case SiteConstants.ACTIONS.GAMEROOM_GAME_JOINED:
       joinedGameAuths[action.gameID] = action.gameAuth;
       UserStore.emitChange();
       break;
-    case SiteConstants.ACTIONS.HEARTBEAT_FAILED:
+    case SiteConstants.ACTIONS.GAMEROOM_HEARTBEAT_FAILED:
       delete joinedGameAuths[action.gameID];
       UserStore.emitChange();
       break;
@@ -371,7 +377,7 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
       if(action.gameID in openGames &&
          openGames[action.gameID].openGameData !== undefined &&
          openGames[action.gameID].openGameData.creator !== undefined &&
-         openGames[action.gameID].openGameData.creator.name == UserStore.getUsername()) {
+         openGames[action.gameID].openGameData.creator.name === UserStore.getUsername()) {
         leftCreatedGameIDs[action.gameID] = action.gameID;
         if(action.gameID in openGames) delete openGames[action.gameID];
         if(action.gameID in ownOpenGames) delete ownOpenGames[action.gameID];

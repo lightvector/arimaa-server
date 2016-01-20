@@ -16,9 +16,11 @@ object Accounts {
 }
 
 case class Account(
-  lowercaseName: UserID,
+  lowercaseName: LowercaseName,
   //Distinct from lowercaseName so that we can remember the username captialization
-  username: Username, 
+  username: Username,
+  //Some string for distinguishing distinct players with the same name (given things like account deletion) for recording on historical games.
+  userID: UserID,
   email: Email,
   //If Some, the user needs to verify that his/her email address is correct with this auth or else the account will be deleted after some time
   emailVerifyNeeded: Option[Auth],
@@ -38,7 +40,8 @@ case class Account(
       name = username,
       rating = gameStats.rating,
       isBot = isBot,
-      isGuest = isGuest
+      isGuest = isGuest,
+      userID = userID
     )
   }
 }
@@ -134,6 +137,7 @@ class Accounts(val domainName: String, val db: Database, val scheduler: Schedule
   def removeIfGuest(username: Username): Future[Unit] = {
     val lowercaseName = username.toLowerCase
     val query: DBIO[Int] = Accounts.table.filter(_.lowercaseName === lowercaseName).filter(_.isGuest).delete
+    logger.info("Removing guest account: " + username)
     db.run(DBIO.seq(query))
   }
 
@@ -141,6 +145,7 @@ class Accounts(val domainName: String, val db: Database, val scheduler: Schedule
   def removeIfUnverified(username: Username): Future[Unit] = {
     val lowercaseName = username.toLowerCase
     val query: DBIO[Int] = Accounts.table.filter(_.lowercaseName === lowercaseName).filter(_.emailVerifyNeeded.isDefined).delete
+    logger.info("Removing unverified account: " + username)
     db.run(DBIO.seq(query))
   }
 
@@ -257,6 +262,7 @@ class Accounts(val domainName: String, val db: Database, val scheduler: Schedule
 class AccountTable(tag: Tag) extends Table[Account](tag, "accountTable") {
   def lowercaseName : Rep[String] = column[String]("lowercaseName")
   def username : Rep[String] = column[String]("username")
+  def userID : Rep[String] = column[String]("userID")
   def email : Rep[String] = column[String]("email")
   def emailVerifyNeeded : Rep[Option[String]] = column[Option[String]]("emailVerifyNeeded")
   def passwordHash : Rep[String] = column[String]("passwordHash")
@@ -275,19 +281,19 @@ class AccountTable(tag: Tag) extends Table[Account](tag, "accountTable") {
   def priorRatingStdev : Rep[Double] = column[Double]("priorRatingStdev")
 
   def * : ProvenShape[Account] =
-    (lowercaseName, username, email, emailVerifyNeeded, passwordHash, isBot, createdTime, isGuest, isAdmin, lastLogin,
+    (lowercaseName, username, userID, email, emailVerifyNeeded, passwordHash, isBot, createdTime, isGuest, isAdmin, lastLogin,
       (numGamesGold, numGamesSilv, numGamesWon, numGamesLost, rating, ratingStdev),
       priorRating, priorRatingStdev).shaped <> (
     //Database shape -> Scala object
-    { case (lowercaseName, username, email, emailVerifyNeeded, passwordHash, isBot, createdTime, isGuest, isAdmin, lastLogin, gameStats, priorRating, priorRatingStdev) =>
-      Account(lowercaseName, username, email, emailVerifyNeeded, passwordHash, isBot, createdTime, isGuest, isAdmin, lastLogin,
+    { case (lowercaseName, username, userID, email, emailVerifyNeeded, passwordHash, isBot, createdTime, isGuest, isAdmin, lastLogin, gameStats, priorRating, priorRatingStdev) =>
+      Account(lowercaseName, username, userID, email, emailVerifyNeeded, passwordHash, isBot, createdTime, isGuest, isAdmin, lastLogin,
         AccountGameStats.ofDB(gameStats), Rating(priorRating, priorRatingStdev)
       )
     },
     //Scala object -> Database shape
     { a: Account =>
       Some((
-        a.lowercaseName,a.username,a.email,a.emailVerifyNeeded,a.passwordHash,a.isBot,a.createdTime,a.isGuest,a.isAdmin,a.lastLogin,
+        a.lowercaseName,a.username,a.userID,a.email,a.emailVerifyNeeded,a.passwordHash,a.isBot,a.createdTime,a.isGuest,a.isAdmin,a.lastLogin,
         AccountGameStats.toDB(a.gameStats), a.priorRating.mean, a.priorRating.stdev
       ))
     }

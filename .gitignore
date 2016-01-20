@@ -5,6 +5,7 @@ tmp/
 
 # Setup-specific
 src/main/resources/application.conf
+src/main/resources/application.conf.backup
 
 # sbt specific
 .cache

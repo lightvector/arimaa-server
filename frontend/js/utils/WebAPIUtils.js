@@ -78,11 +78,19 @@ var APIUtils = {
   },
 
   loginGuest: function(username, success, error) {
-    POST('/api/accounts/loginGuest', {username:username}, success, error);
+    var siteAuth = UserStore.siteAuthToken();
+    if(siteAuth)
+      POST('/api/accounts/loginGuest', {username:username, oldSiteAuth:siteAuth}, success, error);
+    else
+      POST('/api/accounts/loginGuest', {username:username}, success, error);
   },
 
   register: function(username, email, password, priorRating, success, error) {
-    POST('/api/accounts/register', {username:username, email:email, password:password, isBot:false, priorRating:priorRating}, success, error);
+    var siteAuth = UserStore.siteAuthToken();
+    if(siteAuth)
+      POST('/api/accounts/register', {username:username, email:email, password:password, isBot:false, priorRating:priorRating, oldSiteAuth:siteAuth}, success, error);
+    else
+      POST('/api/accounts/register', {username:username, email:email, password:password, isBot:false, priorRating:priorRating}, success, error);
   },
 
   logout: function(success, error) {
@@ -109,7 +117,7 @@ var APIUtils = {
     POST('/api/accounts/verifyEmail', {username:username, verifyAuth:verifyAuth}, success, error);
   },
 
-  resendVerifyEmail: function(username, verifyAuth, success, error) {
+  resendVerifyEmail: function(username, success, error) {
     POST('/api/accounts/resendVerifyEmail', {username:username, siteAuth:UserStore.siteAuthToken()}, success, error);
   },
 

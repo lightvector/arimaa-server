@@ -8,7 +8,7 @@ var ArimaaConstants = require('../constants/ArimaaConstants.js');
 function getGameState() {
   var boardState = {
     fen: ArimaaStore.getArimaa().get_fen(),
-    stepFrom: ArimaaStore.getSeletedSquare().name, //TODO need to change this name
+    stepFrom: ArimaaStore.getSelectedSquare().name,
     steps: ArimaaStore.getValidSteps(),
     viewSide: ArimaaStore.getViewSide(),
     setupColor: ArimaaStore.getSetupColor(),
@@ -115,12 +115,15 @@ var Board = React.createClass({
     var squares = position.map(this.renderSquare, this);
 
     return (
-      <div className="board unselectable" onMouseLeave={this.hoverAway}>
-        {squares}
+      <div className="boardSquare unselectable" >
+        <div className="boardSquareBuffer"></div>
+        <div className="board unselectable" onMouseLeave={this.hoverAway}>
+          {squares}
+        </div>
       </div>
     );
   }
-  
+
 });
 
 module.exports = Board;
