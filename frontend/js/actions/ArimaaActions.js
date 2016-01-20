@@ -25,8 +25,8 @@ var ArimaaActions = {
     //Check if we're part of this game and the game is not finished. If so, then join the game and begin heartbeating
     var username = UserStore.getUsername();
     if(data.meta.result === undefined) {
-      if((data.meta.gUser !== undefined && data.meta.gUser.name == username) ||
-         (data.meta.sUser !== undefined && data.meta.sUser.name == username)) {
+      if((data.meta.gUser !== undefined && data.meta.gUser.name === username) ||
+         (data.meta.sUser !== undefined && data.meta.sUser.name === username)) {
         ArimaaActions.joinAndStartHeartbeatLoop(data.meta.gameID);
       }
     }
@@ -67,8 +67,8 @@ var ArimaaActions = {
     var game = ArimaaStore.getGameState();
     if(game !== null &&
        game.meta.activeGameData !== undefined &&
-       (game.meta.gUser.name == username && !game.meta.activeGameData.gPresent) ||
-       (game.meta.sUser.name == username && !game.meta.activeGameData.sPresent)) {
+       (game.meta.gUser.name === username && !game.meta.activeGameData.gPresent) ||
+       (game.meta.sUser.name === username && !game.meta.activeGameData.sPresent)) {
       ArimaaActions.joinAndStartHeartbeatLoop(gameID);
     }
   },
@@ -83,13 +83,13 @@ var ArimaaActions = {
       return;
 
     //If we're not part of this game, terminate
-    if(!(game.meta.gUser !== undefined && game.meta.gUser.name == username) &&
-       !(game.meta.sUser !== undefined && game.meta.sUser.name == username))
+    if(!(game.meta.gUser !== undefined && game.meta.gUser.name === username) &&
+       !(game.meta.sUser !== undefined && game.meta.sUser.name === username))
       return;
 
     //If we're not joined to this game, try joining it again
-    if((game.meta.gUser.name == username && !game.meta.activeGameData.gPresent) ||
-       (game.meta.sUser.name == username && !game.meta.activeGameData.sPresent)) {
+    if((game.meta.gUser.name === username && !game.meta.activeGameData.gPresent) ||
+       (game.meta.sUser.name === username && !game.meta.activeGameData.sPresent)) {
       //But wait a bit to see if we actually do get a game state indicating we're joined
       setTimeout(function () {
         ArimaaActions.rejoinIfNotActive(gameID);

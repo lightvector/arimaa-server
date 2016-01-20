@@ -161,6 +161,9 @@ h4 {
   input.submit:active, button:active {
     background: #28624E;
   }
+  input.submit:disabled, button:disabled {
+    background: #CECECE;
+  }
 
   input.submit.yes, button.yes {
     margin: 2px 4px 2px 4px;
@@ -169,6 +172,9 @@ h4 {
   }
   input.submit.yes:active, button.yes:active {
     background: #286A38;
+  }
+  input.submit.yes:disabled, button.yes:disabled {
+    background: #CECECE;
   }
 
   input.submit.no, button.no {
@@ -179,12 +185,18 @@ h4 {
   input.submit.no:active, button.no:active {
     background: #6A2838;
   }
+  input.submit.no:disabled, button.no:disabled {
+    background: #CECECE;
+  }
 
   input.submit.gameButton, button.gameButton {
     margin: 2px 4px 2px 4px;
     height: 24px;
   }
   input.submit.gameButton:active, button.gameButton:active {
+  }
+  input.submit.gameButton:disabled, button.gameButton:disabled {
+    background: #CECECE;
   }
 
   input.submit.goToOurGame, button.goToOurGame {
@@ -194,6 +206,9 @@ h4 {
   }
   input.submit.goToOurGame:active, button.goToOurGame:active {
     background: #28386A;
+  }
+  input.submit.goToOurGame:disabled, button.goToOurGame:disabled {
+    background: #CECECE;
   }
 
   input[type=text], input[type=password] {

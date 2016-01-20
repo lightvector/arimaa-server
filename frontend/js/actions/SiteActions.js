@@ -153,21 +153,14 @@ var SiteActions = {
   },
 
   goLoginPageIfNotLoggedInSuccess: function(data) {
-    if(!data.value)
+    if(!data.value) {
+      cookie.remove('siteAuth','/');
+      cookie.remove('username','/');
       window.location.pathname = "/";
+    }
   },
 
   createGame: function(opts) {
-    APIUtils.createGame(opts, SiteActions.createGameSuccess, SiteActions.createGameError);
-  },
-
-  createStandardGame: function(tc,rated) {
-    var opts = {
-      tc: tc,
-      rated: rated,
-      gameType: "standard",
-      siteAuth: UserStore.siteAuthToken()
-    };
     APIUtils.createGame(opts, SiteActions.createGameSuccess, SiteActions.createGameError);
   },
   createGameSuccess: function(data) {
@@ -396,7 +389,6 @@ var SiteActions = {
   joinedOpenGameMetadataSuccess: function(gameAuth,data,startHeartbeats) {
     var seqNum = data.sequence;
     var gameID = data.gameID;
-    var username = UserStore.getUsername();
     var storedGameAuth = UserStore.getJoinedGameAuth(gameID);
 
     ArimaaDispatcher.dispatch({
@@ -461,7 +453,7 @@ var SiteActions = {
     //If we're not one of the players joined to this game, terminate.
     var joined = false;
     for(var j = 0; j<game.openGameData.joined.length; j++) {
-      if(game.openGameData.joined[j].name == username) {
+      if(game.openGameData.joined[j].name === username) {
         joined = true; break;
       }
     }

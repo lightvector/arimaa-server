@@ -168,7 +168,7 @@ var component = React.createClass({
       var joined = false;
       var joinedNotUs = [];
       for(var j = 0; j<metadata.openGameData.joined.length; j++) {
-        if(metadata.openGameData.joined[j].name == username)
+        if(metadata.openGameData.joined[j].name === username)
           joined = true;
         else
           joinedNotUs.push(metadata.openGameData.joined[j]);
@@ -176,7 +176,7 @@ var component = React.createClass({
 
       if(!joined)
         joinAccepts.push(<button className="gameButton" onClick={this.joinGameButtonClicked.bind(this, metadata.gameID)}>Play</button>);
-      else if(metadata.openGameData.creator !== undefined && metadata.openGameData.creator.name != username) {
+      else if(metadata.openGameData.creator !== undefined && metadata.openGameData.creator.name !== username) {
         joinAccepts.push(<span>Requested game, waiting for opponent to reply...</span>);
         if(gameAuth !== null)
           joinAccepts.push(React.createElement("button", {key: "leaveButton_"+metadata.gameID, className: "no", onClick: this.leaveButtonClicked.bind(this,metadata.gameID, gameAuth)}, "Cancel"));
@@ -250,7 +250,7 @@ var component = React.createClass({
       }
     }
     if(metadata.activeGameData !== undefined) {
-      if(metadata.gUser.name == username || metadata.sUser.name == username)
+      if(metadata.gUser.name === username || metadata.sUser.name === username)
         gameButton.push(React.createElement("button", {key: "gameButton_"+metadata.gameID, className: "goToOurGame", onClick: this.gameButtonClicked.bind(this,metadata.gameID)}, "Go to My Game"));
       else
         gameButton.push(React.createElement("button", {key: "gameButton_"+metadata.gameID, className: "gameButton", onClick: this.gameButtonClicked.bind(this,metadata.gameID)}, "Watch Game"));
@@ -298,7 +298,6 @@ var component = React.createClass({
 
   render: function() {
     var that = this;
-    var username = UserStore.getUsername();
 
     var createModal = (
         <Modal isOpen={this.state.createGameDialogOpen} onRequestClose={this.closeCreateDialog}>

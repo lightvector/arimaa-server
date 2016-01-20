@@ -67,11 +67,17 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
   },
 
   getUsername: function() {
-    return cookie.load('username');
+    var username = cookie.load('username');
+    if(!username)
+      return null;
+    return username;
   },
 
   siteAuthToken: function() {
-    return cookie.load('siteAuth');
+    var siteAuth = cookie.load('siteAuth');
+    if(!siteAuth)
+      return null;
+    return siteAuth;
   },
 
   getUsersLoggedIn: function() {
@@ -185,8 +191,8 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
 
       openGames[gameID] = metadata;
       if(metadata.openGameData.creator.name === username ||
-         (metadata.gUser !== undefined && metadata.gUser.name == username) ||
-         (metadata.sUser !== undefined && metadata.sUser.name == username)) {
+         (metadata.gUser !== undefined && metadata.gUser.name === username) ||
+         (metadata.sUser !== undefined && metadata.sUser.name === username)) {
         ownOpenGames[gameID] = metadata;
       }
       else if(metadata.gUser === undefined || metadata.sUser === undefined) {
@@ -198,8 +204,8 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
     }
     else if(metadata.activeGameData !== undefined) {
       activeGames[gameID] = metadata;
-      if(metadata.gUser.name == username ||
-         metadata.sUser.name == username) {
+      if(metadata.gUser.name === username ||
+         metadata.sUser.name === username) {
         ownActiveGames[gameID] = metadata;
       }
       else {
@@ -217,7 +223,7 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
       }
 
       //If we created this game and someone new joined, alert
-      if(metadata.openGameData.creator.name == username) {
+      if(metadata.openGameData.creator.name === username) {
         for(var i = 0; i<newJoined.length; i++) {
           if(newJoined[i] !== username && (prevGameIfOpen === null || !Utils.isUserJoined(prevGameIfOpen,newJoined[i]))) {
             Utils.flashWindowIfNotFocused("User Joined Game");
@@ -371,7 +377,7 @@ const UserStore = Object.assign({}, EventEmitter.prototype, {
       if(action.gameID in openGames &&
          openGames[action.gameID].openGameData !== undefined &&
          openGames[action.gameID].openGameData.creator !== undefined &&
-         openGames[action.gameID].openGameData.creator.name == UserStore.getUsername()) {
+         openGames[action.gameID].openGameData.creator.name === UserStore.getUsername()) {
         leftCreatedGameIDs[action.gameID] = action.gameID;
         if(action.gameID in openGames) delete openGames[action.gameID];
         if(action.gameID in ownOpenGames) delete ownOpenGames[action.gameID];

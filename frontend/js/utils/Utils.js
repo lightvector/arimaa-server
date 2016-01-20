@@ -134,15 +134,15 @@ var Utils = {
   isUserJoined: function(metadata, username) {
     if(metadata.openGameData !== undefined) {
       for(var j = 0; j<metadata.openGameData.joined.length; j++) {
-        if(metadata.openGameData.joined[j].name == username) {
+        if(metadata.openGameData.joined[j].name === username) {
           return true;
         }
       }
     }
     if(metadata.activeGameData !== undefined) {
-      if(metadata.gUser.name == username && metadata.activeGameData.gPresent)
+      if(metadata.gUser.name === username && metadata.activeGameData.gPresent)
         return true;
-      if(metadata.sUser.name == username && metadata.activeGameData.sPresent)
+      if(metadata.sUser.name === username && metadata.activeGameData.sPresent)
         return true;
     }
     return false;
