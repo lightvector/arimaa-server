@@ -8,7 +8,11 @@ var component = React.createClass({
   getInitialState: function() {
     return {
       myColor: ArimaaStore.getMyColor(),
-      arimaa: ArimaaStore.getArimaa()
+      isSendingMoveNow: ArimaaStore.isSendingMoveNow(),
+      isOurTurn: ArimaaStore.isOurTurn(),
+      isSpectator: ArimaaStore.isSpectator(),
+      canUndo: ArimaaStore.canUndo(),
+      canRedo: ArimaaStore.canRedo()
     };
   },
 
@@ -21,15 +25,17 @@ var component = React.createClass({
   _onChange: function() {
     this.setState({
       myColor:ArimaaStore.getMyColor(),
-      arimaa:ArimaaStore.getArimaa()
+      isSendingMoveNow: ArimaaStore.isSendingMoveNow(),
+      isOurTurn: ArimaaStore.isOurTurn(),
+      isSpectator: ArimaaStore.isSpectator(),
+      canUndo: ArimaaStore.canUndo(),
+      canRedo: ArimaaStore.canRedo()
     });
   },
 
   completeMove: function() {
-    if(ArimaaStore.getSetupColor() === ArimaaConstants.GAME.GOLD) {
-      ArimaaActions.sendGoldSetup(this.props.gameID);
-    } else if(ArimaaStore.getSetupColor() === ArimaaConstants.GAME.SILVER) {
-      ArimaaActions.sendSilverSetup(this.props.gameID);
+    if(ArimaaStore.getSetupColor() !== ArimaaConstants.GAME.NULL_COLOR) {
+      ArimaaActions.sendSetup(this.props.gameID);
     } else {
       ArimaaActions.completeMove(this.props.gameID);
     }
@@ -52,15 +58,23 @@ var component = React.createClass({
   },
 
   render: function() {
-    return (
-      <div className="boardButtons">
-        <button onClick={this.completeMove}>Send Move</button>
-        <button onClick={this.undoStep}>Undo Step</button>
-        <button onClick={this.redoStep}>Redo Step</button>
-        <button onClick={this.flipBoard}>Flip Board</button>
-        <button onClick={this.resign}>Resign</button>
-      </div>
-    );
+    var s = this.state;
+    if(s.isSpectator)
+      return (
+        <div className="boardButtons">
+          <button onClick={this.flipBoard}>Flip Board</button>
+        </div>
+      );
+    else
+      return (
+        <div className="boardButtons">
+          <button onClick={this.completeMove} disabled={s.sendingMoveNow || !s.isOurTurn}>Send Move</button>
+          <button onClick={this.undoStep} disabled={s.sendingMoveNow || !s.isOurTurn || !s.canUndo}>Undo Step</button>
+          <button onClick={this.redoStep} disabled={s.sendingMoveNow || !s.isOurTurn || !s.canRedo}>Redo Step</button>
+          <button onClick={this.flipBoard}>Flip Board</button>
+          <button onClick={this.resign}>Resign</button>
+        </div>
+      );
   }
 });
 

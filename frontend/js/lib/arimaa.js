@@ -148,6 +148,14 @@ var Arimaa = function(options) {
     return prevStep;
   }
 
+  function can_undo_step() {
+    return ongoingMove.length > 0;
+  }
+
+  function can_redo_step() {
+    return stepStack.length > 0;
+  }
+
   //need to undo 2 steps if one is a capture
   function undo_step() {
     if(ongoingMove.length === 0) return null;
@@ -223,10 +231,16 @@ var Arimaa = function(options) {
     return {success:true};
   }
 
-  //NO ERROR CHECKING!!!
-  function setup(setupString) {
+  function can_setup() {
     if(halfmoveNumber >= 2)
       return {success: false, reason: "Setup not possible after the first move"};
+    return {success:true};
+  }
+
+  //NO ERROR CHECKING!!!
+  function setup(setupString) {
+    var canComplete = can_setup();
+    if(!canComplete.success) return canComplete;
 
     var stepStrsList = setupString.split(' ');
 
@@ -828,12 +842,11 @@ var Arimaa = function(options) {
     },
 
     //Ra1 Rb1 ...
-    setup_gold: function(setupString) {
+    setup: function(setupString) {
       return setup(setupString);
     },
-
-    setup_silver: function(setupString) {
-      return setup(setupString);
+    can_setup: function() {
+      return can_setup();
     },
 
     //TODO this is ugly!!
@@ -859,6 +872,14 @@ var Arimaa = function(options) {
 
     add_step: function(stepString) {
       return add_step(stepString);
+    },
+
+    can_undo_step: function() {
+      return can_undo_step();
+    },
+
+    can_redo_step: function() {
+      return can_redo_step();
     },
 
     undo_step: function() {

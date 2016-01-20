@@ -227,20 +227,12 @@ var ArimaaActions = {
     });
   },
 
-  sendGoldSetup: function(gameID) {
+  sendSetup: function(gameID) {
     ArimaaDispatcher.dispatch({
-      actionType: ArimaaConstants.ACTIONS.GAME_SEND_SETUP_GOLD,
+      actionType: ArimaaConstants.ACTIONS.GAME_SEND_SETUP,
       gameID: gameID
     });
   },
-
-  sendSilverSetup: function(gameID) {
-    ArimaaDispatcher.dispatch({
-      actionType: ArimaaConstants.ACTIONS.GAME_SEND_SETUP_SILVER,
-      gameID: gameID
-    });
-  },
-
 
   addStep: function(stepString) {
     ArimaaDispatcher.dispatch({
