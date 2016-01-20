@@ -69,4 +69,15 @@ object RandGen {
       throw new IllegalStateException("RandGen.initialize not called")
     secureRand.nextBoolean
   }
+
+
+  def main(args: Array[String]): Unit = {
+    if(args.length != 2)
+      throw new Exception("Args: numInts quantity")
+    initialize()
+    val numInts = args(0).toInt
+    val qty = args(1).toInt
+    for(i <- 1 to qty)
+      println(genToken(numInts))
+  }
 }
