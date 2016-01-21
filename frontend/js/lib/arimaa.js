@@ -472,8 +472,8 @@ var Arimaa = function(options) {
     //var stepObj = {piece:piece,squareNum:squareNum,direction:direction,string:stepString};
     var stepObj = ArimaaStep(piece, squareNum, direction);
 
-    if(piece === GRABBIT && direction === 's') return {success:false, stepsLeft: stepsLeft};
-    if(piece === SRABBIT && direction === 'n') return {success:false, stepsLeft: stepsLeft};
+    if(colorToMove === GOLD && piece === GRABBIT && direction === 's') return {success:false, stepsLeft: stepsLeft};
+    if(colorToMove === SILVER && piece === SRABBIT && direction === 'n') return {success:false, stepsLeft: stepsLeft};
 
     if(ongoingMove.length) {
       var prevStep = get_prev_step_no_caps();

@@ -10,13 +10,14 @@ var CreateGameDialog = React.createClass({
 
   //Time controls to choose between
   timeControls: [
-    {label:"Lightning", tc:{initialTime:360, increment:5, overtimeAfter:70}},
-    {label:"Blitz", tc:{initialTime:480, increment:10, overtimeAfter:70}},
-    {label:"Fast",  tc:{initialTime:960, increment:20, overtimeAfter:70}},
-    {label:"Normal", tc:{initialTime:1800, increment:30, overtimeAfter:70}},
-    {label:"Slow", tc:{initialTime:2700, increment:45, overtimeAfter:70}},
-    {label:"Blitz (delay)", tc:{initialTime:480, delay:15, overtimeAfter:70}},
-    {label:"Fast (delay)",  tc:{initialTime:960, delay:30, overtimeAfter:70}},
+    {label:"Lightning", tc:{initialTime:180, increment:6, overtimeAfter:70}},
+    {label:"Blitz", tc:{initialTime:360, increment:12, overtimeAfter:70}},
+    {label:"Fast",  tc:{initialTime:600, increment:20, overtimeAfter:70}},
+    {label:"Normal", tc:{initialTime:900, increment:30, overtimeAfter:70}},
+    {label:"Steady", tc:{initialTime:1200, increment:40, overtimeAfter:70}},
+    {label:"Slow", tc:{initialTime:1800, increment:60, overtimeAfter:70}},
+    {label:"Blitz (delay)", tc:{initialTime:360, delay:18, overtimeAfter:70}},
+    {label:"Fast (delay)",  tc:{initialTime:600, delay:30, overtimeAfter:70}},
   ],
 
   handleTCChange: function(event) {
