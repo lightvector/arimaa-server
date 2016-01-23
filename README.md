@@ -1,5 +1,5 @@
 # arimaa-server
-This site is currently live in alpha at: [playArimaa.org](http://playarimaa.org/)
+This site is currently live in alpha at: [playarimaa.org](http://playarimaa.org/)
 
 ## Getting started
 
