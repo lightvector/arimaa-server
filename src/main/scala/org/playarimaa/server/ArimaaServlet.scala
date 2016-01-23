@@ -4,17 +4,13 @@ import org.scalatra.scalate.ScalateSupport
 
 import org.json4s.{DefaultFormats, Formats}
 import org.scalatra.json.JacksonJsonSupport
+import org.json4s.jackson.Serialization
 
-case class Response(message: String, message2: Option[String], timestamp: Long)
-object Response {
-  def create(message: String): Response = {
-    val timestamp = System.currentTimeMillis()
-    Response(message,None,timestamp)
-  }
-  def create(message: String, message2: String): Response = {
-    val timestamp = System.currentTimeMillis()
-    Response(message,Some(message2),timestamp)
-  }
+import org.playarimaa.server.CommonTypes._
+import org.playarimaa.server.Utils._
+
+object IOTypes {
+  case class SimpleError(error: String)
 }
 
 class ArimaaServlet(val siteLogin: SiteLogin)
@@ -108,9 +104,12 @@ class ArimaaServlet(val siteLogin: SiteLogin)
   }
 
   get("/debug/?") {
-    contentType="text/html"
-    val path = "/board.html"
-    new java.io.File( getServletContext().getResource(path).getFile )
+    if(Mode.isProd)
+      Json.write(IOTypes.SimpleError("Debug page not available in production mode"))
+    else {
+      contentType="text/html"
+      val path = "/board.html"
+      new java.io.File( getServletContext().getResource(path).getFile )
+    }
   }
-
 }
