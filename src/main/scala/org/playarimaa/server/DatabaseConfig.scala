@@ -20,15 +20,13 @@ object DatabaseConfig {
   //Switch which db we load based on whether we are in prod or test. See /project/Build.scala for the run configurations
   //that take advantage of this
   lazy val whichDB: WhichDB = {
-    System.getProperty("isProd") match {
-      case "true" =>
-        logger.info("Using PostgresDB")
+    Mode.isProd match {
+      case true =>
+        logger.info("Server in production mode - using PostgresDB")
         PostgresDB
-      case "false" =>
-        logger.info("Using H2DB")
+      case false =>
+        logger.info("Server in testing mode - using H2DB")
         H2DB
-      case null => throw new Exception("isProd system property undefined, expected \"true\" or \"false\"")
-      case x => throw new Exception("Unexpected value for isProd system property, expected \"true\" or \"false\": " + x)
     }
   }
 
@@ -66,4 +64,3 @@ object DatabaseConfig {
     }
   }
 }
-
