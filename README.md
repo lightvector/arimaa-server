@@ -29,7 +29,9 @@ To run the server separately, not within SBT, such as you might do on a producti
 6. Download an appropriate Java servlet engine such as Jetty: http://www.eclipse.org/jetty/. For a quick lightweight start, consider Jetty Runner: http://www.eclipse.org/jetty/documentation/9.2.3.v20140905/runner.html
 7. Within sbt, run `clean` and then `package` to build a ".war" file in target/scala-2.11/. This is the packaged servlet that can then be run using Jetty or the servlet engine. Note that `clean` is often necessary here because if there are stale unused build files left over from development, they can sometimes actually get packaged in with the .war file  and cause issues.
 
-## SBT memory configuration
+## Troubleshooting Notes
+
+### SBT memory issues
 
 Note that to avoid memory leaks via Java's permanent generation in a long-running sbt process,
 you may need to edit your sbt configuration (i.e. the sbt script installed at ~/bin/sbt) if
@@ -39,6 +41,17 @@ to call Java with the following flags:
     -XX:+CMSClassUnloadingEnabled
     -XX:+UseConcMarkSweepGC
     -XX:MaxPermSize=1G
+
+### Scala SBT file name length errors
+
+If during a compile in SBT you encounter the error `filename too long` or similar, it may be due to sbt trying to generate a file whose name exceeds the max allowed filename length on your system. See if you can specify an override for your sbt install to cap the filename length it uses:
+
+http://stackoverflow.com/questions/28565837/filename-too-long-sbt
+
+### Port 8080 already in use, BindException
+
+If you see an error like `java.net.BindException Address already in use` or similar, it may be because you already have some software or program or server running that is listening on port 8080, which is the port this server attempts to listen on. If you are running from within SBT, try locally editing the `++ jetty(port=8080)` in project/Build.scala to specify a different port not in use. If you are running using a servlet engine like Jetty with the packaged servlet as a ".war" file, see the documentation on that engine on how to specify the port.
+
 
 ## API
 
@@ -59,4 +72,3 @@ See the included LICENSE.txt file for more details: https://github.com/lightvect
 * lightvector
 * mattj256
 * aaronyzhou
-

@@ -70,7 +70,7 @@ object ArimaaServerBuild extends Build {
       //New commands in sbt
       commands ++= Seq(startServerProd, startServerTest)
 
-    ) ++ jetty()
+    ) ++ jetty(port=8080)
   )
 
   //Start the server in production mode (currently, this affects how we initialize the DB - see DatabaseConfig.scala)
