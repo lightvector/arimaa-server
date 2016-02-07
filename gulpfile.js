@@ -8,6 +8,7 @@ var browserify = require('browserify');
 var reactify = require('reactify');
 var streamify = require('gulp-streamify');
 var uglify = require('gulp-uglify');
+var gutil = require('gulp-util');
 var source = require('vinyl-source-stream');
 var minifer = require('gulp-uglify/minifier');
 var uglifyjs = require('uglify-js');
@@ -60,7 +61,7 @@ function buildScript(filename, watch) {
     if(process.env.NODE_ENV === 'production') {
       return stream.on('error', onError)
       .pipe(source(filename))
-      .pipe(streamify(minifer({}, uglifyjs)))
+      .pipe(streamify(minifer({}, uglifyjs).on('error', gutil.log)))
       .pipe(rename({
             extname: '.min.js'
       }))
