@@ -25,7 +25,7 @@ Utils.initWindowOnFocus();
 const createBrowserHistory = require('history/lib/createBrowserHistory');
 
 const App = React.createClass({
-  render() {
+  render: function() {
     return (
       <div className="app" >
         {this.props.children}

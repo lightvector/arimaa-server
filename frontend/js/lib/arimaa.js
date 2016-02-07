@@ -906,7 +906,7 @@ var Arimaa = function(options) {
       return can_complete_move();
     },
 
-    has_uncompleted_push() {
+    has_uncompleted_push: function() {
       return has_uncompleted_push();
     },
 
