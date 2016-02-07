@@ -9,9 +9,13 @@ import org.json4s.jackson.Serialization
 import org.playarimaa.server.CommonTypes._
 import org.playarimaa.server.Utils._
 
-object IOTypes {
-  case class SimpleError(error: String)
+object ArimaaServlet {
+  object IOTypes {
+    case class SimpleError(error: String)
+  }
 }
+
+import org.playarimaa.server.AccountServlet._
 
 class ArimaaServlet(val siteLogin: SiteLogin)
     extends WebAppStack with JacksonJsonSupport with ScalateSupport {
