@@ -172,6 +172,9 @@ var Utils = {
     return title;
   },
 
+  linkifyStr: function(chatStr) {
+    return chatStr.replace( /((http:\/\/)?www\.[^\s]+)/gi , '<a href="$1">$1</a>' );
+  },
 
   userDisplayStr: function(userInfo) {
     if(userInfo === null) return "";

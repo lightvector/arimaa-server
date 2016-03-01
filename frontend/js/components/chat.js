@@ -190,7 +190,7 @@ var chatBox = React.createClass({
       var lineContents = [
         Utils.timeToHHMMSS(line.timestamp) + " ",
         React.createElement("b", {key: "chatLineName_"+line.id}, line.username + ": "),
-        line.text
+        Utils.linkifyStr(line.text)
       ];
       return React.createElement("tr", {key: "chatLine_"+line.id}, React.createElement("td", {key: "chatLineTD_"+line.id}, lineContents));
     });
